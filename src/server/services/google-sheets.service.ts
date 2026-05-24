@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { google } from 'googleapis';
 import { prisma } from '../index.js';
 import { encrypt, decrypt } from '../utils/auth.js';
@@ -137,11 +136,6 @@ export class GoogleSheetsService {
       requestBody: { values },
     });
 
-    // Get spreadsheet URL
-    const spreadsheet = await sheets.spreadsheets.get({
-      spreadsheetId,
-    });
-
     return {
       synced: contacts.length,
       spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
@@ -184,14 +178,14 @@ export class GoogleSheetsService {
     for (const row of dataRows) {
       try {
         const contactData: any = {};
-        headers.forEach((header, index) => {
+        headers.forEach((header: string, index: number) => {
           contactData[header.toLowerCase().replace(/\s+/g, '_')] = row[index] || '';
         });
 
         // Map common fields
         await prisma.contact.upsert({
           where: {
-            phone_businessId: {
+            businessId_phone: {
               phone: contactData.phone || '',
               businessId,
             },
@@ -278,6 +272,7 @@ export class GoogleSheetsService {
 
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
 
+    // Create spreadsheet with a Contacts sheet
     const spreadsheet = await sheets.spreadsheets.create({
       requestBody: {
         properties: {

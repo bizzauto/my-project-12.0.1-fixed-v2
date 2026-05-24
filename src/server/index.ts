@@ -98,7 +98,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'https://bizzautoai.com',
   credentials: true,
 }));
-// app.use(compression());
+app.use(compression());
 app.use(morgan('combined', {
   stream: { write: (message) => logger.info(message.trim()) }
 }));
@@ -145,20 +145,20 @@ app.use('/api/two-factor', twoFactorRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 
-// Test GET endpoint
-app.get('/test-get', (req, res) => {
-  res.json({ success: true, method: 'GET' });
-});
+// Test endpoints (development only)
+if (NODE_ENV !== 'production') {
+  app.get('/test-get', (req, res) => {
+    res.json({ success: true, method: 'GET' });
+  });
 
-// Test POST endpoint - no body
-app.post('/test-nobody', (req, res) => {
-  res.json({ success: true, method: 'POST', hasBody: !!req.body });
-});
+  app.post('/test-nobody', (req, res) => {
+    res.json({ success: true, method: 'POST', hasBody: !!req.body });
+  });
 
-// Test POST endpoint with body
-app.post('/test', (req, res) => {
-  res.json({ success: true, body: req.body });
-});
+  app.post('/test', (req, res) => {
+    res.json({ success: true, body: req.body });
+  });
+}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -182,6 +182,18 @@ if (NODE_ENV === 'production') {
     }
   });
 }
+// Startup validation for critical secrets
+(() => {
+  const missing: string[] = [];
+  if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
+  if (!process.env.ENCRYPTION_KEY) missing.push('ENCRYPTION_KEY');
+  if (missing.length > 0) {
+    const msg = `CRITICAL: Missing required environment variables: ${missing.join(', ')}. Server will start but secrets will be auto-generated. Set these in production!`;
+    logger.warn(msg);
+    console.warn(`WARNING: ${msg}`);
+  }
+})();
+
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error('Error:', {
@@ -215,7 +227,8 @@ process.on('unhandledRejection', (error: any) => {
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
   await prisma.$disconnect();
-  process.exit(0);
+  logger.on('finish', () => process.exit(0));
+  logger.end();
 });
 
 process.on('uncaughtException', async (error) => {

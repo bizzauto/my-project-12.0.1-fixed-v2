@@ -1,15 +1,26 @@
 import OpenAI from 'openai';
-// @ts-nocheck
 import axios from 'axios';
-import { prisma } from '../../index';
+import { prisma } from '../index.js';
 
-// AI Provider Configuration
+// AI Provider Configuration — lazy init to avoid crash when env vars are missing
+let _openrouterClient: OpenAI | null = null;
+function getOpenRouterClient(): OpenAI {
+  if (!_openrouterClient) {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('OpenRouter API key not configured. Set OPENROUTER_API_KEY in .env');
+    }
+    _openrouterClient = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey,
+    });
+  }
+  return _openrouterClient;
+}
+
 const providers = {
   openrouter: {
-    client: new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY || '',
-    }),
+    get client() { return getOpenRouterClient(); },
     models: {
       text: 'meta-llama/llama-3.2-3b-instruct',
       code: 'meta-llama/llama-3.1-70b-instruct',

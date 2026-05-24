@@ -1,6 +1,6 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate, requireRole } from '../middleware/auth.js';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import axios from 'axios';
 
 const router = Router();
@@ -11,7 +11,7 @@ router.use(authenticate);
 // ==================== AUTOMATION RULES ====================
 
 // Get all automation rules for business
-router.get('/rules', async (req: any, res: any) => {
+router.get('/rules', async (req: AuthRequest, res: Response) => {
   try {
     const rules = await prisma.chatbotFlow.findMany({
       where: { businessId: req.user.businessId },
@@ -29,7 +29,7 @@ router.get('/rules', async (req: any, res: any) => {
 });
 
 // Get single automation rule
-router.get('/rules/:id', async (req: any, res: any) => {
+router.get('/rules/:id', async (req: AuthRequest, res: Response) => {
   try {
     const rule = await prisma.chatbotFlow.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -53,14 +53,14 @@ router.get('/rules/:id', async (req: any, res: any) => {
 });
 
 // Create automation rule
-router.post('/rules', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.post('/rules', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, triggerType, isActive } = req.body;
+    const { name, trigger, keywords, response, aiEnabled } = req.body;
 
-    if (!name || !triggerType) {
+    if (!name) {
       return res.status(400).json({
         success: false,
-        error: 'Name and triggerType are required',
+        error: 'Name is required',
       });
     }
 
@@ -68,9 +68,10 @@ router.post('/rules', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) 
       data: {
         businessId: req.user.businessId,
         name,
-        description: description || '',
-        triggerType,
-        isActive: false,
+        trigger: trigger || 'keyword',
+        keywords: keywords || [],
+        response: response || '',
+        aiEnabled: aiEnabled || false,
       },
     });
 
@@ -86,7 +87,7 @@ router.post('/rules', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) 
 
 // Update automation rule
 // Toggle automation rule
-router.patch('/rules/:id/toggle', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.patch('/rules/:id/toggle', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const rule = await prisma.chatbotFlow.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -119,7 +120,7 @@ router.patch('/rules/:id/toggle', requireRole('OWNER', 'ADMIN'), async (req: any
 });
 
 // Delete automation rule
-router.delete('/rules/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.delete('/rules/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     await prisma.chatbotFlow.delete({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -136,7 +137,7 @@ router.delete('/rules/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res:
 });
 
 // Get n8n connection status
-router.get('/n8n/status', async (req: any, res: any) => {
+router.get('/n8n/status', async (req: AuthRequest, res: Response) => {
   try {
     const n8nUrl = process.env.N8N_URL || 'http://n8n:5678';
 
@@ -170,7 +171,7 @@ router.get('/n8n/status', async (req: any, res: any) => {
 });
 
 // Forward webhook to n8n workflow
-router.post('/n8n/trigger/:workflowId', async (req: any, res: any) => {
+router.post('/n8n/trigger/:workflowId', async (req: AuthRequest, res: Response) => {
   try {
     const { workflowId } = req.params;
     const n8nUrl = process.env.N8N_URL || 'http://n8n:5678';
@@ -193,7 +194,7 @@ router.post('/n8n/trigger/:workflowId', async (req: any, res: any) => {
 });
 
 // Get n8n workflows
-router.get('/n8n/workflows', async (req: any, res: any) => {
+router.get('/n8n/workflows', async (req: AuthRequest, res: Response) => {
   try {
     const n8nUrl = process.env.N8N_URL || 'http://n8n:5678';
 
@@ -226,7 +227,7 @@ router.get('/n8n/workflows', async (req: any, res: any) => {
 });
 
 // Trigger n8n workflow (alternative endpoint)
-router.post('/n8n/workflows/:workflowId/trigger', async (req: any, res: any) => {
+router.post('/n8n/workflows/:workflowId/trigger', async (req: AuthRequest, res: Response) => {
   try {
     const { workflowId } = req.params;
     const n8nUrl = process.env.N8N_URL || 'http://n8n:5678';
@@ -248,12 +249,12 @@ router.post('/n8n/workflows/:workflowId/trigger', async (req: any, res: any) => 
 });
 
 // Get auto-reply templates
-router.get('/templates', async (req: any, res: any) => {
+router.get('/templates', async (req: AuthRequest, res: Response) => {
   try {
     const templates = await prisma.chatbotFlow.findMany({
       where: {
         businessId: req.user.businessId,
-        triggerType: 'auto_reply',
+        trigger: 'auto_reply',
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -269,7 +270,7 @@ router.get('/templates', async (req: any, res: any) => {
 });
 
 // Get auto-reply settings
-router.get('/settings', async (req: any, res: any) => {
+router.get('/settings', async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
@@ -291,7 +292,7 @@ router.get('/settings', async (req: any, res: any) => {
 });
 
 // Update auto-reply settings
-router.put('/settings', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.put('/settings', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { autoReplyEnabled, autoReplyMessage, businessHours } = req.body;
 
@@ -322,7 +323,7 @@ router.put('/settings', requireRole('OWNER', 'ADMIN'), async (req: any, res: any
 });
 
 // Get all automations for business
-router.get('/automations', async (req: any, res: any) => {
+router.get('/automations', async (req: AuthRequest, res: Response) => {
   try {
     const { page = '1', limit = '20', type, isActive } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -362,7 +363,7 @@ router.get('/automations', async (req: any, res: any) => {
 });
 
 // Create new automation
-router.post('/automations', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.post('/automations', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { name, type, trigger, actions, isActive, config } = req.body;
 
@@ -395,7 +396,7 @@ router.post('/automations', requireRole('OWNER', 'ADMIN'), async (req: any, res:
 });
 
 // Update automation
-router.put('/automations/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.put('/automations/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const automation = await prisma.automationRule.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -424,7 +425,7 @@ router.put('/automations/:id', requireRole('OWNER', 'ADMIN'), async (req: any, r
 });
 
 // Delete automation
-router.delete('/automations/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.delete('/automations/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const automation = await prisma.automationRule.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -452,7 +453,7 @@ router.delete('/automations/:id', requireRole('OWNER', 'ADMIN'), async (req: any
 });
 
 // Toggle automation (activate/pause)
-router.post('/automations/:id/toggle', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.post('/automations/:id/toggle', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const automation = await prisma.automationRule.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -485,7 +486,7 @@ router.post('/automations/:id/toggle', requireRole('OWNER', 'ADMIN'), async (req
 });
 
 // Get automation templates
-router.get('/automations/templates', async (req: any, res: any) => {
+router.get('/automations/templates', async (req: AuthRequest, res: Response) => {
   try {
     const templates = [
       {
@@ -601,4 +602,4 @@ router.get('/automations/templates', async (req: any, res: any) => {
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

@@ -1,16 +1,20 @@
-// @ts-nocheck\n
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 // Get reviews
-router.get('/', authenticate, async (req: any, res: any) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { page = 1, limit = 50, status } = req.query;
     const where: any = { businessId: req.user.businessId };
-    if (status) where.isRead = status === 'unread' ? false : true;
+
+    if (status === 'unread') {
+      where.isRead = false;
+    } else if (status === 'read') {
+      where.isRead = true;
+    }
 
     const [reviews, total] = await Promise.all([
       prisma.review.findMany({ where, skip: (Number(page) - 1) * Number(limit), take: Number(limit), orderBy: { createdAt: 'desc' } }),
@@ -24,7 +28,7 @@ router.get('/', authenticate, async (req: any, res: any) => {
 });
 
 // Update review reply
-router.put('/:id/reply', authenticate, async (req: any, res: any) => {
+router.put('/:id/reply', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { replyText } = req.body;
     await prisma.review.update({
@@ -38,7 +42,7 @@ router.put('/:id/reply', authenticate, async (req: any, res: any) => {
 });
 
 // Get review stats
-router.get('/stats', authenticate, async (req: any, res: any) => {
+router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user.businessId;
 
@@ -80,19 +84,90 @@ router.get('/stats', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Sync reviews (placeholder for Google Business Profile integration)
-router.post('/sync', authenticate, async (req: any, res: any) => {
+// Sync reviews from Google Business Profile
+router.post('/sync', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    // This would integrate with Google Business Profile API
-    // For now, return success
+    // Get GBP credentials
+    const business = await prisma.business.findUnique({
+      where: { id: req.user.businessId },
+      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
+    });
+
+    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Google Business Profile not connected. Please connect in Settings → Integrations.',
+      });
+    }
+
+    // Fetch reviews from Google My Business API
+    const axios = await import('axios');
+    const { decrypt } = await import('../utils/auth.js');
+    const accessToken = decrypt(business.gbpAccessToken);
+
+    const response = await axios.default.get(
+      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/reviews`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        params: { pageSize: 100 },
+      }
+    );
+
+    const gbpReviews = response.data.reviews || [];
+    let synced = 0;
+
+    for (const gbpReview of gbpReviews) {
+      // Map GBP star rating to numeric
+      const starMap: Record<string, number> = {
+        FIVE: 5, FOUR: 4, THREE: 3, TWO: 2, ONE: 1,
+      };
+      const rating = starMap[gbpReview.starRating] || 0;
+      const externalId = gbpReview.reviewId || gbpReview.name;
+
+      if (!externalId) continue;
+
+      // Check if already synced
+      const existing = await prisma.review.findFirst({
+        where: { businessId: req.user.businessId, externalId },
+      });
+
+      const reviewData = {
+        businessId: req.user.businessId,
+        platform: 'google' as const,
+        externalId,
+        reviewerName: gbpReview.reviewer?.displayName || 'Anonymous',
+        reviewerEmail: gbpReview.reviewer?.email || undefined,
+        rating,
+        text: gbpReview.comment || '',
+        reviewDate: gbpReview.createTime ? new Date(gbpReview.createTime) : new Date(),
+        isPublished: true,
+        replyText: gbpReview.reviewReply?.comment || null,
+        replyStatus: gbpReview.reviewReply?.comment ? 'replied' as const : null,
+        repliedAt: gbpReview.reviewReply?.updateTime ? new Date(gbpReview.reviewReply.updateTime) : null,
+      };
+
+      if (existing) {
+        await prisma.review.update({
+          where: { id: existing.id },
+          data: reviewData,
+        });
+      } else {
+        await prisma.review.create({
+          data: reviewData,
+        });
+      }
+      synced++;
+    }
+
     res.json({
       success: true,
-      message: 'Review sync initiated',
-      data: { synced: 0, message: 'Google Business Profile integration required' },
+      message: `Synced ${synced} reviews from Google Business Profile`,
+      data: { synced },
     });
   } catch (error: any) {
+    console.error('Review sync error:', error);
     res.status(500).json({ success: false, error: 'Failed to sync reviews', details: error.message });
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

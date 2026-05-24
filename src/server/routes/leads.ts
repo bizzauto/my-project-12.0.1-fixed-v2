@@ -1,7 +1,7 @@
-// @ts-nocheck
+
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { LeadCaptureService } from '../services/lead-capture.service.js';
 import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EmailService } from '../services/email.service.js';
@@ -234,7 +234,7 @@ router.post('/manual', async (req: Request, res: Response) => {
  * GET /api/leads
  * List all leads with filters
  */
-router.get('/', authenticate, async (req: any, res: any) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user.businessId;
 
@@ -305,7 +305,7 @@ router.get('/', authenticate, async (req: any, res: any) => {
  * GET /api/leads/stats
  * Get lead statistics
  */
-router.get('/stats', authenticate, async (req: any, res: any) => {
+router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user.businessId;
 
@@ -324,12 +324,23 @@ router.get('/stats', authenticate, async (req: any, res: any) => {
       }),
     ]);
 
+    // Fix: groupBy on full timestamp doesn't aggregate by month, so we post-process
+    const monthlyMap = new Map<string, number>();
+    for (const entry of leadsByMonth) {
+      const month = (entry.createdAt as Date).toISOString().slice(0, 7); // YYYY-MM
+      monthlyMap.set(month, (monthlyMap.get(month) || 0) + entry._count);
+    }
+    const leadsByMonthAggregated = Array.from(monthlyMap.entries())
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-12);
+
     res.json({
       success: true,
       data: {
         totalLeads,
         leadsBySource,
-        leadsByMonth: leadsByMonth.slice(-12),
+        leadsByMonth: leadsByMonthAggregated,
       },
     });
   } catch (error: any) {
@@ -342,7 +353,7 @@ router.get('/stats', authenticate, async (req: any, res: any) => {
  * POST /api/leads/export/csv
  * Export leads as CSV
  */
-router.post('/export/csv', authenticate, async (req: any, res: any) => {
+router.post('/export/csv', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user.businessId;
     const { leadIds } = req.body;
@@ -353,7 +364,13 @@ router.post('/export/csv', authenticate, async (req: any, res: any) => {
     const contacts = await prisma.contact.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      take: 10000, // Max 10,000 rows per export
     });
+
+    res.setHeader('X-Total-Count', String(contacts.length));
+    if (contacts.length >= 10000) {
+      res.setHeader('X-Warning', 'Export limited to 10,000 rows. Filter your data for complete export.');
+    }
 
     const headers = ['Name', 'Phone', 'Email', 'Company', 'Location', 'Product', 'Supplier', 'Requirement', 'Source', 'Tags', 'Deal Value', 'Created At'];
     const rows = contacts.map((c: any) => [
@@ -380,7 +397,7 @@ router.post('/export/csv', authenticate, async (req: any, res: any) => {
  * POST /api/leads/export/excel
  * Export leads as Excel (simple XML spreadsheet format)
  */
-router.post('/export/excel', authenticate, async (req: any, res: any) => {
+router.post('/export/excel', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user.businessId;
     const { leadIds } = req.body;
@@ -416,7 +433,7 @@ router.post('/export/excel', authenticate, async (req: any, res: any) => {
  * POST /api/leads/export/sheets
  * Sync leads to Google Sheets
  */
-router.post('/export/sheets', authenticate, async (req: any, res: any) => {
+router.post('/export/sheets', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user.businessId;
     const { leadIds } = req.body;
@@ -434,7 +451,7 @@ router.post('/export/sheets', authenticate, async (req: any, res: any) => {
  * POST /api/leads/bulk-reply
  * Send bulk reply to leads via WhatsApp/Email/SMS
  */
-router.post('/bulk-reply', authenticate, async (req: any, res: any) => {
+router.post('/bulk-reply', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user.businessId;
     const { leadIds, channel, message } = req.body;
@@ -496,7 +513,7 @@ router.post('/bulk-reply', authenticate, async (req: any, res: any) => {
  * DELETE /api/leads/:id
  * Delete a lead/contact
  */
-router.delete('/:id', authenticate, async (req: any, res: any) => {
+router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const businessId = req.user.businessId;
@@ -594,4 +611,4 @@ router.post('/capture/:businessId', async (req: Request, res: Response) => {
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

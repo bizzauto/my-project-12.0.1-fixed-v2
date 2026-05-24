@@ -1,7 +1,7 @@
-// @ts-nocheck
-import { Router } from 'express';
+
+import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate, requireBusinessOwner } from '../middleware/auth.js';
+import { authenticate, requireBusinessOwner, AuthRequest } from '../middleware/auth.js';
 import axios from 'axios';
 import { encrypt, decrypt } from '../utils/auth';
 
@@ -32,7 +32,7 @@ async function getWhatsAppCredentials(businessId: string) {
 }
 
 // WhatsApp webhook endpoint (public)
-router.post('/webhook/:businessId', async (req: any, res: any) => {
+router.post('/webhook/:businessId', async (req: Request, res: Response) => {
   try {
     const { businessId } = req.params;
     const body = req.body;
@@ -147,7 +147,7 @@ router.post('/webhook/:businessId', async (req: any, res: any) => {
 });
 
 // Get WhatsApp conversations
-router.get('/conversations', authenticate, async (req: any, res: any) => {
+router.get('/conversations', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { page = 1, limit = 50, status } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -204,7 +204,7 @@ router.get('/conversations', authenticate, async (req: any, res: any) => {
 });
 
 // Get conversation with a specific contact
-router.get('/conversation/:contactId', authenticate, async (req: any, res: any) => {
+router.get('/conversation/:contactId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { contactId } = req.params;
     const { page = 1, limit = 100 } = req.query;
@@ -264,7 +264,7 @@ router.get('/conversation/:contactId', authenticate, async (req: any, res: any) 
 });
 
 // Send text message
-router.post('/send/text', authenticate, async (req: any, res: any) => {
+router.post('/send/text', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { contactId, content } = req.body;
 
@@ -371,7 +371,7 @@ router.post('/send/text', authenticate, async (req: any, res: any) => {
 });
 
 // Send template message
-router.post('/send/template', authenticate, async (req: any, res: any) => {
+router.post('/send/template', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { contactId, templateName, languageCode = 'en', components } = req.body;
 
@@ -458,7 +458,7 @@ router.post('/send/template', authenticate, async (req: any, res: any) => {
 });
 
 // Connect WhatsApp (Embedded Signup URL)
-router.post('/connect', authenticate, requireBusinessOwner, async (req: any, res: any) => {
+router.post('/connect', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
@@ -493,7 +493,7 @@ router.post('/connect', authenticate, requireBusinessOwner, async (req: any, res
 });
 
 // Get WhatsApp templates
-router.get('/templates', authenticate, async (req: any, res: any) => {
+router.get('/templates', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
@@ -536,7 +536,7 @@ router.get('/templates', authenticate, async (req: any, res: any) => {
 // ==================== SCHEDULED MESSAGES ====================
 
 // Create a scheduled message
-router.post('/schedule', authenticate, async (req: any, res: any) => {
+router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { contactId, phone, type, content, mediaUrl, mediaType, templateName, templateVars, templateLanguage, scheduledAt, timezone } = req.body;
 
@@ -599,7 +599,7 @@ router.post('/schedule', authenticate, async (req: any, res: any) => {
 });
 
 // Get all scheduled messages
-router.get('/scheduled', authenticate, async (req: any, res: any) => {
+router.get('/scheduled', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { status, page = 1, limit = 50 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -629,7 +629,7 @@ router.get('/scheduled', authenticate, async (req: any, res: any) => {
 });
 
 // Cancel a scheduled message
-router.patch('/scheduled/:id/cancel', authenticate, async (req: any, res: any) => {
+router.patch('/scheduled/:id/cancel', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -658,7 +658,7 @@ router.patch('/scheduled/:id/cancel', authenticate, async (req: any, res: any) =
 });
 
 // Update a scheduled message
-router.patch('/scheduled/:id', authenticate, async (req: any, res: any) => {
+router.patch('/scheduled/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { content, scheduledAt, phone, templateName, templateVars } = req.body;
@@ -703,7 +703,7 @@ router.patch('/scheduled/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Delete a scheduled message
-router.delete('/scheduled/:id', authenticate, async (req: any, res: any) => {
+router.delete('/scheduled/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -728,7 +728,7 @@ router.delete('/scheduled/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Get messages for a specific contact (alias for conversation endpoint)
-router.get('/messages/:contactId', authenticate, async (req: any, res: any) => {
+router.get('/messages/:contactId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { contactId } = req.params;
     const { page = 1, limit = 100 } = req.query;
@@ -788,7 +788,7 @@ router.get('/messages/:contactId', authenticate, async (req: any, res: any) => {
 });
 
 // Send image message
-router.post('/send/image', authenticate, async (req: any, res: any) => {
+router.post('/send/image', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { contactId, imageUrl, caption } = req.body;
 
@@ -880,7 +880,7 @@ router.post('/send/image', authenticate, async (req: any, res: any) => {
 });
 
 // Create template
-router.post('/templates', authenticate, requireBusinessOwner, async (req: any, res: any) => {
+router.post('/templates', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
     const { name, category, language, components } = req.body;
 
@@ -935,7 +935,7 @@ router.post('/templates', authenticate, requireBusinessOwner, async (req: any, r
 });
 
 // Delete template
-router.delete('/templates/:id', authenticate, requireBusinessOwner, async (req: any, res: any) => {
+router.delete('/templates/:id', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -976,9 +976,9 @@ router.delete('/templates/:id', authenticate, requireBusinessOwner, async (req: 
 });
 
 // Get auto-replies
-router.get('/auto-replies', authenticate, async (req: any, res: any) => {
+router.get('/auto-replies', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const autoReplies = await prisma['autoReply'].findMany({
+    const autoReplies = await prisma.autoReply.findMany({
       where: {
         businessId: req.user.businessId,
         isActive: true,
@@ -1000,7 +1000,7 @@ router.get('/auto-replies', authenticate, async (req: any, res: any) => {
 });
 
 // Create auto-reply
-router.post('/auto-replies', authenticate, requireBusinessOwner, async (req: any, res: any) => {
+router.post('/auto-replies', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
     const { keyword, response, isActive = true } = req.body;
 
@@ -1011,7 +1011,7 @@ router.post('/auto-replies', authenticate, requireBusinessOwner, async (req: any
       });
     }
 
-    const autoReply = await prisma['autoReply'].create({
+    const autoReply = await prisma.autoReply.create({
       data: {
         businessId: req.user.businessId,
         keyword,
@@ -1035,12 +1035,12 @@ router.post('/auto-replies', authenticate, requireBusinessOwner, async (req: any
 });
 
 // Update auto-reply
-router.put('/auto-replies/:id', authenticate, requireBusinessOwner, async (req: any, res: any) => {
+router.put('/auto-replies/:id', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { keyword, response, isActive } = req.body;
 
-    const autoReply = await prisma['autoReply'].findFirst({
+    const autoReply = await prisma.autoReply.findFirst({
       where: {
         id,
         businessId: req.user.businessId,
@@ -1054,7 +1054,7 @@ router.put('/auto-replies/:id', authenticate, requireBusinessOwner, async (req: 
       });
     }
 
-    const updated = await prisma['autoReply'].update({
+    const updated = await prisma.autoReply.update({
       where: { id },
       data: {
         ...(keyword && { keyword }),
@@ -1078,11 +1078,11 @@ router.put('/auto-replies/:id', authenticate, requireBusinessOwner, async (req: 
 });
 
 // Delete auto-reply
-router.delete('/auto-replies/:id', authenticate, requireBusinessOwner, async (req: any, res: any) => {
+router.delete('/auto-replies/:id', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const autoReply = await prisma['autoReply'].findFirst({
+    const autoReply = await prisma.autoReply.findFirst({
       where: {
         id,
         businessId: req.user.businessId,
@@ -1096,7 +1096,7 @@ router.delete('/auto-replies/:id', authenticate, requireBusinessOwner, async (re
       });
     }
 
-    await prisma['autoReply'].delete({ where: { id } });
+    await prisma.autoReply.delete({ where: { id } });
 
     res.json({
       success: true,
@@ -1113,7 +1113,7 @@ router.delete('/auto-replies/:id', authenticate, requireBusinessOwner, async (re
 });
 
 // Send broadcast
-router.post('/broadcast', authenticate, requireBusinessOwner, async (req: any, res: any) => {
+router.post('/broadcast', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
     const { templateName, languageCode = 'en', components, contactIds } = req.body;
 
@@ -1202,7 +1202,7 @@ router.post('/broadcast', authenticate, requireBusinessOwner, async (req: any, r
 });
 
 // Get WhatsApp contacts
-router.get('/contacts', authenticate, async (req: any, res: any) => {
+router.get('/contacts', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { page = 1, limit = 50, search } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -1251,7 +1251,7 @@ router.get('/contacts', authenticate, async (req: any, res: any) => {
 });
 
 // Get WhatsApp status
-router.get('/status', authenticate, async (req: any, res: any) => {
+router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
@@ -1282,7 +1282,7 @@ router.get('/status', authenticate, async (req: any, res: any) => {
 });
 
 // Disconnect WhatsApp
-router.post('/disconnect', authenticate, requireBusinessOwner, async (req: any, res: any) => {
+router.post('/disconnect', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
     await prisma.business.update({
       where: { id: req.user.businessId },
@@ -1307,4 +1307,4 @@ router.post('/disconnect', authenticate, requireBusinessOwner, async (req: any, 
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

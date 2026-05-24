@@ -129,6 +129,9 @@ export const postersAPI = {
   generate: (data: { templateId: string; userData: any }) =>
     apiClient.post('/posters/generate', data),
   download: (id: string) => apiClient.get(`/posters/${id}/download`, { responseType: 'blob' }),
+  generated: (params?: { page?: number; limit?: number; category?: string }) =>
+    apiClient.get('/posters/generated', { params }),
+  deleteGenerated: (id: string) => apiClient.delete(`/posters/generated/${id}`),
 };
 
 // Chatbot API

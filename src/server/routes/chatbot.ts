@@ -1,10 +1,10 @@
+import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate } from '../middleware/auth.js';
-import { Router } from 'express';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 const router = Router();
 
 // Get chatbot flows
-router.get('/', authenticate, async (req: any, res: any) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const flows = await prisma.chatbotFlow.findMany({
       where: { businessId: req.user.businessId },
@@ -17,18 +17,17 @@ router.get('/', authenticate, async (req: any, res: any) => {
 });
 
 // Create chatbot flow
-router.post('/', authenticate, async (req: any, res: any) => {
+router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, triggerType, triggerValue, flowData, nodes, edges } = req.body;
+    const { name, trigger, keywords, response, aiEnabled } = req.body;
     const flow = await prisma.chatbotFlow.create({
       data: {
         businessId: req.user.businessId,
         name,
-        triggerType,
-        triggerValue,
-        flowData: flowData || {},
-        nodes: nodes || [],
-        edges: edges || [],
+        trigger: trigger || 'keyword',
+        keywords: keywords || [],
+        response: response || '',
+        aiEnabled: aiEnabled || false,
       },
     });
     res.status(201).json({ success: true, data: flow });
@@ -38,7 +37,7 @@ router.post('/', authenticate, async (req: any, res: any) => {
 });
 
 // Update chatbot flow
-router.put('/:id', authenticate, async (req: any, res: any) => {
+router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const flow = await prisma.chatbotFlow.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -56,7 +55,7 @@ router.put('/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Toggle chatbot flow
-router.post('/:id/toggle', authenticate, async (req: any, res: any) => {
+router.post('/:id/toggle', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const flow = await prisma.chatbotFlow.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -74,7 +73,7 @@ router.post('/:id/toggle', authenticate, async (req: any, res: any) => {
 });
 
 // Activate chatbot flow
-router.post('/:id/activate', authenticate, async (req: any, res: any) => {
+router.post('/:id/activate', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const flow = await prisma.chatbotFlow.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -92,7 +91,7 @@ router.post('/:id/activate', authenticate, async (req: any, res: any) => {
 });
 
 // Deactivate chatbot flow
-router.post('/:id/deactivate', authenticate, async (req: any, res: any) => {
+router.post('/:id/deactivate', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const flow = await prisma.chatbotFlow.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -110,7 +109,7 @@ router.post('/:id/deactivate', authenticate, async (req: any, res: any) => {
 });
 
 // Test chatbot flow
-router.post('/:id/test', authenticate, async (req: any, res: any) => {
+router.post('/:id/test', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { message } = req.body;
     const flow = await prisma.chatbotFlow.findFirst({
@@ -132,7 +131,7 @@ router.post('/:id/test', authenticate, async (req: any, res: any) => {
 });
 
 // Delete chatbot flow
-router.delete('/:id', authenticate, async (req: any, res: any) => {
+router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const flow = await prisma.chatbotFlow.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -146,4 +145,4 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

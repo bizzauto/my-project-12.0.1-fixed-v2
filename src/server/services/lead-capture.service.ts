@@ -1,4 +1,3 @@
-// @ts-nocheck
 import axios from 'axios';
 import { prisma } from '../index.js';
 import { WhatsAppService } from './whatsapp.service.js';
@@ -88,6 +87,7 @@ export class LeadCaptureService {
         title: 'New lead from IndiaMART',
         content: `Product: ${leadData.product}, Requirement: ${leadData.requirement}`,
         metadata: { source: 'indiamart', ...leadData },
+        createdBy: 'lead_capture_service',
       },
     });
 
@@ -147,6 +147,7 @@ export class LeadCaptureService {
         title: 'New lead from JustDial',
         content: `Service: ${leadData.service}, Location: ${leadData.location}`,
         metadata: { source: 'justdial', ...leadData },
+        createdBy: 'lead_capture_service',
       },
     });
 
@@ -210,6 +211,7 @@ export class LeadCaptureService {
         title: 'New lead from Facebook Ads',
         content: `Form: ${leadData.formId}, Campaign: ${leadData.campaignId}`,
         metadata: { source: 'facebook_ads', ...leadData },
+        createdBy: 'lead_capture_service',
       },
     });
 
@@ -271,6 +273,7 @@ export class LeadCaptureService {
         title: 'New lead from Instagram Ads',
         content: `Form: ${leadData.formId}, Username: ${leadData.username}`,
         metadata: { source: 'instagram_ads', ...leadData },
+        createdBy: 'lead_capture_service',
       },
     });
 
@@ -298,7 +301,7 @@ export class LeadCaptureService {
     if (data.phone) {
       contact = await prisma.contact.findUnique({
         where: {
-          phone_businessId: {
+          businessId_phone: {
             phone: data.phone,
             businessId,
           },
@@ -307,12 +310,10 @@ export class LeadCaptureService {
     }
 
     if (!contact && data.email) {
-      contact = await prisma.contact.findUnique({
+      contact = await prisma.contact.findFirst({
         where: {
-          email_businessId: {
-            email: data.email,
-            businessId,
-          },
+          email: data.email,
+          businessId,
         },
       });
     }
@@ -406,7 +407,7 @@ export class LeadCaptureService {
         take: 1,
       });
 
-      const lastAssignedUserId = recentAssignments[0]?.userId;
+      const lastAssignedUserId = recentAssignments[0]?.createdBy;
       const lastIndex = users.findIndex((u) => u.id === lastAssignedUserId);
       const nextUser = users[(lastIndex + 1) % users.length];
 

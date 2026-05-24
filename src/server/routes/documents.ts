@@ -1,6 +1,6 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate, requireRole } from '../middleware/auth.js';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -8,7 +8,7 @@ router.use(authenticate);
 
 // ==================== DOCUMENTS ====================
 
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { type, status, page = '1', limit = '20' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -30,7 +30,7 @@ router.get('/', async (req: any, res: any) => {
   }
 });
 
-router.post('/', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.post('/', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const docNumber = `DOC-${Date.now().toString(36).toUpperCase()}`;
     const document = await prisma.document.create({
@@ -42,7 +42,7 @@ router.post('/', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
   }
 });
 
-router.put('/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.put('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const document = await prisma.document.update({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -55,7 +55,7 @@ router.put('/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => 
 });
 
 // Get single document
-router.get('/:id', async (req: any, res: any) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const document = await prisma.document.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -71,7 +71,7 @@ router.get('/:id', async (req: any, res: any) => {
 });
 
 // Convert document to different type
-router.post('/:id/convert', async (req: any, res: any) => {
+router.post('/:id/convert', async (req: AuthRequest, res: Response) => {
   try {
     const { targetType } = req.body;
 
@@ -106,7 +106,7 @@ router.post('/:id/convert', async (req: any, res: any) => {
 });
 
 // Send document via WhatsApp
-router.post('/:id/send', async (req: any, res: any) => {
+router.post('/:id/send', async (req: AuthRequest, res: Response) => {
   try {
     const document = await prisma.document.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -122,10 +122,8 @@ router.post('/:id/send', async (req: any, res: any) => {
       where: { id: document.id },
       data: {
         publicLink,
-        publicLinkExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         status: document.status === 'draft' ? 'sent' : document.status,
-        sentAt: new Date(),
-        sentVia: [...(document.sentVia as string[] || []), 'whatsapp'],
+        sentVia: document.sentVia ? `${document.sentVia},whatsapp` : 'whatsapp',
       },
     });
 
@@ -136,7 +134,7 @@ router.post('/:id/send', async (req: any, res: any) => {
 });
 
 // Delete document
-router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     await prisma.document.delete({ where: { id: req.params.id, businessId: req.user.businessId } });
     res.json({ success: true, message: 'Deleted' });
@@ -147,10 +145,10 @@ router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) 
 
 // ==================== DOCUMENT TEMPLATES ====================
 
-router.get('/templates', async (req: any, res: any) => {
+router.get('/templates', async (req: AuthRequest, res: Response) => {
   try {
     const templates = await prisma.documentTemplate.findMany({
-      where: { OR: [{ businessId: req.user.businessId }, { isSystem: true }] },
+      where: { OR: [{ businessId: req.user.businessId }, { isDefault: true }] },
       orderBy: { createdAt: 'desc' },
     });
     res.json({ success: true, data: templates });
@@ -159,7 +157,7 @@ router.get('/templates', async (req: any, res: any) => {
   }
 });
 
-router.post('/templates', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.post('/templates', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const template = await prisma.documentTemplate.create({
       data: { businessId: req.user.businessId, ...req.body },
@@ -172,7 +170,7 @@ router.post('/templates', requireRole('OWNER', 'ADMIN'), async (req: any, res: a
 
 // ==================== AI CONTENT ====================
 
-router.get('/ai-content', async (req: any, res: any) => {
+router.get('/ai-content', async (req: AuthRequest, res: Response) => {
   try {
     const { type, page = '1', limit = '20' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -190,7 +188,7 @@ router.get('/ai-content', async (req: any, res: any) => {
   }
 });
 
-router.post('/ai-content', async (req: any, res: any) => {
+router.post('/ai-content', async (req: AuthRequest, res: Response) => {
   try {
     const aiContent = await prisma.aIContent.create({
       data: { businessId: req.user.businessId, userId: req.user.id, ...req.body },
@@ -201,4 +199,4 @@ router.post('/ai-content', async (req: any, res: any) => {
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

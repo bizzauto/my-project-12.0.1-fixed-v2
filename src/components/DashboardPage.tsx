@@ -290,7 +290,7 @@ export default function DashboardPage() {
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Welcome back, {userName}!</h1>
-          <p className="text-gray-500 dark:text-gray-400">Here&apos;s what&apos;s happening with your business today.</p>
+          <p className="text-gray-500 dark:text-gray-400">Here's what's happening with your business today.</p>
         </div>
         <button
           onClick={fetchDashboard}
@@ -383,7 +383,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-gray-900 dark:text-white">{contact.dealValue ? `&#8377;${contact.dealValue.toLocaleString()}` : '-'}</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{contact.dealValue ? `₹${contact.dealValue.toLocaleString()}` : '-'}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{contact.lastActivity}</p>
                   </div>
                 </div>

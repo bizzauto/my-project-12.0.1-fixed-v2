@@ -1,9 +1,9 @@
-// @ts-nocheck
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EmailService } from '../services/email.service.js';
 import { GoogleSheetsService } from '../services/google-sheets.service.js';
+import { LeadCaptureService } from '../services/lead-capture.service.js';
 import { prisma } from '../index.js';
 
 // Redis connection
@@ -207,15 +207,203 @@ const leadProcessingWorker = new Worker(
   async (job: Job) => {
     const { businessId, leadData, source } = job.data;
 
-    // Process lead and send auto-replies
-    // This is handled by LeadCaptureService directly in webhooks
-    return { processed: true, source };
+    if (!businessId || !source || !leadData) {
+      throw new Error('Missing required fields: businessId, source, leadData');
+    }
+
+    let contact;
+
+    // Process lead via LeadCaptureService based on source
+    switch (source) {
+      case 'indiamart':
+        contact = await LeadCaptureService.captureIndiaMARTLead(businessId, {
+          name: leadData.name || '',
+          phone: leadData.phone || '',
+          email: leadData.email,
+          company: leadData.company,
+          product: leadData.product || leadData.service,
+          requirement: leadData.requirement || leadData.message,
+          city: leadData.city,
+          state: leadData.state,
+        });
+        break;
+      case 'justdial':
+        contact = await LeadCaptureService.captureJustDialLead(businessId, {
+          name: leadData.name || '',
+          phone: leadData.phone || '',
+          email: leadData.email,
+          service: leadData.service,
+          location: leadData.location,
+          message: leadData.message,
+        });
+        break;
+      case 'facebook_ads':
+        contact = await LeadCaptureService.captureFacebookLead(businessId, {
+          name: leadData.name,
+          phone: leadData.phone,
+          email: leadData.email,
+          formId: leadData.form_id || leadData.formId,
+          adId: leadData.ad_id || leadData.adId,
+          campaignId: leadData.campaign_id || leadData.campaignId,
+          customFields: leadData.custom_fields || leadData.customFields,
+        });
+        break;
+      case 'instagram_ads':
+        contact = await LeadCaptureService.captureInstagramLead(businessId, {
+          name: leadData.name,
+          phone: leadData.phone,
+          email: leadData.email,
+          username: leadData.username,
+          formId: leadData.form_id || leadData.formId,
+          adId: leadData.ad_id || leadData.adId,
+        });
+        break;
+      default:
+        // Generic lead capture via upsert
+        contact = await LeadCaptureService.upsertContact(businessId, {
+          name: leadData.name || 'Website Lead',
+          phone: leadData.phone || '',
+          email: leadData.email,
+          company: leadData.company,
+          source,
+          tags: [source.charAt(0).toUpperCase() + source.slice(1), 'Lead'],
+          metadata: {
+            ...leadData,
+            capturedAt: new Date().toISOString(),
+          },
+        });
+        break;
+    }
+
+    if (!contact) {
+      throw new Error('Failed to process lead');
+    }
+
+    // Post-capture processing
+    const results: any = {
+      contactId: contact.id,
+      source,
+      processed: true,
+    };
+
+    // 1. Auto-assign lead to a sales rep
+    try {
+      const assignedUserId = await LeadCaptureService.autoAssignLead(businessId, contact.id, {
+        roundRobin: true,
+      });
+      if (assignedUserId) {
+        await prisma.activity.create({
+          data: {
+            businessId,
+            contactId: contact.id,
+            type: 'lead_assigned',
+            title: 'Lead auto-assigned',
+            content: `Lead from ${source} assigned to team member`,
+            createdBy: 'system',
+            metadata: { source, assignedTo: assignedUserId, assignedBy: 'system' },
+          },
+        });
+        results.assignedTo = assignedUserId;
+      }
+    } catch (error: any) {
+      console.error('Lead auto-assignment error:', error.message);
+      results.assignmentError = error.message;
+    }
+
+    // 2. Create notifications for business users
+    try {
+      const businessUsers = await prisma.user.findMany({
+        where: { businessId, isActive: true },
+        select: { id: true },
+      });
+      for (const user of businessUsers) {
+        await prisma.notification.create({
+          data: {
+            userId: user.id,
+            businessId,
+            type: 'lead_captured',
+            title: `New lead from ${source}`,
+            message: `${leadData.name || 'Someone'} reached out about ${leadData.product || leadData.service || 'your services'}`,
+            entityType: 'lead',
+            entityId: contact.id,
+          },
+        });
+      }
+    } catch (error: any) {
+      console.error('Lead notification error:', error.message);
+    }
+
+    // 3. Update lead score if contact has enough data
+    try {
+      const scoreValue = calculateLeadScore(leadData);
+      await prisma.leadScore.upsert({
+        where: { businessId_contactId: { businessId, contactId: contact.id } },
+        create: {
+          contactId: contact.id,
+          businessId,
+          score: scoreValue.score,
+          factors: scoreValue.factors as any,
+        },
+        update: {
+          score: scoreValue.score,
+          factors: scoreValue.factors as any,
+          lastUpdated: new Date(),
+        },
+      });
+      results.score = scoreValue.score;
+    } catch (error: any) {
+      console.error('Lead scoring error:', error.message);
+    }
+
+    return results;
   },
   {
     connection: redisConnection,
     concurrency: 10,
   }
 );
+
+/**
+ * Calculate lead engagement score based on available data
+ */
+function calculateLeadScore(leadData: any): { score: number; factors: Array<{ factor: string; points: number }> } {
+  let score = 30; // Base score
+  const factors: Array<{ factor: string; points: number }> = [{ factor: 'base', points: 30 }];
+
+  if (leadData.name && leadData.name.length > 0) {
+    score += 10;
+    factors.push({ factor: 'has_name', points: 10 });
+  }
+  if (leadData.phone) {
+    score += 15;
+    factors.push({ factor: 'has_phone', points: 15 });
+  }
+  if (leadData.email) {
+    score += 15;
+    factors.push({ factor: 'has_email', points: 15 });
+  }
+  if (leadData.company) {
+    score += 10;
+    factors.push({ factor: 'has_company', points: 10 });
+  }
+  if (leadData.product || leadData.service) {
+    score += 10;
+    factors.push({ factor: 'has_product_interest', points: 10 });
+  }
+  if (leadData.requirement || leadData.message) {
+    score += 10;
+    factors.push({ factor: 'has_detailed_requirement', points: 10 });
+  }
+  if (leadData.city || leadData.location) {
+    score += 5;
+    factors.push({ factor: 'has_location', points: 5 });
+  }
+
+  // Cap at 100
+  score = Math.min(score, 100);
+
+  return { score, factors };
+}
 
 // Campaign Scheduler Worker
 const campaignSchedulerWorker = new Worker(

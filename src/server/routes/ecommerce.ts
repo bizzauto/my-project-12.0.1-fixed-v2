@@ -1,20 +1,20 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate, requireRole } from '../middleware/auth.js';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authenticate);
 
 // ==================== ECOMMERCE STORE ====================
 
-router.get('/store', async (req: any, res: any) => {
+router.get('/store', async (req: AuthRequest, res: Response) => {
   try {
     let store = await prisma.eCommerceStore.findUnique({
       where: { businessId: req.user.businessId },
     });
     if (!store) {
       store = await prisma.eCommerceStore.create({
-        data: { businessId: req.user.businessId, platform: 'custom' },
+        data: { businessId: req.user.businessId, name: 'My Store', provider: 'custom' },
       });
     }
     res.json({ success: true, data: store });
@@ -23,12 +23,12 @@ router.get('/store', async (req: any, res: any) => {
   }
 });
 
-router.put('/store', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.put('/store', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const store = await prisma.eCommerceStore.upsert({
       where: { businessId: req.user.businessId },
       update: req.body,
-      create: { businessId: req.user.businessId, ...req.body, platform: req.body.platform || 'custom' },
+      create: { businessId: req.user.businessId, ...req.body, name: req.body.name || 'My Store', provider: req.body.provider || 'custom' },
     });
     res.json({ success: true, data: store });
   } catch (error: any) {
@@ -38,7 +38,7 @@ router.put('/store', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) =
 
 // ==================== PRODUCTS ====================
 
-router.get('/products', async (req: any, res: any) => {
+router.get('/products', async (req: AuthRequest, res: Response) => {
   try {
     const { page = '1', limit = '20', category, isActive } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -57,7 +57,7 @@ router.get('/products', async (req: any, res: any) => {
   }
 });
 
-router.post('/products', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.post('/products', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const product = await prisma.product.create({
       data: { businessId: req.user.businessId, ...req.body },
@@ -68,7 +68,7 @@ router.post('/products', requireRole('OWNER', 'ADMIN'), async (req: any, res: an
   }
 });
 
-router.put('/products/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.put('/products/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const product = await prisma.product.update({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -80,7 +80,7 @@ router.put('/products/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res:
   }
 });
 
-router.delete('/products/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.delete('/products/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     await prisma.product.delete({ where: { id: req.params.id, businessId: req.user.businessId } });
     res.json({ success: true, message: 'Deleted' });
@@ -90,7 +90,7 @@ router.delete('/products/:id', requireRole('OWNER', 'ADMIN'), async (req: any, r
 });
 
 // Get single product
-router.get('/products/:id', async (req: any, res: any) => {
+router.get('/products/:id', async (req: AuthRequest, res: Response) => {
   try {
     const product = await prisma.product.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -106,7 +106,7 @@ router.get('/products/:id', async (req: any, res: any) => {
 
 // ==================== ORDERS ====================
 
-router.get('/orders', async (req: any, res: any) => {
+router.get('/orders', async (req: AuthRequest, res: Response) => {
   try {
     const { status, page = '1', limit = '20' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -127,7 +127,7 @@ router.get('/orders', async (req: any, res: any) => {
   }
 });
 
-router.post('/orders', async (req: any, res: any) => {
+router.post('/orders', async (req: AuthRequest, res: Response) => {
   try {
     const order = await prisma.order.create({
       data: { businessId: req.user.businessId, ...req.body },
@@ -138,7 +138,7 @@ router.post('/orders', async (req: any, res: any) => {
   }
 });
 
-router.put('/orders/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.put('/orders/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const order = await prisma.order.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -160,7 +160,7 @@ router.put('/orders/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: a
 });
 
 // Get single order
-router.get('/orders/:id', async (req: any, res: any) => {
+router.get('/orders/:id', async (req: AuthRequest, res: Response) => {
   try {
     const order = await prisma.order.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -179,7 +179,7 @@ router.get('/orders/:id', async (req: any, res: any) => {
 });
 
 // Update order status
-router.patch('/orders/:id/status', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
+router.patch('/orders/:id/status', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.body;
 
@@ -209,4 +209,4 @@ router.patch('/orders/:id/status', requireRole('OWNER', 'ADMIN'), async (req: an
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

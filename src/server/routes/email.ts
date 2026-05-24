@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { Router, Request, Response } from 'express';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { EmailService } from '../services/email.service.js';
 import { prisma } from '../index.js';
 import crypto from 'crypto';
@@ -10,7 +10,7 @@ const router = Router();
  * POST /api/email/test
  * Test SMTP connection
  */
-router.post('/test', authenticate, async (req: any, res: Response) => {
+router.post('/test', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const result = await EmailService.testConnection();
 
@@ -126,4 +126,4 @@ router.post('/password-reset/confirm', async (req: Request, res: Response) => {
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

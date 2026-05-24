@@ -44,11 +44,6 @@ export const authenticate = async (
       });
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
     // Generate CSRF token for the session
     const { CSRFService } = await import('../services/csrf.service.js');
     const csrfToken = await CSRFService.generateToken(user.id);

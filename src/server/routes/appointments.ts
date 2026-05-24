@@ -1,6 +1,6 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ const router = Router();
  * - notes, internalNotes
  * - createdAt, updatedAt
  */
-router.get('/', authenticate, async (req: any, res: any) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { status, date, limit = 50, offset = 0 } = req.query;
 
@@ -86,7 +86,7 @@ router.get('/', authenticate, async (req: any, res: any) => {
  * Required fields: title, startTime, endTime
  * Optional: description, service, contactId, location, meetingUrl
  */
-router.post('/', authenticate, async (req: any, res: any) => {
+router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { title, startTime, endTime, description, service, contactId, location, meetingUrl } = req.body;
 
@@ -107,6 +107,12 @@ router.post('/', authenticate, async (req: any, res: any) => {
       return res.status(400).json({
         success: false,
         error: 'End time is required',
+      });
+    }
+    if (!contactId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Contact ID is required',
       });
     }
 
@@ -133,13 +139,14 @@ router.post('/', authenticate, async (req: any, res: any) => {
 
     const appointment = await prisma.appointment.create({
       data: {
-        businessId: req.user.businessId,
+        business: { connect: { id: req.user.businessId as string } },
+        createdBy: req.user.id,
         title,
         startTime: new Date(startTime),
         endTime: new Date(endTime),
         description: description || null,
         service: service || null,
-        contactId: contactId || null,
+        contact: { connect: { id: contactId } },
         location: location || null,
         meetingUrl: meetingUrl || null,
       },
@@ -172,7 +179,7 @@ router.post('/', authenticate, async (req: any, res: any) => {
  * Update an existing appointment.
  * Only updates fields that are provided in the request body.
  */
-router.put('/:id', authenticate, async (req: any, res: any) => {
+router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const updateData: any = {};
@@ -255,7 +262,7 @@ router.put('/:id', authenticate, async (req: any, res: any) => {
  * DELETE /api/appointments/:id
  * Delete an appointment permanently.
  */
-router.delete('/:id', authenticate, async (req: any, res: any) => {
+router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     await prisma.appointment.delete({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -267,7 +274,7 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Confirm appointment
-router.patch('/:id/confirm', authenticate, async (req: any, res: any) => {
+router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const appointment = await prisma.appointment.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -285,7 +292,7 @@ router.patch('/:id/confirm', authenticate, async (req: any, res: any) => {
 });
 
 // Cancel appointment
-router.patch('/:id/cancel', authenticate, async (req: any, res: any) => {
+router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const appointment = await prisma.appointment.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -303,7 +310,7 @@ router.patch('/:id/cancel', authenticate, async (req: any, res: any) => {
 });
 
 // Complete appointment
-router.patch('/:id/complete', authenticate, async (req: any, res: any) => {
+router.patch('/:id/complete', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const appointment = await prisma.appointment.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
@@ -320,4 +327,4 @@ router.patch('/:id/complete', authenticate, async (req: any, res: any) => {
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

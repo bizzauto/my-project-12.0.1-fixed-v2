@@ -1,9 +1,8 @@
-// @ts-nocheck
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../index.js';
 import { hashPassword, comparePassword, generateToken } from '../utils/auth.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { encrypt, decrypt } from '../utils/auth.js';
@@ -11,7 +10,7 @@ import { encrypt, decrypt } from '../utils/auth.js';
 const router = Router();
 
 // Register
-router.post('/register', async (req: any, res: any) => {
+router.post('/register', async (req: Request, res: Response) => {
   try {
     const { email, password, name, businessName, businessType, phone } = req.body;
 
@@ -98,7 +97,7 @@ router.post('/register', async (req: any, res: any) => {
 });
 
 // Login
-router.post('/login', async (req: any, res: any) => {
+router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password, twoFactorToken } = req.body;
     const { TwoFactorService } = await import('../services/twoFactor.service.js');
@@ -199,7 +198,7 @@ router.post('/login', async (req: any, res: any) => {
 });
 
 // Get current user
-router.get('/me', authenticate, async (req: any, res: any) => {
+router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -246,7 +245,7 @@ router.get('/me', authenticate, async (req: any, res: any) => {
 });
 
 // Update profile
-router.put('/profile', authenticate, async (req: any, res: any) => {
+router.put('/profile', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { name, phone } = req.body;
 
@@ -281,7 +280,7 @@ router.put('/profile', authenticate, async (req: any, res: any) => {
 });
 
 // Change password
-router.put('/change-password', authenticate, async (req: any, res: any) => {
+router.put('/change-password', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -338,7 +337,7 @@ router.put('/change-password', authenticate, async (req: any, res: any) => {
 // Usage: curl -X POST http://localhost:4000/api/auth/create-super-admin
 //   -H "Content-Type: application/json"
 //   -d '{"email": "admin@example.com", "password": "SuperAdmin123!", "name": "Super Admin"}'
-router.post('/create-super-admin', async (req: any, res: any) => {
+router.post('/create-super-admin', async (req: Request, res: Response) => {
   try {
     const { email, password, name } = req.body;
 
@@ -400,18 +399,64 @@ router.post('/create-super-admin', async (req: any, res: any) => {
   }
 });
 
-const otpStore = new Map<string, { otp: string; expiresAt: number }>();
+// In-memory OTP store with cleanup interval
+const otpStore = new Map<string, { otp: string; expiresAt: number; attempts: number }>();
+const OTP_RATE_LIMIT = 3; // max OTP requests per email per window
+const OTP_RATE_WINDOW = 15 * 60 * 1000; // 15 minutes
 
-router.post('/forgot-password', async (req: any, res: any) => {
+// Periodic cleanup of expired OTPs (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of otpStore.entries()) {
+    if (value.expiresAt < now) otpStore.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+router.post('/forgot-password', async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.json({ success: true, message: 'If an account exists, an OTP has been sent' });
+    // Rate limiting: max 3 OTP requests per email per 15 minutes
+    const existing = otpStore.get(email);
+    if (existing) {
+      const requestsInWindow = existing.attempts;
+      if (requestsInWindow >= OTP_RATE_LIMIT) {
+        return res.status(429).json({ success: false, error: 'Too many requests. Please try again later.' });
+      }
+    }
 
     const otp = crypto.randomInt(100000, 999999).toString();
-    otpStore.set(email, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+    const attempts = (existing?.attempts || 0) + 1;
+    otpStore.set(email, { otp, expiresAt: Date.now() + 10 * 60 * 1000, attempts });
+
+    // Send OTP via email (fire-and-forget)
+    try {
+      const { EmailService } = await import('../services/email.service.js');
+      await EmailService.sendEmail(
+        email,
+        'Password Reset OTP - BizzAuto',
+        `<h2>Password Reset</h2><p>Your OTP for password reset is: <strong>${otp}</strong></p><p>This OTP expires in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`
+      );
+    } catch (emailErr: any) {
+      console.error('Failed to send OTP email:', emailErr.message);
+    }
+
+    // Log the request for audit trail
+    try {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user?.businessId) {
+        await prisma.activity.create({
+          data: {
+            businessId: user.businessId,
+            type: 'password_reset_requested',
+            title: 'Password reset requested',
+            content: `OTP sent to ${email}`,
+            createdBy: user.id,
+          },
+        });
+      }
+    } catch { /* audit log is non-critical */ }
 
     res.json({ success: true, message: 'If an account exists, an OTP has been sent' });
   } catch (error: any) {
@@ -419,7 +464,7 @@ router.post('/forgot-password', async (req: any, res: any) => {
   }
 });
 
-router.post('/verify-otp', async (req: any, res: any) => {
+router.post('/verify-otp', async (req: Request, res: Response) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP are required' });
@@ -435,7 +480,7 @@ router.post('/verify-otp', async (req: any, res: any) => {
   }
 });
 
-router.post('/reset-password', async (req: any, res: any) => {
+router.post('/reset-password', async (req: Request, res: Response) => {
   try {
     const { email, otp, newPassword } = req.body;
     if (!email || !otp || !newPassword) return res.status(400).json({ success: false, error: 'All fields are required' });
@@ -450,10 +495,36 @@ router.post('/reset-password', async (req: any, res: any) => {
     await prisma.user.update({ where: { email }, data: { password: hashedPassword } });
     otpStore.delete(email);
 
+    // Log successful password reset
+    try {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user?.businessId) {
+        await prisma.activity.create({
+          data: {
+            businessId: user.businessId,
+            type: 'password_reset_completed',
+            title: 'Password reset completed',
+            content: `Password reset for ${email}`,
+            createdBy: user.id,
+          },
+        });
+      }
+    } catch { /* audit log is non-critical */ }
+
+    // Send confirmation email
+    try {
+      const { EmailService } = await import('../services/email.service.js');
+      await EmailService.sendEmail(
+        email,
+        'Your password has been changed - BizzAuto',
+        `<h2>Password Changed</h2><p>Your password has been successfully changed.</p><p>If you did not make this change, please contact support immediately.</p>`
+      );
+    } catch { /* non-critical */ }
+
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'Failed to reset password' });
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;

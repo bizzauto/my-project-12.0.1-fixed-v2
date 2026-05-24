@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { prisma } from '../index.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 // Get Google Business connection status
-router.get('/status', authenticate, async (req: any, res: any) => {
+router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
@@ -35,7 +35,7 @@ router.get('/status', authenticate, async (req: any, res: any) => {
 });
 
 // Connect Google Business Profile
-router.post('/connect', authenticate, async (req: any, res: any) => {
+router.post('/connect', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { accessToken, accountId, locationId } = req.body;
 
@@ -68,7 +68,7 @@ router.post('/connect', authenticate, async (req: any, res: any) => {
 });
 
 // Disconnect Google Business Profile
-router.post('/disconnect', authenticate, async (req: any, res: any) => {
+router.post('/disconnect', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     await prisma.business.update({
       where: { id: req.user.businessId },
@@ -90,7 +90,7 @@ router.post('/disconnect', authenticate, async (req: any, res: any) => {
 });
 
 // Get Google Business Profile locations
-router.get('/locations', authenticate, async (req: any, res: any) => {
+router.get('/locations', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
@@ -123,14 +123,14 @@ router.get('/locations', authenticate, async (req: any, res: any) => {
 });
 
 // Get Google Business reviews
-router.get('/reviews', authenticate, async (req: any, res: any) => {
+router.get('/reviews', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpLocationId: true },
+      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpLocationId) {
+    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
       return res.status(400).json({ success: false, error: 'Google Business not configured' });
     }
 
@@ -139,7 +139,7 @@ router.get('/reviews', authenticate, async (req: any, res: any) => {
     const accessToken = decrypt(business.gbpAccessToken);
 
     const response = await axios.default.get(
-      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpLocationId}/reviews`,
+      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/reviews`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -155,15 +155,15 @@ router.get('/reviews', authenticate, async (req: any, res: any) => {
 });
 
 // Reply to Google Business review
-router.post('/reviews/:reviewId/reply', authenticate, async (req: any, res: any) => {
+router.post('/reviews/:reviewId/reply', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { reply } = req.body;
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpLocationId: true },
+      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpLocationId) {
+    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
       return res.status(400).json({ success: false, error: 'Google Business not configured' });
     }
 
@@ -172,7 +172,7 @@ router.post('/reviews/:reviewId/reply', authenticate, async (req: any, res: any)
     const accessToken = decrypt(business.gbpAccessToken);
 
     await axios.default.put(
-      `https://mybusiness.googleapis.com/v4/${req.params.reviewId}/reply`,
+      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/reviews/${req.params.reviewId}/reply`,
       { comment: reply },
       {
         headers: {
@@ -190,15 +190,15 @@ router.post('/reviews/:reviewId/reply', authenticate, async (req: any, res: any)
 });
 
 // Create Google Business post
-router.post('/posts', authenticate, async (req: any, res: any) => {
+router.post('/posts', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { content, mediaUrl, callToAction } = req.body;
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpLocationId: true },
+      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpLocationId) {
+    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
       return res.status(400).json({ success: false, error: 'Google Business not configured' });
     }
 
@@ -224,7 +224,7 @@ router.post('/posts', authenticate, async (req: any, res: any) => {
     }
 
     const response = await axios.default.post(
-      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpLocationId}/localPosts`,
+      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/localPosts`,
       postData,
       {
         headers: {
@@ -242,14 +242,14 @@ router.post('/posts', authenticate, async (req: any, res: any) => {
 });
 
 // Get Google Business posts
-router.get('/posts', authenticate, async (req: any, res: any) => {
+router.get('/posts', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpLocationId: true },
+      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpLocationId) {
+    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
       return res.status(400).json({ success: false, error: 'Google Business not configured' });
     }
 
@@ -258,7 +258,7 @@ router.get('/posts', authenticate, async (req: any, res: any) => {
     const accessToken = decrypt(business.gbpAccessToken);
 
     const response = await axios.default.get(
-      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpLocationId}/localPosts`,
+      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/localPosts`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -274,14 +274,14 @@ router.get('/posts', authenticate, async (req: any, res: any) => {
 });
 
 // Delete Google Business post
-router.delete('/posts/:id', authenticate, async (req: any, res: any) => {
+router.delete('/posts/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpLocationId: true },
+      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpLocationId) {
+    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
       return res.status(400).json({ success: false, error: 'Google Business not configured' });
     }
 
@@ -290,7 +290,7 @@ router.delete('/posts/:id', authenticate, async (req: any, res: any) => {
     const accessToken = decrypt(business.gbpAccessToken);
 
     await axios.default.delete(
-      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpLocationId}/localPosts/${req.params.id}`,
+      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/localPosts/${req.params.id}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -306,14 +306,14 @@ router.delete('/posts/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Get Google Business statistics
-router.get('/stats', authenticate, async (req: any, res: any) => {
+router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpLocationId: true },
+      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpLocationId) {
+    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
       return res.status(400).json({ success: false, error: 'Google Business not configured' });
     }
 
@@ -323,7 +323,7 @@ router.get('/stats', authenticate, async (req: any, res: any) => {
 
     // Fetch insights from Google My Business API
     const response = await axios.default.get(
-      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpLocationId}/insights`,
+      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/insights`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -341,4 +341,4 @@ router.get('/stats', authenticate, async (req: any, res: any) => {
   }
 });
 
-export default router; // @ts-nocheck // @ts-nocheck
+export default router;
