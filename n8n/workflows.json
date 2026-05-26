@@ -3,17 +3,16 @@
     "name": "WhatsApp Auto-Reply with AI",
     "nodes": [
       {
-        "parameters": {},
-        "name": "Webhook",
-        "type": "n8n-nodes-base.webhook",
-        "typeVersion": 2,
-        "position": [250, 300],
-        "webhookId": "whatsapp-auto-reply",
         "parameters": {
           "path": "whatsapp-incoming",
           "responseMode": "responseNode",
           "options": {}
-        }
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [250, 300],
+        "webhookId": "whatsapp-auto-reply"
       },
       {
         "parameters": {
@@ -33,50 +32,44 @@
       },
       {
         "parameters": {
-          "prompt": "={{$json.body.entry[0].changes[0].value.messages[0].text.body}}",
-          "model": "google/gemma-2-9b-it:free",
-          "maxTokens": 200,
-          "options": {
-            "systemPrompt": "You are a helpful customer service assistant. Reply politely in maximum 2 sentences. If the message is a greeting, respond warmly. If it's a question, provide a helpful brief answer. Use emojis naturally."
-          }
-        },
-        "name": "AI Generate Reply",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2,
-        "position": [690, 200],
-        "parameters": {
           "url": "https://openrouter.ai/api/v1/chat/completions",
-          "method": "POST",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "httpHeaderAuth",
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "HTTP-Referer",
-                "value": "http://localhost:4000"
-              },
-              {
-                "name": "X-Title",
-                "value": "IndiaCRM Auto-Reply"
-              }
-            ]
-          },
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={\n  \"model\": \"google/gemma-2-9b-it:free\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful customer service assistant. Reply politely in maximum 2 sentences.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"={{$json.body.entry[0].changes[0].value.messages[0].text.body}}\"\n    }\n  ],\n  \"max_tokens\": 200\n}"
-        }
-      },
-      {
-        "parameters": {
-          "url": "https://graph.facebook.com/v18.0/{{PHONE_NUMBER_ID}}/messages",
           "method": "POST",
           "sendHeaders": true,
           "headerParameters": {
             "parameters": [
               {
                 "name": "Authorization",
-                "value": "Bearer {{WHATSAPP_ACCESS_TOKEN}}"
+                "value": "Bearer {{$env.N8N_OPENROUTER_KEY}}"
+              },
+              {
+                "name": "HTTP-Referer",
+                "value": "={{$env.N8N_APP_URL}}"
+              },
+              {
+                "name": "X-Title",
+                "value": "BizzAuto AI Reply"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"model\": \"google/gemma-2-9b-it:free\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful customer service assistant. Reply politely in maximum 2 sentences. If the message is a greeting, respond warmly. If it's a question, provide a helpful brief answer. Use emojis naturally.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"={{$json.body.entry[0].changes[0].value.messages[0].text.body}}\"\n    }\n  ],\n  \"max_tokens\": 200\n}"
+        },
+        "name": "AI Generate Reply",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [690, 200]
+      },
+      {
+        "parameters": {
+          "url": "https://graph.facebook.com/v18.0/{{$env.WHATSAPP_PHONE_NUMBER_ID}}/messages",
+          "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{$env.WHATSAPP_ACCESS_TOKEN}}"
               }
             ]
           },
@@ -92,37 +85,13 @@
     ],
     "connections": {
       "Webhook": {
-        "main": [
-          [
-            {
-              "node": "Check Message Type",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+        "main": [[{ "node": "Check Message Type", "type": "main", "index": 0 }]]
       },
       "Check Message Type": {
-        "main": [
-          [
-            {
-              "node": "AI Generate Reply",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+        "main": [[{ "node": "AI Generate Reply", "type": "main", "index": 0 }]]
       },
       "AI Generate Reply": {
-        "main": [
-          [
-            {
-              "node": "Send WhatsApp Reply",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+        "main": [[{ "node": "Send WhatsApp Reply", "type": "main", "index": 0 }]]
       }
     },
     "settings": {
@@ -149,11 +118,24 @@
       },
       {
         "parameters": {
-          "url": "http://app:4000/api/leads/indiamart",
+          "url": "={{$env.N8N_APP_URL || 'http://app:4000'}}/api/leads/indiamart/{{$json.businessId}}",
           "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-n8n-api-key",
+                "value": "={{$env.N8N_API_KEY}}"
+              },
+              {
+                "name": "x-business-id",
+                "value": "={{$json.businessId}}"
+              }
+            ]
+          },
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={\n  \"name\": \"={{$json.name}}\",\n  \"phone\": \"={{$json.phone}}\",\n  \"email\": \"={{$json.email}}\",\n  \"product\": \"={{$json.product}}\",\n  \"requirement\": \"={{$json.requirement}}\",\n  \"businessId\": \"={{$json.businessId}}\"\n}"
+          "jsonBody": "={\n  \"name\": \"={{$json.name}}\",\n  \"phone\": \"={{$json.phone}}\",\n  \"email\": \"={{$json.email}}\",\n  \"product\": \"={{$json.product}}\",\n  \"requirement\": \"={{$json.requirement}}\"\n}"
         },
         "name": "Save to CRM",
         "type": "n8n-nodes-base.httpRequest",
@@ -162,22 +144,26 @@
       },
       {
         "parameters": {
-          "url": "https://graph.facebook.com/v18.0/{{PHONE_NUMBER_ID}}/messages",
+          "url": "={{$env.N8N_APP_URL || 'http://app:4000'}}/api/whatsapp/send/text",
           "method": "POST",
           "sendHeaders": true,
           "headerParameters": {
             "parameters": [
               {
-                "name": "Authorization",
-                "value": "Bearer {{WHATSAPP_ACCESS_TOKEN}}"
+                "name": "x-n8n-api-key",
+                "value": "={{$env.N8N_API_KEY}}"
+              },
+              {
+                "name": "x-business-id",
+                "value": "={{$json.data.businessId}}"
               }
             ]
           },
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"={{$json.phone}}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Hello {{$json.name}}! 👋\\n\\nThank you for your inquiry about {{$json.product}}.\\n\\nWe'll get back to you shortly with all the details.\\n\\nBest regards,\\nYour Business Team\"\n  }\n}"
+          "jsonBody": "={\n  \"contactId\": \"={{$json.data.id}}\",\n  \"content\": \"Hello {{$json.data.name}}! \ud83d\udc4b\n\nThank you for your inquiry! We've received your details and our team will get back to you shortly.\n\nBest regards,\nYour Business Team\"\n}"
         },
-        "name": "Send Welcome WhatsApp",
+        "name": "Send Welcome WhatsApp via App",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [690, 300]
@@ -185,26 +171,10 @@
     ],
     "connections": {
       "IndiaMART Webhook": {
-        "main": [
-          [
-            {
-              "node": "Save to CRM",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+        "main": [[{ "node": "Save to CRM", "type": "main", "index": 0 }]]
       },
       "Save to CRM": {
-        "main": [
-          [
-            {
-              "node": "Send Welcome WhatsApp",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+        "main": [[{ "node": "Send Welcome WhatsApp via App", "type": "main", "index": 0 }]]
       }
     },
     "tags": ["leads", "indiamart", "auto-reply"]
@@ -242,8 +212,20 @@
       },
       {
         "parameters": {
-          "prompt": "Write a thank you message for a {{$json.rating}}-star review. Keep it under 100 characters. Be warm and professional.",
-          "model": "google/gemma-2-9b-it:free"
+          "url": "https://openrouter.ai/api/v1/chat/completions",
+          "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{$env.N8N_OPENROUTER_KEY}}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"model\": \"google/gemma-2-9b-it:free\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Write a thank you message for a {{$json.rating}}-star review. Keep it under 100 characters. Be warm and professional.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate thank you reply for this review\"\n    }\n  ],\n  \"max_tokens\": 150\n}"
         },
         "name": "AI Thank You",
         "type": "n8n-nodes-base.httpRequest",
@@ -252,8 +234,20 @@
       },
       {
         "parameters": {
-          "prompt": "Write an apology and ask for a chance to improve. Keep it under 100 characters. Be professional and caring.",
-          "model": "google/gemma-2-9b-it:free"
+          "url": "https://openrouter.ai/api/v1/chat/completions",
+          "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{$env.N8N_OPENROUTER_KEY}}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"model\": \"google/gemma-2-9b-it:free\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Write an apology and ask for a chance to improve. Keep it under 100 characters. Be professional and caring.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate apology for this negative review\"\n    }\n  ],\n  \"max_tokens\": 150\n}"
         },
         "name": "AI Apology",
         "type": "n8n-nodes-base.httpRequest",
@@ -262,13 +256,22 @@
       },
       {
         "parameters": {
-          "url": "http://app:4000/api/reviews/reply",
-          "method": "POST",
+          "url": "={{$env.N8N_APP_URL || 'http://app:4000'}}/api/reviews/{{$json.reviewId}}/reply",
+          "method": "PUT",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-n8n-api-key",
+                "value": "={{$env.N8N_API_KEY}}"
+              }
+            ]
+          },
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={\n  \"reviewId\": \"={{$json.reviewId}}\",\n  \"reply\": \"={{$json.choices[0].message.content}}\"\n}"
+          "jsonBody": "={\n  \"replyText\": \"={{$json.choices[0].message.content}}\"\n}"
         },
-        "name": "Post Reply to Google",
+        "name": "Post Reply",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [910, 300]
@@ -276,55 +279,19 @@
     ],
     "connections": {
       "Review Webhook": {
-        "main": [
-          [
-            {
-              "node": "Check Rating",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+        "main": [[{ "node": "Check Rating", "type": "main", "index": 0 }]]
       },
       "Check Rating": {
         "main": [
-          [
-            {
-              "node": "AI Thank You",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "AI Apology",
-              "type": "main",
-              "index": 0
-            }
-          ]
+          [{ "node": "AI Thank You", "type": "main", "index": 0 }],
+          [{ "node": "AI Apology", "type": "main", "index": 0 }]
         ]
       },
       "AI Thank You": {
-        "main": [
-          [
-            {
-              "node": "Post Reply to Google",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+        "main": [[{ "node": "Post Reply", "type": "main", "index": 0 }]]
       },
       "AI Apology": {
-        "main": [
-          [
-            {
-              "node": "Post Reply to Google",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+        "main": [[{ "node": "Post Reply", "type": "main", "index": 0 }]]
       }
     },
     "tags": ["reviews", "google", "auto-reply"]

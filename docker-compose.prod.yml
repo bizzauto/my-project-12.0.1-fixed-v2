@@ -1,9 +1,21 @@
-# Docker Compose for Coolify Production Deployment
-# Optimized for Coolify's auto-deployment
+# ==============================================
+# BizzAuto CRM - Coolify Production Stack
+# All 4 services wired together:
+#   app + supabase (DB) + evolution-api (WhatsApp) + n8n (automation)
+# ==============================================
+# Usage in Coolify:
+#   - Option A: Deploy as a Docker Compose stack (this file)
+#   - Option B: Deploy each service separately and use env vars to connect
+#
+# For Option B, each service needs:
+#   App → env: DATABASE_URL (Supabase), EVOLUTION_API_URL, N8N_URL
+#   n8n  → env: WEBHOOK_URL (points to app's public URL)
+#   Evolution API → env: no special wiring, App calls it directly
 
 version: '3.8'
 
 services:
+  # ==================== BIZZAUTO APP ====================
   app:
     image: ghcr.io/infoledbrighter-boop/bizzauto:latest
     container_name: bizzauto-app
@@ -13,28 +25,56 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4000
+
+      # === Database (Supabase PostgreSQL) ===
       - DATABASE_URL=${DATABASE_URL}
+
+      # === Redis (Caching/Queue) ===
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+
+      # === Auth ===
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+
+      # === CORS & URLs ===
       - CORS_ORIGIN=${FRONTEND_URL}
       - FRONTEND_URL=${FRONTEND_URL}
       - VITE_API_URL=${API_URL}
-      # Third party services
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+
+      # === Evolution API (WhatsApp) ===
       - EVOLUTION_API_URL=${EVOLUTION_API_URL}
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-bizzauto}
+
+      # === n8n (Workflow Automation) ===
+      - N8N_URL=${N8N_URL:-http://n8n:5678}
+      - N8N_PASSWORD=${N8N_PASSWORD}
+
+      # === AI Services ===
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - GROK_API_KEY=${GROK_API_KEY}
+
+      # === SMTP / Email ===
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
       - SMTP_FROM=${SMTP_FROM:-"BizzAuto CRM <noreply@bizzautoai.com>"}
+
+      # === Payments ===
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
-      # n8n
-      - N8N_URL=http://n8n:5678
-      - N8N_PASSWORD=${N8N_PASSWORD}
+
+      # === Meta / Facebook (WhatsApp Business API) ===
+      - META_APP_ID=${META_APP_ID}
+      - WHATSAPP_REDIRECT_URL=${WHATSAPP_REDIRECT_URL}
+
+      # === Google ===
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}
+
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/api/health"]
       interval: 30s
@@ -48,23 +88,22 @@ services:
         reservations:
           memory: 512M
 
-  # PostgreSQL - Use Coolify's managed database or this
-  # postgres:
-  #   image: postgres:15-alpine
-  #   restart: always
-  #   environment:
-  #     - POSTGRES_USER=${POSTGRES_USER}
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-  #     - POSTGRES_DB=${POSTGRES_DB}
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # ==================== REDIS (Caching/Queue) ====================
+  redis:
+    image: redis:7-alpine
+    container_name: bizzauto-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-  # n8n - Workflow Automation
+  # ==================== n8n WORKFLOW AUTOMATION ====================
+  # Connects to: BizzAuto App (via webhooks) and Supabase (via DB)
   n8n:
     image: n8nio/n8n:latest
     container_name: bizzauto-n8n
@@ -82,10 +121,16 @@ services:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=admin
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
-      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-https://bizzautoai.com}
       - GENERIC_TIMEZONE=Asia/Kolkata
       - DB_TYPE=sqlite
       - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+
+      # === n8n variables for workflows ===
+      # These are accessible in n8n as $env.N8N_APP_URL
+      - N8N_APP_URL=${FRONTEND_URL:-https://bizzautoai.com}
+      - N8N_API_URL=${API_URL:-https://bizzautoai.com}
+      - N8N_OPENROUTER_KEY=${OPENROUTER_API_KEY}
     volumes:
       - n8n_data:/home/node/.n8n
     healthcheck:
@@ -95,20 +140,6 @@ services:
       retries: 3
       start_period: 40s
 
-  # Redis - Optional, for caching
-  redis:
-    image: redis:7-alpine
-    container_name: bizzauto-redis
-    restart: always
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
 volumes:
-  n8n_data:
   redis_data:
+  n8n_data:

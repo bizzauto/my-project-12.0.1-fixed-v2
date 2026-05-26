@@ -8,6 +8,36 @@ export interface AuthRequest extends Request {
   [key: string]: any;
 }
 
+/**
+ * N8N_API_KEY-based authentication for service-to-service calls.
+ * n8n workflows send x-n8n-api-key header to authenticate with the App API.
+ * Falls through to normal JWT auth if no API key is present.
+ */
+async function authenticateViaN8nApiKey(req: AuthRequest): Promise<boolean> {
+  const apiKey = req.headers['x-n8n-api-key'] as string | undefined;
+  if (!apiKey) return false;
+
+  const configuredKey = process.env.N8N_API_KEY;
+  if (!configuredKey) return false;
+
+  if (apiKey !== configuredKey) {
+    return false;
+  }
+
+  // Create a system-level user context for n8n automation
+  // n8n workflows operate at the system level - individual businessId scoping
+  // is handled by the specific route logic (e.g., using :businessId param)
+  req.user = {
+    id: 'n8n-automation',
+    email: 'n8n@system',
+    businessId: req.headers['x-business-id'] as string || 'system',
+    role: 'ADMIN',
+    isServiceAccount: true,
+  };
+
+  return true;
+}
+
 export const authenticate = async (
   req: AuthRequest,
   res: Response,
@@ -16,7 +46,13 @@ export const authenticate = async (
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
 
+    // If no Bearer token, try n8n API key auth
     if (!token) {
+      const n8nAuthed = await authenticateViaN8nApiKey(req);
+      if (n8nAuthed) {
+        return next();
+      }
+
       return res.status(401).json({
         success: false,
         error: 'Authentication required',
