@@ -10,7 +10,7 @@ import {
   Wifi, WifiOff, QrCode, Smartphone, LogOut, Link2,
   Star, Tag, Calendar, BarChart3, ExternalLink,
   AlertCircle, CheckCircle, VolumeX
-} from 'lucide-react';
+, Loader} from 'lucide-react';
 import apiClient, { whatsappAPI } from '../lib/api';
 
 // ============================================================
@@ -390,26 +390,65 @@ const QRConnectView: React.FC<{
 
                 {evolutionConfig.configured ? (
                   <div className="space-y-4">
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
-                      <CheckCircle size={20} className="text-green-600" />
-                      <div className="text-left">
-                        <p className="text-sm font-medium text-green-800">Evolution API Configured</p>
-                        <p className="text-xs text-green-600">{evolutionConfig.baseUrl}</p>
+                    {connectionStatus === 'scanning' || connectionStatus === 'connecting' ? (
+                      <div className="text-center space-y-4">
+                        {qrValue ? (
+                          <div className="bg-white rounded-xl p-4 border-2 border-purple-300 inline-block mx-auto">
+                            {qrValue.startsWith('data:') || qrValue.startsWith('http') ? (
+                              <img
+                                src={qrValue}
+                                alt="WhatsApp QR Code"
+                                className="w-64 h-64 object-contain mx-auto rounded-lg"
+                              />
+                            ) : (
+                              <div className="w-64 h-64 mx-auto flex items-center justify-center bg-purple-50 rounded-lg">
+                                <QrCode size={120} className="text-purple-400" />
+                              </div>
+                            )}
+                            <p className="text-sm text-gray-500 mt-3">
+                              {connectionStatus === 'connecting' ? 'Connecting...' : 'Scan this QR code with WhatsApp'}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Open WhatsApp &gt; Linked Devices &gt; Link a Device
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2 text-purple-600">
+                            <Loader size={20} className="animate-spin" />
+                            <span>Generating QR code...</span>
+                          </div>
+                        )}
+                        <button
+                          onClick={onEvolutionConnect}
+                          className="text-sm text-purple-600 hover:text-purple-800 underline"
+                        >
+                          Refresh QR Code
+                        </button>
                       </div>
-                    </div>
-                    <button
-                      onClick={onEvolutionConnect}
-                      className="w-full px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2"
-                    >
-                      <QrCode size={20} />
-                      Connect & Get QR Code
-                    </button>
-                    <button
-                      onClick={() => setShowEvolutionForm(true)}
-                      className="text-sm text-gray-500 hover:text-gray-700 underline"
-                    >
-                      Update Configuration
-                    </button>
+                    ) : (
+                      <>
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                          <CheckCircle size={20} className="text-green-600" />
+                          <div className="text-left">
+                            <p className="text-sm font-medium text-green-800">Evolution API Configured</p>
+                            <p className="text-xs text-green-600">{evolutionConfig.baseUrl}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={onEvolutionConnect}
+                          className="w-full px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2"
+                        >
+                          <QrCode size={20} />
+                          Connect & Get QR Code
+                        </button>
+                        <button
+                          onClick={() => setShowEvolutionForm(true)}
+                          className="text-sm text-gray-500 hover:text-gray-700 underline"
+                        >
+                          Update Configuration
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <button
@@ -2154,11 +2193,12 @@ const WhatsAppModule: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
       const instanceName = evolutionConfig.instanceName || `instance-${Date.now()}`;
       setEvolutionInstanceName(instanceName);
 
-      // Try to create instance
+      // Try to create instance (include apiKey!)
       try {
         await evolutionAPI.createInstance({
           instanceName,
           baseUrl: evolutionConfig.baseUrl,
+          apiKey: evolutionConfig.apiKey,
         });
       } catch {
         // Instance may already exist, continue
@@ -2166,8 +2206,9 @@ const WhatsAppModule: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
 
       // Connect and get QR
       const connectRes = await evolutionAPI.connectInstance(instanceName);
-      if (connectRes?.data?.qrCode) {
-        setEvolutionQR(connectRes.data.qrCode);
+      // Server wraps response: { success: true, data: { qrCode, qrCodeBase64, status } }
+      if (connectRes?.data?.data?.qrCode || connectRes?.data?.data?.qrCodeBase64) {
+        setEvolutionQR(connectRes.data.data.qrCodeBase64 || connectRes.data.data.qrCode);
       }
       setConnectionStatus('scanning');
     } catch (err: any) {

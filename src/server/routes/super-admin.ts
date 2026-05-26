@@ -42,8 +42,6 @@ router.get('/stats', async (req: any, res: any) => {
             select: {
               users: true,
               contacts: true,
-              // @ts-expect-error - Prisma field mismatch
-              messages: true,
               campaigns: true,
             },
           },
@@ -174,8 +172,6 @@ router.get('/businesses', async (req: any, res: any) => {
             select: {
               users: true,
               contacts: true,
-              // @ts-expect-error - Prisma schema type mismatch
-              messages: true,
               campaigns: true,
             },
           },
@@ -224,8 +220,6 @@ router.get('/businesses/:id', async (req: any, res: any) => {
           select: {
             users: true,
             contacts: true,
-            // @ts-expect-error - Prisma schema type mismatch
-            messages: true,
             campaigns: true,
             posts: true,
             reviews: true,

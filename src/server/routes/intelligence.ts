@@ -54,11 +54,9 @@ async function scoreContact(contactId: string, businessId: string) {
   else if (totalScore >= 25) category = 'warm';
 
   const score = await prisma.leadScore.upsert({
-    // @ts-expect-error - Prisma schema type mismatch
-    where: { contactId },
+    where: { businessId_contactId: { businessId, contactId } },
     update: {
       score: totalScore,
-      // @ts-expect-error - Prisma schema type mismatch
       category,
       engagementScore,
       recencyScore,
@@ -79,7 +77,6 @@ async function scoreContact(contactId: string, businessId: string) {
       contactId,
       businessId,
       score: totalScore,
-      // @ts-expect-error - Prisma schema type mismatch
       category,
       engagementScore,
       recencyScore,
@@ -127,7 +124,6 @@ router.get('/scores', async (req: any, res: any) => {
       _count: { score: true },
     });
 
-    // @ts-expect-error - Prisma circular reference
     const byCategory = await prisma.leadScore.groupBy({
       by: ['category'],
       where: { businessId: req.user.businessId },

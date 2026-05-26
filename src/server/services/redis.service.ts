@@ -60,8 +60,7 @@ export const cacheHelpers = {
     try {
       const cached = await redisClient.get(key as string);
       if (cached) {
-        // @ts-expect-error - Redis type mismatch
-        return JSON.parse(cached) as T;
+        return JSON.parse(cached as string) as T;
       }
 
       const data = await callback();
@@ -106,8 +105,7 @@ export const cacheHelpers = {
 
     try {
       const data = await redisClient.get(`user:${userId}:${key}` as string);
-      // @ts-expect-error - Redis type mismatch
-      return data ? JSON.parse(data) : null;
+      return data ? JSON.parse(data as string) : null;
     } catch (error) {
       console.error('User cache get error:', error);
       return null;
@@ -130,8 +128,7 @@ export const cacheHelpers = {
 
     try {
       const data = await redisClient.get(`business:${businessId}:${key}` as string);
-      // @ts-expect-error - Redis type mismatch
-      return data ? JSON.parse(data) : null;
+      return data ? JSON.parse(data as string) : null;
     } catch (error) {
       console.error('Business cache get error:', error);
       return null;

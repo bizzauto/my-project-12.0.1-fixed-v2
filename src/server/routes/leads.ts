@@ -474,12 +474,11 @@ router.post('/bulk-reply', authenticate, async (req: AuthRequest, res: Response)
           sent++;
         } else if (channel === 'email' && contact.email) {
           const { EmailService } = await import('../services/email.service.js');
-          // @ts-expect-error - sendEmail argument count
-          await EmailService.sendEmail(businessId, {
-            to: contact.email,
-            subject: 'Response to your inquiry',
-            html: `<p>Dear ${contact.name || 'Customer'},</p><p>${message.replace(/\n/g, '<br/>')}</p>`,
-          });
+          await EmailService.sendEmail(
+            contact.email,
+            'Response to your inquiry',
+            `<p>Dear ${contact.name || 'Customer'},</p><p>${message.replace(/\n/g, '<br/>')}</p>`
+          );
           sent++;
         } else if (channel === 'sms' && contact.phone) {
           // SMS via WhatsApp as fallback (or integrate Twilio later)
@@ -494,13 +493,13 @@ router.post('/bulk-reply', authenticate, async (req: AuthRequest, res: Response)
 
     // Log activity
     await prisma.activity.create({
-      // @ts-expect-error - Prisma schema type mismatch
       data: {
         businessId,
         type: 'bulk_reply',
         title: `Bulk reply via ${channel}`,
         content: `Sent to ${sent} of ${contacts.length} leads`,
         metadata: { channel, sent, total: contacts.length, errors: errors.slice(0, 5) },
+        createdBy: req.user.id,
       },
     });
 
@@ -584,12 +583,11 @@ router.post('/capture/:businessId', async (req: Request, res: Response) => {
     // Auto-reply via Email if email provided
     if (email) {
       try {
-        // @ts-expect-error - sendEmail argument count
-        await EmailService.sendEmail(businessId, {
-          to: email,
-          subject: 'Thank you for your inquiry',
-          html: `<h2>Thank you for contacting us!</h2><p>Dear ${name || 'there'},</p><p>We have received your inquiry about <strong>${product || 'our products'}</strong>.</p><p>Our team will get back to you shortly.</p><p>Best regards,<br/>Our Team</p>`,
-        });
+        await EmailService.sendEmail(
+          email,
+          'Thank you for your inquiry',
+          `<h2>Thank you for contacting us!</h2><p>Dear ${name || 'there'},</p><p>We have received your inquiry about <strong>${product || 'our products'}</strong>.</p><p>Our team will get back to you shortly.</p><p>Best regards,<br/>Our Team</p>`
+        );
       } catch (e: any) {
         console.error('Auto-reply email failed:', e.message);
       }
@@ -597,7 +595,6 @@ router.post('/capture/:businessId', async (req: Request, res: Response) => {
 
     // Log activity
     await prisma.activity.create({
-      // @ts-expect-error - Prisma schema type mismatch
       data: {
         businessId,
         contactId: contact.id,
@@ -605,6 +602,7 @@ router.post('/capture/:businessId', async (req: Request, res: Response) => {
         title: `New lead from ${src || 'website'}`,
         content: `Product: ${product}, Requirement: ${requirement}`,
         metadata: { source: src || 'website', product, requirement, city, supplier },
+        createdBy: 'system',
       },
     });
 

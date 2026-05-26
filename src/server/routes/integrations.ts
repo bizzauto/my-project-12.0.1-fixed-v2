@@ -170,15 +170,12 @@ router.post('/email', async (req: any, res: Response) => {
     } = req.body;
 
     const integration = await EmailService.configureEmail(businessId, {
-      // @ts-expect-error - Prisma schema type mismatch
-      smtpHost: smtpHost || 'smtp.gmail.com',
-      smtpPort: smtpPort || 587,
-      smtpSecure: smtpSecure || false,
-      smtpUser,
-      smtpPass,
+      host: smtpHost || 'smtp.gmail.com',
+      port: smtpPort || 587,
+      secure: smtpSecure || false,
+      user: smtpUser,
+      pass: smtpPass,
       fromName: fromName || smtpUser,
-      enableAutoReply,
-      autoReplyMessage,
     });
 
     res.json({ success: true, data: integration });
@@ -197,12 +194,11 @@ router.post('/email/test', async (req: any, res: Response) => {
 
 
     const isValid = await EmailService.testEmailConfig({
-      // @ts-expect-error - Prisma schema type mismatch
-      smtpHost,
-      smtpPort,
-      smtpSecure,
-      smtpUser,
-      smtpPass,
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      user: smtpUser,
+      pass: smtpPass,
     });
 
     res.json({ success: true, data: { valid: isValid } });

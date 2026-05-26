@@ -282,7 +282,6 @@ export class EvolutionApiService {
       // Save to database
       await
       prisma.message.create({
-        // @ts-expect-error - Prisma schema type mismatch
         data: {
           businessId,
           direction: 'outbound',
@@ -303,7 +302,6 @@ export class EvolutionApiService {
       // Save failed message
       await
       prisma.message.create({
-        // @ts-expect-error - Prisma schema type mismatch
         data: {
           businessId,
           direction: 'outbound',
@@ -359,7 +357,6 @@ export class EvolutionApiService {
 
       await
       prisma.message.create({
-        // @ts-expect-error - Prisma schema type mismatch
         data: {
           businessId,
           direction: 'outbound',
@@ -420,7 +417,6 @@ export class EvolutionApiService {
 
       await
       prisma.message.create({
-        // @ts-expect-error - Prisma schema type mismatch
         data: {
           businessId,
           direction: 'outbound',
@@ -622,9 +618,9 @@ export class EvolutionApiService {
 
         if (!contact) {
           contact = await prisma.contact.create({
-            // @ts-expect-error - Prisma schema type mismatch
             data: {
               businessId,
+              name: from || 'WhatsApp Contact',
               phone: from,
               source: 'whatsapp',
               whatsappOptIn: true,

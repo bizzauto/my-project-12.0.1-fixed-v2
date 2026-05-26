@@ -50,8 +50,7 @@ router.post('/', authenticate, async (req: any, res: any) => {
       data: {
         businessId: req.user.businessId,
         content,
-        // @ts-expect-error - Prisma field mismatch
-          images: [],
+        mediaUrls: [],
         platforms: platforms || [],
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         status: scheduledAt ? 'scheduled' : 'draft',

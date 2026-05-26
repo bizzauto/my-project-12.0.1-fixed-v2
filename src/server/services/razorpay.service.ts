@@ -155,9 +155,8 @@ export const createSubscription = async (
   total_count: number
 ) => {
   try {
-    const subscription = await razorpay.subscriptions.create({
+    const subscription = await (razorpay.subscriptions.create as any)({
       plan_id: planId,
-      // @ts-expect-error - Razorpay type mismatch
       customer_id: customerId,
       total_count,
       addons: [],

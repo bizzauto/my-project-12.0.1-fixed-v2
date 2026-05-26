@@ -247,8 +247,7 @@ router.post('/cancel', authenticate, requireBusinessOwner, async (req: any, res:
       data: {
         status: 'cancelled',
         cancelledAt: new Date(),
-        // @ts-expect-error - Prisma field mismatch
-          cancelledBy: req.user.id,
+        cancelledBy: req.user.id,
       },
     });
 
@@ -363,13 +362,11 @@ router.post('/upgrade', authenticate, requireBusinessOwner, async (req: any, res
 
     // Create new subscription
     const subscription = await prisma.subscription.create({
-      // @ts-expect-error - Prisma schema type mismatch
       data: {
         businessId: req.user.businessId,
         plan,
         status: 'pending',
-
-          amount: getPlanAmount(plan),
+        amount: getPlanAmount(plan),
       },
     });
 
@@ -384,11 +381,17 @@ router.put('/payment-method', authenticate, requireBusinessOwner, async (req: an
   try {
     const { paymentMethodId } = req.body;
 
-    await prisma.business.update({
-      where: { id: req.user.businessId },
-      // @ts-expect-error - Prisma schema type mismatch
-      data: { paymentMethodId },
+    // Update the active subscription's payment method
+    const subscription = await prisma.subscription.findFirst({
+      where: { businessId: req.user.businessId, status: 'active' },
     });
+
+    if (subscription) {
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { paymentMethodId },
+      });
+    }
 
     res.json({ success: true, message: 'Payment method updated' });
   } catch (error: any) {

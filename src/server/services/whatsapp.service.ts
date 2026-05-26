@@ -160,7 +160,6 @@ export class WhatsAppService {
       const response = await axios.post(url, payload, config);
 
       await prisma.message.create({
-        // @ts-expect-error - Prisma schema type mismatch
         data: {
           businessId,
           direction: 'outbound',
@@ -238,7 +237,6 @@ export class WhatsAppService {
       const response = await axios.post(url, payload, config);
 
       await prisma.message.create({
-        // @ts-expect-error - Prisma schema type mismatch
         data: {
           businessId,
           direction: 'outbound',

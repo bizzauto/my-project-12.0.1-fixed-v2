@@ -51,8 +51,7 @@ export function captureError(error: Error, context?: Record<string, any>) {
 
 export function captureMessage(message: string, level: Sentry.SeverityLevel = 'info', context?: Record<string, any>) {
   if (process.env.SENTRY_DSN) {
-    // @ts-expect-error - newer @sentry/node types differ from runtime API
-    Sentry.captureMessage(message, level, {
+    (Sentry.captureMessage as any)(message, level, {
       extra: context,
     });
   }

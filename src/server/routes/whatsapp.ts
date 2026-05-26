@@ -71,9 +71,9 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
 
         if (!contact) {
           contact = await prisma.contact.create({
-            // @ts-expect-error - Prisma schema type mismatch
             data: {
               businessId,
+              name: message.from,
               phone: message.from,
               source: 'whatsapp',
               whatsappOptIn: true,
@@ -99,7 +99,6 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
           messageData.content = message.image.caption;
         }
 
-        await
         await prisma.message.create({
           data: messageData,
         });
@@ -350,14 +349,14 @@ router.post('/send/text', authenticate, async (req: AuthRequest, res: Response) 
     });
 
     // Create activity
-    await
-        await prisma.activity.create({
-          // @ts-expect-error - Prisma schema type mismatch
-          data: {
+    await prisma.activity.create({
+      data: {
         businessId: req.user.businessId,
         contactId,
         type: 'whatsapp_sent',
+        title: 'WhatsApp message sent',
         content,
+        createdBy: req.user.id,
       },
     });
 
@@ -436,7 +435,6 @@ router.post('/send/template', authenticate, async (req: AuthRequest, res: Respon
     );
 
     const message = await prisma.message.create({
-      // @ts-expect-error - Prisma schema type mismatch
       data: {
         businessId: req.user.businessId,
         contactId,
@@ -576,7 +574,6 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
         phone,
         type: type || 'text',
         content,
-        // @ts-expect-error - Prisma schema type mismatch
         mediaUrl,
         mediaType,
         templateName,

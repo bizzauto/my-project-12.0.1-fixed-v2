@@ -104,6 +104,7 @@ model Business {
 
   // Legacy fields
   totalMessages   Int @default(0)
+  totalContacts   Int @default(0)
 
   // AI Credits
   aiCreditsUsed      Int @default(0)
@@ -188,6 +189,7 @@ model Subscription {
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   cancelledAt        DateTime?
+  cancelledBy        String?
 
   // Metadata
   metadata Json?
@@ -338,9 +340,9 @@ model Activity {
 // ==================== WHATSAPP MESSAGING ====================
 
 model Message {
-  id        String  @id @default(cuid())
-  contactId String
-  contact   Contact @relation(fields: [contactId], references: [id])
+  id        String   @id @default(cuid())
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
   businessId String?
 
   waMessageId String? // WhatsApp message ID
@@ -1140,6 +1142,23 @@ model LeadScore {
 
   score       Int @default(0)
   factors     Json[] // [{ factor: "email_opened", points: 5 }]
+
+  // Scoring breakdown
+  category         String  @default("cold") // cold, warm, hot, very_hot
+  engagementScore  Int     @default(0)
+  recencyScore     Int     @default(0)
+  intentScore      Int     @default(0)
+  fitScore         Int     @default(0)
+
+  // AI scoring
+  aiModel       String  @default("algorithm_v1")
+  aiConfidence  Float   @default(0.0)
+  predictedValue Float?
+  churnRisk     Int     @default(0)
+
+  // Reasoning
+  reasons    Json? // { recency: "...", engagement: "..." }
+  lastScoredAt DateTime?
   lastUpdated DateTime @updatedAt
 
   createdAt DateTime @default(now())
@@ -1190,6 +1209,7 @@ model ApiKey {
   business    Business @relation(fields: [businessId], references: [id])
   name        String
   key         String   @unique
+  prefix      String?
   permissions Json
   lastUsedAt  DateTime?
   expiresAt   DateTime?
