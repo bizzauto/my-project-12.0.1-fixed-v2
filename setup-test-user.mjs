@@ -19,7 +19,7 @@ async function createTestUser() {
                 name: 'Test Business',
                 type: 'general',
                 phone: '+1234567890',
-                plan: 'PRO',
+                plan: 'PROFESSIONAL',
                 planStartedAt: new Date(),
                 planExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
             },

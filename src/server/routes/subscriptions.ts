@@ -363,10 +363,12 @@ router.post('/upgrade', authenticate, requireBusinessOwner, async (req: any, res
     // Create new subscription
     const subscription = await prisma.subscription.create({
       data: {
-        businessId: req.user.businessId,
+        business: { connect: { id: req.user.businessId } },
         plan,
         status: 'pending',
         amount: getPlanAmount(plan),
+        startDate: new Date(),
+        interval: 'monthly',
       },
     });
 

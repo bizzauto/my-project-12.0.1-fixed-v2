@@ -113,9 +113,8 @@ router.post('/', authenticate, async (req: any, res: any) => {
     }
 
     const campaign = await prisma.campaign.create({
-      // @ts-expect-error - Prisma schema type mismatch
       data: {
-        businessId: req.user.businessId,
+        business: { connect: { id: req.user.businessId } },
         name,
         type,
         templateName,
@@ -123,8 +122,10 @@ router.post('/', authenticate, async (req: any, res: any) => {
         targetTags: targetTags || [],
         targetFilters: targetFilters || {},
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-        dripSteps: dripSteps || [],
+        dripSteps: dripSteps || null,
         status: scheduledAt ? 'scheduled' : 'draft',
+        content: req.body.content || { text: '', buttons: [], media: {} },
+        createdBy: req.user.id,
       },
     });
 
@@ -284,12 +285,9 @@ router.post('/:id/start', authenticate, async (req: any, res: any) => {
 
           await prisma.dripQueue.create({
             data: {
-              // @ts-expect-error - Prisma schema type mismatch
-              businessId: campaign.businessId,
-            campaignId: campaign.id,
+              campaignId: campaign.id,
               contactId: contact.id,
-              stepIndex: i,
-              stepData: step,
+              step: i,
               sendAt,
             },
           });

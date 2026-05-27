@@ -53,6 +53,9 @@ interface AuthState {
     phone?: string;
   }) => Promise<void>;
   logout: () => void;
+  
+  googleLogin: (credential: string) => Promise<void>;
+  appleLogin: (credential: string, name?: string) => Promise<void>;
   updateProfile: (data: { name?: string; phone?: string }) => Promise<void>;
   setOnboardingCompleted: (val: boolean) => void;
 }

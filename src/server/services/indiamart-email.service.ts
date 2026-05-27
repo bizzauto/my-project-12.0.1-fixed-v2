@@ -143,10 +143,8 @@ export class IndiaMARTEmailService {
     errors: string[];
   }> {
     // Dynamic import to handle optional dependency
-    // @ts-expect-error - imap module has no types
-    const Imap = (await import('imap')).default;
-    const imap =
-      new Imap({
+    const Imap = (await import('imap')).default as any;
+    const imap = new Imap({
       user: config.email,
       password: config.password,
       host: config.imapHost,
@@ -339,8 +337,7 @@ export class IndiaMARTEmailService {
 
     try {
       // Fetch emails using node-imap
-      // @ts-expect-error - imap module has no types
-      const Imap = (await import('imap')).default;
+      const Imap = (await import('imap')).default as any;
       const imap = new Imap({
         user: emailConfig.email,
         password: emailConfig.password,

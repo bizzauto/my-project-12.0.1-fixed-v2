@@ -38,7 +38,7 @@ router.post('/test', authenticate, async (req: AuthRequest, res: Response) => {
 router.post('/test-connection', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const config = req.body;
-    const result = await EmailService.testConnection(config);
+    const result = await EmailService.testEmailConfig(config);
 
     if (result.success) {
       res.json({
@@ -65,19 +65,21 @@ router.post('/config', authenticate, requireRole('OWNER', 'ADMIN'), async (req: 
   try {
     const { smtpHost, smtpPort, smtpUser, smtpPass, fromName, fromEmail } = req.body;
 
-    const business = await prisma.business.update({
-      where: { id: req.user.businessId },
-      data: {
-        smtpHost: smtpHost || undefined,
-        smtpPort: smtpPort ? Number(smtpPort) : undefined,
-        smtpUser: smtpUser || undefined,
-        smtpPass: smtpPass || undefined,
-        fromName: fromName || undefined,
-        fromEmail: fromEmail || undefined,
-      },
+    const result = await EmailService.configureEmail(req.user.businessId, {
+      host: smtpHost || 'smtp.gmail.com',
+      port: smtpPort ? Number(smtpPort) : 587,
+      secure: false,
+      user: smtpUser || '',
+      pass: smtpPass || '',
+      fromName: fromName || undefined,
+      fromEmail: fromEmail || undefined,
     });
 
-    res.json({ success: true, data: business });
+    if (result.success) {
+      res.json({ success: true, message: 'SMTP configuration saved' });
+    } else {
+      res.status(500).json({ success: false, error: result.error });
+    }
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -164,9 +166,10 @@ router.put('/templates/:id', authenticate, requireRole('OWNER', 'ADMIN'), async 
     });
     if (!existing) return res.status(404).json({ success: false, error: 'Template not found' });
 
+    const { id, businessId, createdAt, ...updateData } = req.body;
     const updated = await prisma.emailTemplate.update({
       where: { id: req.params.id },
-      data: req.body,
+      data: updateData,
     });
     res.json({ success: true, data: updated });
   } catch (error: any) {
@@ -180,8 +183,13 @@ router.put('/templates/:id', authenticate, requireRole('OWNER', 'ADMIN'), async 
  */
 router.delete('/templates/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    await prisma.emailTemplate.delete({
+    const existing = await prisma.emailTemplate.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
+    });
+    if (!existing) return res.status(404).json({ success: false, error: 'Template not found' });
+
+    await prisma.emailTemplate.delete({
+      where: { id: req.params.id },
     });
     res.json({ success: true, message: 'Template deleted' });
   } catch (error: any) {
@@ -245,9 +253,10 @@ router.put('/drips/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req
     });
     if (!existing) return res.status(404).json({ success: false, error: 'Drip not found' });
 
+    const { id, businessId, createdAt, ...updateData } = req.body;
     const updated = await prisma.dripCampaign.update({
       where: { id: req.params.id },
-      data: req.body,
+      data: updateData,
     });
     res.json({ success: true, data: updated });
   } catch (error: any) {
@@ -282,8 +291,13 @@ router.patch('/drips/:id/toggle', authenticate, requireRole('OWNER', 'ADMIN'), a
  */
 router.delete('/drips/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    await prisma.dripCampaign.delete({
+    const existing = await prisma.dripCampaign.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
+    });
+    if (!existing) return res.status(404).json({ success: false, error: 'Drip not found' });
+
+    await prisma.dripCampaign.delete({
+      where: { id: req.params.id },
     });
     res.json({ success: true, message: 'Drip deleted' });
   } catch (error: any) {
@@ -341,8 +355,13 @@ router.post('/lists', authenticate, requireRole('OWNER', 'ADMIN'), async (req: A
  */
 router.delete('/lists/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    await prisma.emailList.delete({
+    const existing = await prisma.emailList.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
+    });
+    if (!existing) return res.status(404).json({ success: false, error: 'List not found' });
+
+    await prisma.emailList.delete({
+      where: { id: req.params.id },
     });
     res.json({ success: true, message: 'List deleted' });
   } catch (error: any) {

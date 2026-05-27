@@ -141,6 +141,9 @@ model Business {
   webhooks        Webhook[]
   apiKeys         ApiKey[]
   chatbotFlows    ChatbotFlow[]
+  emailTemplates   EmailTemplate[]
+  dripCampaigns    DripCampaign[]
+  emailLists       EmailList[]
   scheduledMessages ScheduledMessage[]
   autoReplies     AutoReply[]
 
@@ -1283,6 +1286,58 @@ model DripQueue {
   createdAt  DateTime @default(now())
   @@index([campaignId])
   @@index([status])
+}
+
+// ==================== EMAIL TEMPLATES ====================
+model EmailTemplate {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+
+  name        String
+  subject     String
+  htmlContent String
+  textContent String  @default("")
+  category    String  @default("general")
+  variables   Json[]
+  isDefault   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([category])
+}
+
+model DripCampaign {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+
+  name    String
+  trigger String // signup, purchase, inactivity, custom
+  steps   Json[] // [{ day: 0, subject: "", body: "" }]
+  isActive Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+}
+
+model EmailList {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id])
+
+  name        String
+  description String  @default("")
+  subscriberCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
 }
 
 // ==================== AUTO REPLY ====================

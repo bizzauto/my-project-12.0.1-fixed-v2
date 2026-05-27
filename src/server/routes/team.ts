@@ -644,13 +644,14 @@ router.post('/api-keys', requireRole('OWNER', 'ADMIN'), async (req: any, res: an
 
     const apiKey = await prisma.apiKey.create({
       data: {
-        businessId: req.user.businessId,
+        business: { connect: { id: req.user.businessId } },
         name,
         key,
         prefix,
         permissions,
         expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
         isActive: true,
+        createdBy: req.user.id,
       },
     });
 

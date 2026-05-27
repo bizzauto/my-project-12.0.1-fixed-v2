@@ -471,23 +471,22 @@ const PosterGallery: React.FC = () => {
           )}
         </>
       )}
+
+        {/* Delete confirmation */}
+        <ConfirmDialog
+          isOpen={!!deleteTarget}
+          title="Delete Poster"
+          message={`Are you sure you want to delete "${deleteTarget?.name || ''}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          onClose={() => setDeleteTarget(null)}
+          loading={deleting}
+        />
     </div>
   );
-      {/* Delete confirmation */}
-      <ConfirmDialog
-        isOpen={!!deleteTarget}
-        title="Delete Poster"
-        message={`Are you sure you want to delete "${deleteTarget?.name || ''}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        variant="danger"
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
-        onClose={() => setDeleteTarget(null)}
-        loading={deleting}
-      />
-    </div>
-  );
-};
+}
 
 export default PosterGallery;

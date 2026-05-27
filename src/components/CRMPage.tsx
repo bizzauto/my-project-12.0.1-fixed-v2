@@ -4,7 +4,7 @@ import {
   TrendingUp, Calendar, Clock, MessageSquare, FileText, Bell, CheckCircle, X, Star, Activity, ArrowUp, ArrowDown,
   BarChart3, PieChart, Target, Award, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Users, Building2, MapPin,
   Globe, Linkedin, Twitter, Facebook, Copy, Check, List, Grid, Columns, Settings, Share2, Printer, Smartphone,
-  Zap, Shield, Flag, MessageCircle, Paperclip, Camera, Video, Headphones, Heart, ThumbsUp
+  Zap, Shield, Flag, MessageCircle, Paperclip, Camera, Video, Headphones, Heart, ThumbsUp, Send
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/authStore';
@@ -246,7 +246,7 @@ const demoAppointments: Appointment[] = [
   { id: '1', title: 'Product Demo - Enterprise Suite', clientName: 'Rahul Sharma', clientPhone: '+91 98765 43210', service: 'Enterprise Demo', date: '2024-01-25', time: '10:00', duration: 60, status: 'confirmed', reminder: true, location: 'Virtual - Google Meet', staff: 'Sales Team' },
   { id: '2', title: 'Follow-up Call', clientName: 'Priya Patel', clientPhone: '+91 87654 32109', service: 'Sales Call', date: '2024-01-26', time: '14:00', duration: 30, status: 'scheduled', reminder: false },
   { id: '3', title: 'Contract Signing', clientName: 'Sneha Gupta', clientPhone: '+91 65432 10987', service: 'Legal', date: '2024-01-28', time: '11:00', duration: 45, status: 'scheduled', reminder: true, location: 'Our Office - Conference Room B', staff: 'Legal Team' },
-  { id: '4', title: 'Quarterly Review', clientName: 'Vikram Singh', clientPhone: '+91 54321 09876', service: 'Account Review', date: '2024-01-24', time: '15:30', duration: 60, status: 'confirmed', staff: 'Account Manager' },
+  { id: '4', title: 'Quarterly Review', clientName: 'Vikram Singh', clientPhone: '+91 54321 09876', service: 'Account Review', date: '2024-01-24', time: '15:30', duration: 60, status: 'confirmed', reminder: true, staff: 'Account Manager' },
 ];
 
 const demoGoals: Goal[] = [

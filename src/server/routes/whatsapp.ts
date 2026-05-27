@@ -437,11 +437,12 @@ router.post('/send/template', authenticate, async (req: AuthRequest, res: Respon
     const message = await prisma.message.create({
       data: {
         businessId: req.user.businessId,
-        contactId,
+        contact: { connect: { id: contactId } },
         direction: 'outbound',
         type: 'template',
         templateName,
         templateLanguage: languageCode,
+        content: components ? JSON.stringify(components) : '',
         status: 'sent',
         waMessageId: response.data.messages?.[0]?.id,
       },
@@ -580,7 +581,6 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
         templateVars,
         templateLanguage,
         scheduledAt: scheduledDate,
-        timezone: timezone || 'Asia/Kolkata',
         status: 'pending',
       },
       include: { contact: true },

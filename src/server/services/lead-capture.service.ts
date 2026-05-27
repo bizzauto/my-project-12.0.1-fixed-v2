@@ -63,18 +63,18 @@ export class LeadCaptureService {
     // Send email if available
     if (leadData.email) {
       try {
-        // @ts-expect-error - sendTextMessage argument count mismatch
-        await EmailService.sendEmail(businessId, {
-          to: leadData.email,
-          subject: 'Thank you for your inquiry',
-          html: `
+        // Send email using proper signature: sendEmail(to, subject, html)
+        await EmailService.sendEmail(
+          leadData.email,
+          'Thank you for your inquiry',
+          `
             <h2>Thank you for contacting us!</h2>
             <p>Dear ${leadData.name},</p>
             <p>We have received your inquiry about <strong>${leadData.product || 'our products'}</strong> on IndiaMART.</p>
             <p>Our team will review your requirement and get back to you within 24 hours.</p>
             <p>Best regards,<br/>Your Business Team</p>
-          `,
-        });
+          `
+        );
       } catch (error: any) {
         console.error('Failed to send email:', error.message);
       }
@@ -356,7 +356,6 @@ export class LeadCaptureService {
         lastActivity: new Date(),
         metadata: data.metadata,
         whatsappOptIn: true,
-        // @ts-expect-error - Prisma field mismatch
         emailOptIn: !!data.email,
       },
     });
