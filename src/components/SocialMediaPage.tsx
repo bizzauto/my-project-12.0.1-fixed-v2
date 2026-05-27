@@ -3,13 +3,14 @@ import {
   Calendar, Plus, Image, Zap, Send, Clock, MoreVertical,
   BarChart3, TrendingUp, Eye, Heart, MessageCircle, Share2,
   Edit3, Trash2, Copy, CheckCircle, XCircle, Filter,
-  ChevronLeft, ChevronRight, Settings, RefreshCw
+  ChevronLeft, ChevronRight, Settings, RefreshCw,
+  Instagram, Upload, Loader2, Plug, Unplug, Camera, Film, ImagePlus
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RT,
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
-import { postsAPI } from '../lib/api';
+import { postsAPI, instagramAPI } from '../lib/api';
 import { useAuthStore } from '../lib/authStore';
 
 // Types
@@ -75,6 +76,16 @@ const SocialMediaPage: React.FC = () => {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['facebook', 'instagram']);
   const [scheduleDate, setScheduleDate] = useState('');
   const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
+
+  // Instagram-specific state
+  const [igStatus, setIgStatus] = useState<{ connected: boolean; accountInfo?: any } | null>(null);
+  const [showIgConnectModal, setShowIgConnectModal] = useState(false);
+  const [igConnectForm, setIgConnectForm] = useState({ igUserId: '', igAccessToken: '' });
+  const [igConnecting, setIgConnecting] = useState(false);
+  const [uploadedMedia, setUploadedMedia] = useState<Array<{ url: string; type: string; file?: File; previewUrl: string }>>([]);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [publishingToIg, setPublishingToIg] = useState(false);
+  const [publishProgress, setPublishProgress] = useState<string>('');
 
   // Demo mode data
   const demoPosts: SocialPost[] = [
@@ -199,7 +210,16 @@ const SocialMediaPage: React.FC = () => {
 
   useEffect(() => {
     fetchPosts();
-  }, [fetchPosts]);
+
+    // Check Instagram connection status
+    if (!isDemoMode) {
+      instagramAPI.getStatus().then(res => {
+        if (res.data.success) {
+          setIgStatus(res.data.data);
+        }
+      }).catch(() => {});
+    }
+  }, [fetchPosts, isDemoMode]);
 
   const showToast = (message: string, type = 'success') => {
     setToast({ message, type });
@@ -217,6 +237,13 @@ const SocialMediaPage: React.FC = () => {
         scheduledAt: scheduleDate || undefined,
       });
       if (res.data.success) {
+        // If Instagram is selected and media was uploaded, attach media URLs to the post
+        if (selectedPlatforms.includes('instagram') && uploadedMedia.length > 0) {
+          await postsAPI.update(res.data.data.id, {
+            mediaUrls: uploadedMedia.map(m => m.url),
+          });
+          setUploadedMedia([]);
+        }
         fetchPosts();
         setComposeContent('');
         setSelectedPlatforms(['facebook', 'instagram']);
@@ -245,6 +272,138 @@ const SocialMediaPage: React.FC = () => {
     const dup = { ...post, id: Date.now().toString(), status: 'draft' as const, likes: 0, comments: 0, shares: 0, reach: 0 };
     setPosts([dup, ...posts]);
     showToast('Post duplicated as draft');
+  };
+
+  // Instagram: Upload media
+  const handleIgMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingMedia(true);
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('media', files[i]);
+    }
+
+    try {
+      const res = await instagramAPI.uploadMedia(formData);
+      if (res.data.success) {
+        const newMedia = res.data.data.media.map((m: any, i: number) => ({
+          url: m.url,
+          type: m.type,
+          previewUrl: URL.createObjectURL(files[i]),
+        }));
+        setUploadedMedia(prev => [...prev, ...newMedia]);
+      }
+    } catch (err: any) {
+      showToast(err?.response?.data?.error || 'Failed to upload media', 'error');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  // Instagram: Remove uploaded media
+  const removeIgMedia = (index: number) => {
+    setUploadedMedia(prev => {
+      const item = prev[index];
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // Instagram: Connect account
+  const handleIgConnect = async () => {
+    if (!igConnectForm.igUserId || !igConnectForm.igAccessToken) {
+      showToast('Please enter Instagram User ID and Access Token', 'error');
+      return;
+    }
+    setIgConnecting(true);
+    try {
+      const res = await instagramAPI.connect(igConnectForm);
+      if (res.data.success) {
+        showToast(res.data.message);
+        setShowIgConnectModal(false);
+        // Refresh status
+        const statusRes = await instagramAPI.getStatus();
+        if (statusRes.data.success) setIgStatus(statusRes.data.data);
+      }
+    } catch (err: any) {
+      showToast(err?.response?.data?.error || 'Failed to connect Instagram', 'error');
+    } finally {
+      setIgConnecting(false);
+    }
+  };
+
+  // Instagram: Disconnect account
+  const handleIgDisconnect = async () => {
+    try {
+      await instagramAPI.disconnect();
+      setIgStatus({ connected: false });
+      showToast('Instagram account disconnected');
+    } catch (err: any) {
+      showToast('Failed to disconnect', 'error');
+    }
+  };
+
+  // Instagram: Publish a post directly to Instagram
+  const handleIgPublishPost = async (post: SocialPost) => {
+    setPublishingToIg(true);
+    setPublishProgress('Creating Instagram container...');
+
+    if (!uploadedMedia.length && !post.image) {
+      showToast('Instagram requires media. Upload images first.', 'error');
+      setPublishingToIg(false);
+      return;
+    }
+
+    try {
+      let mediaUrls: string[];
+      let mediaTypes: string[];
+
+      if (uploadedMedia.length > 0) {
+        mediaUrls = uploadedMedia.map(m => m.url);
+        mediaTypes = uploadedMedia.map(m => m.type);
+      } else if (post.image) {
+        mediaUrls = [post.image];
+        mediaTypes = ['IMAGE'];
+      } else {
+        throw new Error('No media to publish');
+      }
+
+      setPublishProgress('Publishing...');
+
+      if (mediaUrls.length === 1) {
+        const res = await instagramAPI.publish({
+          mediaUrl: mediaUrls[0],
+          caption: post.content,
+          mediaType: mediaTypes[0],
+        });
+        if (res.data.success) {
+          // Update post status
+          await postsAPI.publish(post.id).catch(() => {});
+          showToast('✅ Published to Instagram!');
+          setUploadedMedia([]);
+          fetchPosts();
+        }
+      } else {
+        const res = await instagramAPI.publishCarousel({
+          children: mediaUrls.map((url, i) => ({ mediaUrl: url, mediaType: mediaTypes[i] })),
+          caption: post.content,
+        });
+        if (res.data.success) {
+          // Update post status
+          await postsAPI.publish(post.id).catch(() => {});
+          showToast('✅ Carousel published to Instagram!');
+          setUploadedMedia([]);
+          fetchPosts();
+        }
+      }
+    } catch (err: any) {
+      showToast(err?.response?.data?.error || 'Failed to publish to Instagram', 'error');
+    } finally {
+      setPublishingToIg(false);
+      setPublishProgress('');
+    }
   };
 
   // Calendar data for current month
@@ -390,6 +549,16 @@ const SocialMediaPage: React.FC = () => {
                           </div>
                         )}
                         <div className="flex items-center gap-1">
+                          {(post.platforms.includes('instagram') || post.status === 'draft') && igStatus?.connected && (
+                            <button
+                              onClick={() => handleIgPublishPost(post)}
+                              disabled={publishingToIg}
+                              className="p-1.5 hover:bg-pink-50 dark:hover:bg-pink-900/30 rounded-lg"
+                              title="Publish to Instagram"
+                            >
+                              {publishingToIg ? <Loader2 size={14} className="text-pink-500 animate-spin" /> : <Instagram size={14} className="text-pink-500" />}
+                            </button>
+                          )}
                           <button onClick={() => duplicatePost(post)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg" title="Duplicate">
                             <Copy size={14} className="text-gray-400" />
                           </button>
@@ -532,6 +701,104 @@ const SocialMediaPage: React.FC = () => {
         </div>
       )}
 
+      {/* Publish Progress Bar */}
+      {publishingToIg && (
+        <div className="fixed bottom-4 right-4 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 max-w-xs">
+          <div className="flex items-center gap-3 mb-2">
+            <Instagram size={18} className="text-pink-500" />
+            <span className="text-sm font-medium text-gray-900 dark:text-white">Publishing to Instagram...</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Loader2 size={14} className="text-pink-500 animate-spin" />
+            <span className="text-xs text-gray-500">{publishProgress}</span>
+          </div>
+          <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+            <div className="bg-gradient-to-r from-pink-500 to-purple-500 h-full rounded-full animate-pulse" style={{ width: '60%' }} />
+          </div>
+        </div>
+      )}
+
+      {/* Instagram Connect Modal */}
+      {showIgConnectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowIgConnectModal(false)}>
+          <div className="fixed inset-0 bg-black/50" />
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-lg">
+                  <Instagram size={20} className="text-pink-600" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {igStatus?.connected ? 'Change Instagram Account' : 'Connect Instagram'}
+                </h2>
+              </div>
+              <button onClick={() => setShowIgConnectModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <XCircle size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            {igStatus?.connected && (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  Already connected as <strong>{igStatus.accountInfo?.username || 'Instagram Account'}</strong>
+                </p>
+                <button
+                  onClick={handleIgDisconnect}
+                  className="mt-2 text-xs text-red-600 hover:underline"
+                >
+                  <Unplug size={12} className="inline mr-1" /> Disconnect
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Connect your Instagram Business Account to publish posts directly. You'll need your Instagram User ID and a Page Access Token with <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">instagram_basic</code> and <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">instagram_content_publish</code> permissions.
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Instagram User ID</label>
+                <input
+                  type="text"
+                  value={igConnectForm.igUserId}
+                  onChange={e => setIgConnectForm(prev => ({ ...prev, igUserId: e.target.value }))}
+                  placeholder="e.g. 17841405822304945"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Instagram Access Token</label>
+                <input
+                  type="password"
+                  value={igConnectForm.igAccessToken}
+                  onChange={e => setIgConnectForm(prev => ({ ...prev, igAccessToken: e.target.value }))}
+                  placeholder="EAAB... long token"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowIgConnectModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleIgConnect}
+                  disabled={igConnecting || !igConnectForm.igUserId || !igConnectForm.igAccessToken}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 text-sm"
+                >
+                  {igConnecting ? <Loader2 size={16} className="animate-spin" /> : <Plug size={16} />}
+                  {igConnecting ? 'Connecting...' : igStatus?.connected ? 'Update Connection' : 'Connect'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Compose Modal */}
       {showComposeModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={() => setShowComposeModal(false)}>
@@ -562,15 +829,117 @@ const SocialMediaPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Media */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add Media</label>
-                <div className="flex gap-3">
-                  <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
-                    <Image size={18} /> Upload Image
-                  </button>
+              {/* Instagram Connect Banner */}
+              {selectedPlatforms.includes('instagram') && !igStatus?.connected && (
+                <div className="bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Instagram size={20} className="text-pink-500 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-pink-700 dark:text-pink-300">Connect your Instagram Business Account</p>
+                      <p className="text-xs text-pink-600 dark:text-pink-400 mt-1">You need to connect Instagram to publish posts directly.</p>
+                      <button
+                        onClick={() => setShowIgConnectModal(true)}
+                        className="mt-2 px-3 py-1.5 bg-pink-600 text-white text-xs rounded-lg hover:bg-pink-700 transition-colors"
+                      >
+                        <Plug size={12} className="inline mr-1" /> Connect Instagram
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Instagram Connected Status */}
+              {selectedPlatforms.includes('instagram') && igStatus?.connected && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Instagram size={16} className="text-green-600" />
+                      <span className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
+                        Instagram Connected {igStatus.accountInfo?.username ? `@${igStatus.accountInfo.username}` : ''}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setShowIgConnectModal(true)}
+                      className="text-xs text-pink-600 hover:underline"
+                    >
+                      Change Account
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Instagram Media Upload (shown when Instagram is selected) */}
+              {selectedPlatforms.includes('instagram') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Media for Instagram
+                    <span className="text-xs text-gray-400 ml-2">(Up to 10 images/videos for carousel)</span>
+                  </label>
+
+                  {/* Uploaded media preview */}
+                  {uploadedMedia.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+                      {uploadedMedia.map((media, i) => (
+                        <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                          {media.type === 'VIDEO' ? (
+                            <div className="w-full h-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                              <Film size={24} className="text-gray-400" />
+                            </div>
+                          ) : (
+                            <img src={media.previewUrl} alt={`Media ${i + 1}`} className="w-full h-full object-cover" />
+                          )}
+                          <button
+                            onClick={() => removeIgMedia(i)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <XCircle size={14} />
+                          </button>
+                          <span className="absolute bottom-1 left-1 px-1 py-0.5 bg-black/50 text-white text-[10px] rounded">
+                            {media.type === 'VIDEO' ? '🎬' : '📷'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {igStatus?.connected && (
+                    <div className="flex flex-wrap gap-2">
+                      <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 cursor-pointer text-xs sm:text-sm">
+                        {uploadingMedia ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+                        <span>{uploadingMedia ? 'Uploading...' : 'Add Images'}</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/jpeg,image/png,image/webp,video/mp4"
+                          onChange={handleIgMediaUpload}
+                          className="hidden"
+                          disabled={uploadingMedia}
+                        />
+                      </label>
+                      {uploadedMedia.length > 0 && (
+                        <button
+                          onClick={() => setUploadedMedia([])}
+                          className="px-3 py-2 text-xs text-gray-500 hover:text-red-500"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Regular image upload (for non-Instagram platforms) */}
+              {!selectedPlatforms.includes('instagram') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add Media</label>
+                  <div className="flex gap-3">
+                    <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+                      <Image size={18} /> Upload Image
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Platforms */}
               <div>

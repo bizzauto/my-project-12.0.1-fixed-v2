@@ -333,4 +333,34 @@ export const googleBusinessAPI = {
   getStats: () => apiClient.get('/google-business/stats'),
 };
 
+// Instagram API
+export const instagramAPI = {
+  connect: (data: { igUserId: string; igAccessToken: string }) =>
+    apiClient.post('/instagram/connect', data),
+  disconnect: () => apiClient.delete('/instagram/disconnect'),
+  getStatus: () => apiClient.get('/instagram/status'),
+  getAccount: () => apiClient.get('/instagram/account'),
+  uploadMedia: (formData: FormData) =>
+    apiClient.post('/instagram/media/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  createContainer: (data: { mediaUrl: string; caption?: string; mediaType?: string }) =>
+    apiClient.post('/instagram/media/container', data),
+  createCarouselContainer: (data: { children: Array<{ mediaUrl: string; mediaType?: string }>; caption?: string }) =>
+    apiClient.post('/instagram/media/container/carousel', data),
+  checkContainerStatus: (creationId: string) =>
+    apiClient.get(`/instagram/media/container/${creationId}/status`),
+  publishContainer: (creationId: string) =>
+    apiClient.post('/instagram/media/publish', { creationId }),
+  publish: (data: { mediaUrl: string; caption?: string; mediaType?: string }) =>
+    apiClient.post('/instagram/publish', data),
+  publishCarousel: (data: { children: Array<{ mediaUrl: string; mediaType?: string }>; caption?: string }) =>
+    apiClient.post('/instagram/carousel', data),
+  publishPost: (postId: string) =>
+    apiClient.post(`/instagram/post/${postId}/publish`),
+  getMedia: (limit?: number) => apiClient.get('/instagram/media', { params: { limit } }),
+  getMediaInsights: (mediaId: string) =>
+    apiClient.get(`/instagram/media/${mediaId}/insights`),
+};
+
 export default apiClient;

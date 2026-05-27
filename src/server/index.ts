@@ -32,6 +32,7 @@ import leadsRoutes from './routes/leads.js';
 import notificationsRoutes from './routes/notifications.js';
 import postersRoutes from './routes/posters.js';
 import postsRoutes from './routes/posts.js';
+import instagramRoutes from './routes/instagram.js';
 import qwenPreviewRoutes from './routes/qwen-preview.js';
 import reportsRoutes from './routes/reports.js';
 import reviewsRoutes from './routes/reviews.js';
@@ -138,6 +139,7 @@ app.use('/api/leads', leadsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/posters', postersRoutes);
 app.use('/api/posts', postsRoutes);
+app.use('/api/instagram', instagramRoutes);
 app.use('/api/qwen-preview', qwenPreviewRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/reviews', reviewsRoutes);
@@ -173,6 +175,9 @@ app.get('/health', (req, res) => {
     version: '1.0.0'
 });
 });
+
+// Serve uploads directory (always)
+app.use('/uploads', express.static(path.join(__dirname, '..', '..', 'uploads')));
 
 // Serve frontend in production
 if (NODE_ENV === 'production') {

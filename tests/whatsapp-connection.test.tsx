@@ -560,10 +560,9 @@ describe('WhatsAppModule - Evolution API Mode', () => {
     fireEvent.click(screen.getByText('Connect & Get QR Code'));
 
     // After the async call resolves, connectionStatus becomes 'scanning'
-    // Verify the component doesn't crash and stays in Evolution mode
+    // Verify the component shows scanning UI (Generating QR code...) instead of badge
     await waitFor(() => {
-      // The Evolution API view should still be showing (not crashed to error state)
-      expect(screen.getByText('Evolution API Configured')).toBeInTheDocument();
+      expect(screen.getByText(/Generating QR code/i)).toBeInTheDocument();
     });
 
     // The nav bar should still show Disconnected (scanning is not connected)
@@ -991,8 +990,7 @@ describe('WhatsAppModule - Evolution API Mode', () => {
 
       // Should transition to scanning state
       await waitFor(() => {
-        // The Evolution API Configured badge should still be visible
-        expect(screen.getByText('Evolution API Configured')).toBeInTheDocument();
+        expect(screen.getByText(/Generating QR code/i)).toBeInTheDocument();
       });
       // Nav should still show Disconnected (scanning !== connected)
       expect(screen.getByText(/Disconnected/)).toBeInTheDocument();
@@ -1080,7 +1078,7 @@ describe('WhatsAppModule - Evolution API Mode', () => {
       fireEvent.click(screen.getByText('Connect & Get QR Code'));
 
       await waitFor(() => {
-        expect(screen.getByText('Evolution API Configured')).toBeInTheDocument();
+        expect(screen.getByText(/Generating QR code/i)).toBeInTheDocument();
       });
 
       // Verify: still Disconnected (scanning !== connected)
@@ -1098,8 +1096,8 @@ describe('WhatsAppModule - Evolution API Mode', () => {
       // Verify there is no "Connecting..." overlay either (Evolution never enters 'connecting' state)
       expect(screen.queryByText('Connecting...')).not.toBeInTheDocument();
 
-      // The Evolution mode should still show the configured badge
-      expect(screen.getByText('Evolution API Configured')).toBeInTheDocument();
+      // The Evolution mode scanning UI should still be showing
+      expect(screen.getByText(/Generating QR code/i)).toBeInTheDocument();
     });
 
     it('transitions scanning → connected when re-mounted with state=open from status check', async () => {
@@ -1142,7 +1140,7 @@ describe('WhatsAppModule - Evolution API Mode', () => {
 
       // Connect → scanning
       fireEvent.click(screen.getByText('Connect & Get QR Code'));
-      await waitFor(() => expect(screen.getByText('Evolution API Configured')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Generating QR code/i)).toBeInTheDocument());
       expect(screen.getByText(/Disconnected/)).toBeInTheDocument();
 
       // ── Simulate external event: server now reports state=open ──
@@ -1206,7 +1204,7 @@ describe('WhatsAppModule - Evolution API Mode', () => {
 
       // Connect → scanning
       fireEvent.click(screen.getByText('Connect & Get QR Code'));
-      await waitFor(() => expect(screen.getByText('Evolution API Configured')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Generating QR code/i)).toBeInTheDocument());
       expect(screen.getByText(/Disconnected/)).toBeInTheDocument();
 
       // ── Switch to Chats view ──
@@ -1224,17 +1222,17 @@ describe('WhatsAppModule - Evolution API Mode', () => {
         expect(screen.getByText('Connect WhatsApp')).toBeInTheDocument();
       });
 
-      // Evolution config should still be shown (component not recreated)
+      // Evolution scanning state should still be preserved (component not recreated)
       fireEvent.click(screen.getByRole('button', { name: /Evolution API/i }));
       await waitFor(() => {
-        expect(screen.getByText('Evolution API Configured')).toBeInTheDocument();
+        expect(screen.getByText(/Generating QR code/i)).toBeInTheDocument();
       });
 
       // Nav should still show Disconnected — scanning state preserved
       expect(screen.getByText(/Disconnected/)).toBeInTheDocument();
 
-      // Verify Connect & Get QR Code button is still available
-      expect(screen.getByText('Connect & Get QR Code')).toBeInTheDocument();
+      // Refresh QR Code button should be available in scanning state
+      expect(screen.getByText(/Refresh QR Code/i)).toBeInTheDocument();
     });
 
     it('shows error message when Evolution API connect fails', async () => {

@@ -3,10 +3,12 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   moduleNameMapper: {
+    // Strip .js extension from ESM-style imports (server uses .js in import paths)
+    '^(\\.{1,2}/.*)\\.js$': '$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
+    '^.+\\\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
     }],
   },
