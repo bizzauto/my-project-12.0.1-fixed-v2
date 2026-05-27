@@ -37,7 +37,7 @@ async function getApplePublicKeys(): Promise<any[]> {
 }
 
 // POST /api/auth/apple - Apple Sign-In/Sign-Up
-router.post('/apple', async (req: Request, res: Response) => {
+router.post('/apple', socialAuthLimiter, async (req: Request, res: Response) => {
   try {
     const { credential } = req.body;
 
@@ -190,7 +190,7 @@ router.post('/apple', async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/google - Google Sign-In/Sign-Up
-router.post('/google', async (req: Request, res: Response) => {
+router.post('/google', socialAuthLimiter, async (req: Request, res: Response) => {
   try {
     const { credential } = req.body;
 
@@ -352,7 +352,7 @@ router.post('/google', async (req: Request, res: Response) => {
 });
 
 // Register
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', registerLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password, name, businessName, businessType, phone } = req.body;
 
@@ -438,11 +438,51 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-// Rate limiter: 5 login attempts per IP per minute
+// Rate limiters for auth endpoints
 const loginLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 5,
   message: { success: false, error: 'Too many login attempts. Please try again after a minute.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  message: { success: false, error: 'Too many registration attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3,
+  message: { success: false, error: 'Too many password reset requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const verifyOtpLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  message: { success: false, error: 'Too many OTP verification attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const resetPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  message: { success: false, error: 'Too many password reset attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const socialAuthLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  message: { success: false, error: 'Too many authentication attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -763,7 +803,7 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-router.post('/forgot-password', async (req: Request, res: Response) => {
+router.post('/forgot-password', forgotPasswordLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
@@ -815,7 +855,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/verify-otp', async (req: Request, res: Response) => {
+router.post('/verify-otp', verifyOtpLimiter, async (req: Request, res: Response) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP are required' });
@@ -831,7 +871,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/reset-password', async (req: Request, res: Response) => {
+router.post('/reset-password', resetPasswordLimiter, async (req: Request, res: Response) => {
   try {
     const { email, otp, newPassword } = req.body;
     if (!email || !otp || !newPassword) return res.status(400).json({ success: false, error: 'All fields are required' });
