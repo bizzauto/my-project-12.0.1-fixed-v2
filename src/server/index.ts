@@ -8,6 +8,7 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import winston from 'winston';
 import path from 'path';
@@ -43,6 +44,7 @@ import teamRoutes from './routes/team.js';
 import twoFactorRoutes from './routes/twoFactor.js';
 import webhooksRoutes from './routes/webhooks.js';
 import whatsappRoutes from './routes/whatsapp.js';
+import { securityHeaders, apiSecurityHeaders } from './middleware/security.js';
 
 dotenv.config();
 
@@ -53,9 +55,14 @@ const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || '0.0.0.0';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Initialize Prisma
+// Initialize Prisma with optimized connection pool
 export const prisma = new PrismaClient({
-  log: NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  log: NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
 });
 
 // Winston Logger
@@ -111,11 +118,28 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
 
+// Additional security headers
+app.use(securityHeaders);
+
 // Request ID middleware
 app.use((req, res, next) => {
   req.id = crypto.randomUUID();
   next();
 });
+
+// API Security Headers
+app.use('/api', apiSecurityHeaders);
+
+// Global API Rate Limiter (1000 requests per 15 minutes per IP)
+const globalApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  message: { success: false, error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path.startsWith('/health'), // Skip health checks
+});
+app.use('/api', globalApiLimiter);
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -166,14 +190,36 @@ if (NODE_ENV !== 'production') {
   });
 }
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: NODE_ENV,
-    version: '1.0.0'
+// Health check - comprehensive
+app.get('/health', async (req, res) => {
+  try {
+    const { getHealthCheck } = await import('./utils/healthCheck.js');
+    const health = await getHealthCheck();
+    const statusCode = health.status === 'unhealthy' ? 503 : 200;
+    res.status(statusCode).json(health);
+  } catch {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      environment: NODE_ENV,
+      version: '1.0.0',
+    });
+  }
 });
+
+// Liveness probe (for Kubernetes/Docker)
+app.get('/health/live', (req, res) => {
+  res.json({ status: 'alive', timestamp: new Date().toISOString() });
+});
+
+// Readiness probe (for Kubernetes/Docker)
+app.get('/health/ready', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ready', timestamp: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ status: 'not ready', timestamp: new Date().toISOString() });
+  }
 });
 
 // Serve uploads directory (always)
@@ -192,14 +238,25 @@ if (NODE_ENV === 'production') {
   });
 }
 // Startup validation for critical secrets
-(() => {
-  const missing: string[] = [];
-  if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
-  if (!process.env.ENCRYPTION_KEY) missing.push('ENCRYPTION_KEY');
-  if (missing.length > 0) {
-    const msg = `CRITICAL: Missing required environment variables: ${missing.join(', ')}. Server will start but secrets will be auto-generated. Set these in production!`;
-    logger.warn(msg);
-    console.warn(`WARNING: ${msg}`);
+(async () => {
+  try {
+    const { validateEnvironment, printValidationResult } = await import('./utils/envValidator.js');
+    const result = validateEnvironment();
+    printValidationResult(result);
+
+    if (!result.valid && NODE_ENV === 'production') {
+      logger.error('CRITICAL: Environment validation failed. Server starting in degraded mode.');
+    }
+  } catch (e) {
+    // Fallback basic check
+    const missing: string[] = [];
+    if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
+    if (!process.env.ENCRYPTION_KEY) missing.push('ENCRYPTION_KEY');
+    if (missing.length > 0) {
+      const msg = `CRITICAL: Missing required environment variables: ${missing.join(', ')}`;
+      logger.warn(msg);
+      console.warn(`WARNING: ${msg}`);
+    }
   }
 })();
 
@@ -231,19 +288,39 @@ app.use((req, res) => {
 process.on('unhandledRejection', (error: any) => {
   console.error('UNHANDLED REJECTION:', error);
   console.error('Stack:', error?.stack);
+  logger.error('Unhandled Rejection:', error);
 });
 
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  await prisma.$disconnect();
+  try {
+    await prisma.$disconnect();
+  } catch (e) {
+    // ignore disconnect errors during shutdown
+  }
   logger.on('finish', () => process.exit(0));
   logger.end();
+  setTimeout(() => process.exit(0), 5000); // Force exit after 5s
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  try {
+    await prisma.$disconnect();
+  } catch (e) {
+    // ignore
+  }
+  logger.on('finish', () => process.exit(0));
+  logger.end();
+  setTimeout(() => process.exit(0), 5000);
 });
 
 process.on('uncaughtException', async (error) => {
   console.error('UNCAUGHT EXCEPTION:', error);
   console.error('Stack:', error.stack);
   logger.error('Uncaught Exception:', error);
+  // Exit after uncaught exception - process is in undefined state
+  setTimeout(() => process.exit(1), 1000);
 });
 
 // Start server

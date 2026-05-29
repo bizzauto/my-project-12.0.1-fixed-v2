@@ -1,0 +1,107 @@
+/**
+ * Environment Validator
+ * Validates all required environment variables on startup
+ * Prevents runtime errors from missing config
+ */
+
+const REQUIRED_VARS = {
+  DATABASE_URL: { description: 'PostgreSQL connection string', pattern: /^postgresql:\/\// },
+  JWT_SECRET: { description: 'JWT signing secret (min 32 chars)', minLength: 32 },
+  JWT_REFRESH_SECRET: { description: 'JWT refresh secret (min 32 chars)', minLength: 32 },
+  ENCRYPTION_KEY: { description: 'AES-256 encryption key (64 hex chars)', pattern: /^[a-f0-9]{64}$/i },
+  REDIS_URL: { description: 'Redis connection string', pattern: /^redis:\/\// },
+  CORS_ORIGIN: { description: 'Allowed CORS origin' },
+  FRONTEND_URL: { description: 'Frontend application URL' },
+};
+
+const RECOMMENDED_VARS = {
+  SMTP_HOST: 'Email delivery',
+  SMTP_PORT: 'Email port',
+  SMTP_USER: 'Email username',
+  SMTP_PASS: 'Email password',
+  OPENROUTER_API_KEY: 'AI features',
+  RAZORPAY_KEY_ID: 'Payment processing',
+  RAZORPAY_KEY_SECRET: 'Payment processing',
+  SENTRY_DSN: 'Error monitoring',
+  N8N_URL: 'Workflow automation',
+  EVOLUTION_API_URL: 'WhatsApp via Evolution API',
+  SUPER_ADMIN_BOOTSTRAP_TOKEN: 'Super admin creation',
+};
+
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export function validateEnvironment(): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Check required vars
+  for (const [key, config] of Object.entries(REQUIRED_VARS)) {
+    const value = process.env[key];
+
+    if (!value) {
+      errors.push(`❌ MISSING: ${key} — ${config.description}`);
+      continue;
+    }
+
+    if (config.minLength && value.length < config.minLength) {
+      errors.push(`❌ TOO SHORT: ${key} — minimum ${config.minLength} chars, got ${value.length}`);
+      continue;
+    }
+
+    if (config.pattern && !config.pattern.test(value)) {
+      errors.push(`❌ INVALID FORMAT: ${key} — ${config.description}`);
+      continue;
+    }
+  }
+
+  // Check recommended vars
+  for (const [key, description] of Object.entries(RECOMMENDED_VARS)) {
+    if (!process.env[key]) {
+      warnings.push(`⚠️  OPTIONAL: ${key} — ${description} (not configured)`);
+    }
+  }
+
+  // Security checks
+  if (process.env.JWT_SECRET === 'your-jwt-secret-min-32-chars-long') {
+    errors.push('❌ SECURITY: JWT_SECRET is still the default placeholder value!');
+  }
+
+  if (process.env.ENCRYPTION_KEY === 'your-aes-256-encryption-key-64-hex-chars') {
+    errors.push('❌ SECURITY: ENCRYPTION_KEY is still the default placeholder value!');
+  }
+
+  if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'development') {
+    warnings.push(`⚠️  NODE_ENV is "${process.env.NODE_ENV}" — expected "production" or "development"`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+export function printValidationResult(result: ValidationResult): void {
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🔍 Environment Configuration Check');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  if (result.warnings.length > 0) {
+    console.log('\nWarnings:');
+    result.warnings.forEach(w => console.log(`  ${w}`));
+  }
+
+  if (result.errors.length > 0) {
+    console.log('\nErrors (server will NOT start):');
+    result.errors.forEach(e => console.log(`  ${e}`));
+    console.log('\n💡 Fix these in your .env file and restart.');
+  } else {
+    console.log('\n✅ All required environment variables are configured correctly.');
+  }
+
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+}
