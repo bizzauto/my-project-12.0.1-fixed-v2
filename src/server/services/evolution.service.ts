@@ -646,7 +646,7 @@ export class EvolutionApiService {
 
     try {
       const response = await axios.post(
-        `${config.baseUrl}/chat/fetchChats/${config.instanceName}`,
+        `${config.baseUrl}/chat/findChats/${config.instanceName}`,
         {},
         { headers: { apikey: config.apiKey } }
       );
@@ -670,7 +670,7 @@ export class EvolutionApiService {
 
     try {
       const response = await axios.post(
-        `${config.baseUrl}/chat/fetchMessages/${config.instanceName}`,
+        `${config.baseUrl}/chat/findMessages/${config.instanceName}`,
         {
           where: { key: { remoteJid } },
           limit: options.limit || 50,
