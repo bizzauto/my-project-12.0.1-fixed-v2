@@ -26,6 +26,7 @@
 |----------|-----------|-------|
 | `FRONTEND_URL` | `https://bizzautoai.com` | Public app URL |
 | `API_URL` | `https://bizzautoai.com` | If same domain (reverse proxy handles `/api/*`) |
+| `N8N_URL` | `https://n8n.bizzautoai.com` | n8n workflow automation URL — backend uses this to trigger workflows |
 
 ---
 
@@ -55,14 +56,14 @@ These are wired automatically from the env vars above — you don't need to set 
 
 ---
 
-## 🟡 n8n VARS (verify these are set)
+## 🟡 n8n VARS (verify these are set in n8n resource — not App)
 
 | Variable | Your Value | Notes |
 |----------|-----------|-------|
 | `N8N_PASSWORD` | *(your password)* | For n8n admin login |
 | `N8N_ENCRYPTION_KEY` | *(your key)* | Required for n8n |
 | `N8N_USER_MANAGEMENT_JWT_SECRET` | *(your secret)* | Required for n8n |
-| `N8N_WEBHOOK_URL` | `https://bizzautoai.com` | Production webhook URL |
+| `WEBHOOK_URL` | `https://n8n.bizzautoai.com` | n8n's own webhook URL (set in n8n resource) |
 | `OPENROUTER_API_KEY` | *(your key)* | For AI features in n8n workflows |
 
 ---
