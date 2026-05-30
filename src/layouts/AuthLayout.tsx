@@ -7,7 +7,7 @@ import {
   Zap, UserPlus, MapPin, Bot, PhoneCall,
   ShoppingCart, FileText, Clock, MoreVertical, Share2, Moon, Sun, Menu, X, Mail,
   Workflow, Link, GraduationCap, MessageCircle, FormInput, PenTool,
-  CreditCard, Building2, PhoneOff, Camera
+  CreditCard, Building2, PhoneOff, Camera, Upload
 } from 'lucide-react';
 import { useAuthStore } from '../lib/authStore';
 import { useThemeStore } from '../lib/themeStore';
