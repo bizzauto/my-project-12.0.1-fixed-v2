@@ -40,11 +40,11 @@ export class EmailLeadService {
   static parseIndiaMART(content: string): ParsedLead | null {
     const result: ParsedLead = { name: '', phone: '', email: '', product: '', requirement: '', city: '', source: 'indiamart' };
 
-    // Name
-    const nameMatch = content.match(/(?:Dear\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?|Query\s+from\s+(.+?)(?:\n|$)|Buyer\s+Name[:\s]*(.+?)(?:\n|$))/i);
-    if (nameMatch) result.name = (nameMatch[1] || nameMatch[2] || nameMatch[3] || '').trim();
+    // Name - multiple patterns
+    const nameMatch = content.match(/(?:Dear\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?|Query\s+from\s+(.+?)(?:\n|$)|Buyer\s+Name[:\s]*(.+?)(?:\n|$)|Customer\s+Name[:\s]*(.+?)(?:\n|$))/i);
+    if (nameMatch) result.name = (nameMatch[1] || nameMatch[2] || nameMatch[3] || nameMatch[4] || '').trim();
 
-    // Phone
+    // Phone - multiple patterns
     const phones = content.match(/(?:\+?91[\s.-]?)?([6-9]\d{9})/g);
     if (phones) {
       for (const p of phones) {
@@ -56,23 +56,30 @@ export class EmailLeadService {
     // Email
     const emails = content.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
     if (emails) {
-      const valid = emails.filter(e => !e.includes('indiamart.com') && !e.includes('noreply'));
+      const valid = emails.filter(e => !e.includes('indiamart.com') && !e.includes('noreply') && !e.includes('justdial') && !e.includes('tradeindia'));
       if (valid.length > 0) result.email = valid[0];
     }
 
     // Product
-    const productMatch = content.match(/(?:Requirement\s+for|Inquiry\s+for|Interested\s+in|Product\s+Name)[:\s]*(.+?)(?:\n|$)/i);
+    const productMatch = content.match(/(?:Requirement\s+for|Inquiry\s+for|Interested\s+in|Product\s+Name|Product)[:\s]*(.+?)(?:\n|$)/i);
     if (productMatch) result.product = productMatch[1].trim().substring(0, 200);
 
     // Requirement
-    const reqMatch = content.match(/(?:Requirement|Query|Details|Message|Description|Customer\s+Requirement)[:\s]*(.+?)(?:\n\n|$)/is);
+    const reqMatch = content.match(/(?:Requirement|Query|Details|Message|Description|Customer\s+Requirement|Your\s+Requirement)[:\s]*(.+?)(?:\n\n|$)/is);
     if (reqMatch) result.requirement = reqMatch[1].trim().substring(0, 500);
 
     // City
     const cityMatch = content.match(/(?:City|Location|From|Buyer\s+City)[:\s]*([A-Za-z\s]+?)(?:\n|$)/i);
     if (cityMatch) result.city = cityMatch[1].trim().substring(0, 100);
 
-    return (result.phone || result.email) ? result : null;
+    // If we have at least phone or email, return the lead
+    if (result.phone || result.email) {
+      console.log(`[IndiaMART Parser] Found: name=${result.name}, phone=${result.phone}, email=${result.email}`);
+      return result;
+    }
+
+    console.log(`[IndiaMART Parser] No phone/email found in email`);
+    return null;
   }
 
   /**
@@ -295,16 +302,28 @@ export class EmailLeadService {
                     const parsed = await simpleParser(stream);
                     const fromAddress = ((parsed as any).from?.[0]?.address || '').toLowerCase();
                     const subject = ((parsed as any).subject || '').toLowerCase();
+                    const text = ((parsed as any).text || '').toLowerCase();
                     emailCount++;
 
-                    // Check if this email is from the platform
-                    const isMatch = searchDomains.some(domain => fromAddress.includes(domain)) ||
-                                   subject.includes(platform.toLowerCase()) ||
-                                   subject.includes('enquiry') ||
-                                   subject.includes('inquiry') ||
-                                   subject.includes('lead');
+                    // Check if this email is from the platform (very lenient)
+                    const isMatch = 
+                      fromAddress.includes('indiamart') ||
+                      fromAddress.includes('justdial') ||
+                      fromAddress.includes('tradeindia') ||
+                      subject.includes('indiamart') ||
+                      subject.includes('justdial') ||
+                      subject.includes('tradeindia') ||
+                      subject.includes('enquiry') ||
+                      subject.includes('inquiry') ||
+                      subject.includes('lead') ||
+                      subject.includes('buyer') ||
+                      subject.includes('query') ||
+                      text.includes('indiamart') ||
+                      text.includes('buyer name') ||
+                      text.includes('buyer details');
 
                     if (!isMatch) {
+                      console.log(`[${platformName}] Skipping email: ${fromAddress} - ${subject}`);
                       return; // Skip non-platform emails
                     }
 
@@ -320,16 +339,20 @@ export class EmailLeadService {
                     if (leadData && (leadData.phone || leadData.email)) {
                       result.processed++;
 
-                      // Check duplicate
+                      // Check duplicate - only skip if same phone exists in last 30 days
                       const existing = leadData.phone
                         ? await prisma.contact.findFirst({
-                            where: { businessId, phone: leadData.phone, createdAt: { gte: since } },
+                            where: { 
+                              businessId, 
+                              phone: leadData.phone,
+                              source: 'indiamart',
+                            },
                           })
                         : null;
 
                       if (existing) {
                         result.skipped++;
-                        console.log(`[${platformName}] Skipping duplicate: ${leadData.phone}`);
+                        console.log(`[${platformName}] Skipping duplicate: ${leadData.phone} (${leadData.name})`);
                         return;
                       }
 
