@@ -3,6 +3,7 @@ import { prisma } from '../index.js';
 import { authenticate } from '../middleware/auth.js';
 import { IndiaMARTEmailService } from '../services/indiamart-email.service.js';
 import { EmailLeadService, Platform } from '../services/email-lead.service.js';
+import { GmailIMAPService } from '../services/gmail-imap.service.js';
 import { encrypt, decrypt } from '../utils/auth.js';
 
 const router = Router();
@@ -125,6 +126,73 @@ router.get('/config', authenticate, async (req: any, res: Response) => {
   } catch (error: any) {
     console.error('Get config error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/indiamart-email/simple-sync
+ * Simple Gmail sync - 100% reliable
+ */
+router.post('/simple-sync', authenticate, async (req: any, res: Response) => {
+  try {
+    const businessId = req.user.businessId;
+    const { days = 30 } = req.body;
+
+    // Get email config
+    const integration = await prisma.integration.findFirst({
+      where: { businessId, type: 'indiamart_email', isActive: true },
+    });
+
+    if (!integration) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email not configured. Please setup first.',
+      });
+    }
+
+    const config = integration.config as any;
+    const password = decrypt(config.password);
+
+    console.log(`[SimpleSync] Starting sync for ${config.email}`);
+
+    const result = await GmailIMAPService.fetchAndCreateLeads(
+      businessId,
+      {
+        email: config.email,
+        password: password,
+      },
+      {
+        days,
+        platform: 'indiamart',
+      }
+    );
+
+    console.log(`[SimpleSync] Result:`, result);
+
+    // Update last sync time
+    await prisma.integration.update({
+      where: { id: integration.id },
+      data: {
+        config: {
+          ...config,
+          lastSyncAt: new Date().toISOString(),
+        } as any,
+      },
+    });
+
+    res.json({
+      success: result.success,
+      message: result.success 
+        ? `Synced ${result.leadsCreated} new leads from ${result.indiamartEmails} IndiaMART emails`
+        : 'Sync failed',
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('[SimpleSync] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 
