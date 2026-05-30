@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, requireBusinessOwner } from '../middleware/auth.js';
 import razorpayService from '../services/razorpay.service.js';
+import { AutoOnboardingService } from '../services/auto-onboarding.service.js';
 
 const router = Router();
 
@@ -296,11 +297,70 @@ router.post('/webhook', async (req: any, res: any) => {
           razorpayPaymentId: razorpay_payment_id,
         },
       });
+
+      // Trigger auto-onboarding
+      try {
+        const { AutoOnboardingService } = await import('../services/auto-onboarding.service.js');
+        const business = await prisma.business.findUnique({
+          where: { id: subscription.businessId },
+        });
+
+        await AutoOnboardingService.processPayment({
+          razorpayPaymentId: razorpay_payment_id,
+          razorpayOrderId: razorpay_order_id,
+          amount: subscription.amount,
+          currency: subscription.currency || 'INR',
+          contactName: business?.name,
+          contactEmail: business?.email,
+          contactPhone: business?.phone,
+          planName: subscription.plan,
+          metadata: { businessId: subscription.businessId },
+        });
+        console.log(`[Webhook] Auto-onboarding triggered for ${subscription.businessId}`);
+      } catch (onboardingError: any) {
+        console.error(`[Webhook] Auto-onboarding error:`, onboardingError.message);
+      }
     }
 
     res.json({ success: true });
   } catch (error: any) {
     console.error('Webhook error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Manual onboarding trigger
+router.post('/onboard', authenticate, async (req: any, res: any) => {
+  try {
+    const { contactId, amount, planName, paymentId } = req.body;
+
+    if (!contactId) {
+      return res.status(400).json({ success: false, error: 'contactId is required' });
+    }
+
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+    });
+
+    if (!contact) {
+      return res.status(404).json({ success: false, error: 'Contact not found' });
+    }
+
+    const result = await AutoOnboardingService.processPayment({
+      razorpayPaymentId: paymentId || `manual_${Date.now()}`,
+      razorpayOrderId: `order_${Date.now()}`,
+      amount: (amount || 0) * 100,
+      currency: 'INR',
+      contactEmail: contact.email || undefined,
+      contactPhone: contact.phone || undefined,
+      contactName: contact.name,
+      planName: planName || 'Custom Plan',
+      metadata: { businessId: req.user.businessId },
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Onboard error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
