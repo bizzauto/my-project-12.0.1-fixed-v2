@@ -9,6 +9,7 @@ import { LeadCaptureService } from './lead-capture.service.js';
 export class IndiaMARTEmailService {
   /**
    * Parse IndiaMART enquiry email content
+   * Handles multiple IndiaMART email formats
    */
   static parseIndiaMARTEmail(html: string, text: string): {
     name: string;
@@ -20,20 +21,23 @@ export class IndiaMARTEmailService {
   } | null {
     const content = text || this.htmlToText(html);
 
-    // IndiaMART email patterns
+    // IndiaMART email patterns - multiple formats supported
     const patterns = {
-      // Name patterns
-      name: /(?:Dear\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?|Query\s+from\s+(.+))/i,
-      // Phone patterns - multiple formats
+      // Name patterns - various IndiaMART formats
+      name: /(?:Dear\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?|Query\s+from\s+(.+?)(?:\n|$)|Buyer\s+Name[:\s]*(.+?)(?:\n|$))/i,
+      // Phone patterns - multiple formats including +91, 0, spaces, dashes
       phone: /(?:\+?91[\s.-]?)?([6-9]\d{9})/g,
       // Email pattern
       email: /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g,
-      // Product pattern
-      product: /(?:Requirement\s+for|Inquiry\s+for|Interested\s+in|Product|looking\s+for)[:\s]*(.+?)(?:\n|$)/i,
-      // Requirement pattern
-      requirement: /(?:Requirement|Query|Details|Message|Description)[:\s]*(.+?)(?:\n\n|$)/is,
-      // City pattern
-      city: /(?:City|Location|From)[:\s]*([A-Za-z\s]+?)(?:\n|$)/i,
+      // Product pattern - multiple formats
+      product: /(?:Requirement\s+for|Inquiry\s+for|Interested\s+in|Product|looking\s+for|Product\s+Name)[:\s]*(.+?)(?:\n|$)/i,
+      // Requirement/Message pattern
+      requirement: /(?:Requirement|Query|Details|Message|Description|Customer\s+Requirement)[:\s]*(.+?)(?:\n\n|$)/is,
+      // City/Location pattern
+      city: /(?:City|Location|From|Buyer\s+City)[:\s]*([A-Za-z\s]+?)(?:\n|$)/i,
+      // IndiaMART specific patterns
+      indiamartBuyer: /Buyer\s+Details?:?\s*\n([\s\S]*?)(?:\n\n|Product)/i,
+      indiamartProduct: /Product\s+Details?:?\s*\n([\s\S]*?)(?:\n\n|Buyer)/i,
     };
 
     const result = {
@@ -45,10 +49,10 @@ export class IndiaMARTEmailService {
       city: '',
     };
 
-    // Extract name
+    // Extract name - try multiple patterns
     const nameMatch = content.match(patterns.name);
     if (nameMatch) {
-      result.name = (nameMatch[1] || nameMatch[2] || '').trim();
+      result.name = (nameMatch[1] || nameMatch[2] || nameMatch[3] || '').trim();
     }
 
     // Extract phone (get first valid Indian mobile)
@@ -71,7 +75,8 @@ export class IndiaMARTEmailService {
       const validEmails = emails.filter(e =>
         !e.includes('indiamart.com') &&
         !e.includes('noreply') &&
-        !e.includes('no-reply')
+        !e.includes('no-reply') &&
+        !e.includes('support@')
       );
       if (validEmails.length > 0) {
         result.email = validEmails[0];
@@ -345,13 +350,18 @@ export class IndiaMARTEmailService {
         port: emailConfig.imapPort,
         tls: emailConfig.useSSL,
         tlsOptions: { rejectUnauthorized: false },
+        connTimeout: 30000,
+        authTimeout: 15000,
       });
 
       const since = options.since || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const limit = 100;
 
+      console.log(`[IndiaMART] Connecting to IMAP: ${emailConfig.imapHost}:${emailConfig.imapPort}`);
+
       await new Promise<void>((resolve, reject) => {
         imap.once('ready', () => {
+          console.log(`[IndiaMART] IMAP connected successfully`);
           imap.openBox('INBOX', true, async (err, box) => {
             if (err) {
               imap.end();
@@ -359,17 +369,29 @@ export class IndiaMARTEmailService {
               return;
             }
 
+            console.log(`[IndiaMART] INBOX opened. Searching for IndiaMART emails since ${since.toISOString()}`);
+
             imap.search(
               [
                 ['SINCE', since],
                 ['FROM', 'indiamart'],
               ],
               async (err, results) => {
-                if (err || !results || results.length === 0) {
+                if (err) {
+                  console.error(`[IndiaMART] Search error:`, err);
                   imap.end();
                   resolve();
                   return;
                 }
+
+                if (!results || results.length === 0) {
+                  console.log(`[IndiaMART] No IndiaMART emails found`);
+                  imap.end();
+                  resolve();
+                  return;
+                }
+
+                console.log(`[IndiaMART] Found ${results.length} IndiaMART emails`);
 
                 const toFetch = results.slice(-limit);
                 const fetch = imap.fetch(toFetch, { bodies: '', struct: true });
@@ -399,6 +421,7 @@ export class IndiaMARTEmailService {
 
                         if (existing) {
                           result.skipped++;
+                          console.log(`[IndiaMART] Skipping duplicate: ${leadData.name} ${leadData.phone}`);
                           return;
                         }
 
@@ -414,20 +437,24 @@ export class IndiaMARTEmailService {
 
                         result.newLeads++;
                         result.leads.push(contact);
+                        console.log(`[IndiaMART] New lead captured: ${leadData.name} ${leadData.phone}`);
                       }
                     } catch (e: any) {
                       result.errors.push(`Parse error: ${e.message}`);
+                      console.error(`[IndiaMART] Parse error:`, e.message);
                     }
                   });
                 });
 
                 fetch.once('end', () => {
+                  console.log(`[IndiaMART] Email fetch complete. Processed: ${result.processed}, New: ${result.newLeads}`);
                   imap.end();
                   resolve();
                 });
 
                 fetch.once('error', (err) => {
                   result.errors.push(`Fetch error: ${err.message}`);
+                  console.error(`[IndiaMART] Fetch error:`, err);
                   imap.end();
                   resolve();
                 });
@@ -437,6 +464,7 @@ export class IndiaMARTEmailService {
         });
 
         imap.once('error', (err) => {
+          console.error(`[IndiaMART] IMAP connection error:`, err);
           reject(new Error(`IMAP error: ${err.message}`));
         });
 
@@ -453,6 +481,7 @@ export class IndiaMARTEmailService {
       }
     } catch (e: any) {
       result.errors.push(`Process error: ${e.message}`);
+      console.error(`[IndiaMART] Process error:`, e);
     }
 
     return result;
