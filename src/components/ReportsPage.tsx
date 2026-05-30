@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp, Users, MessageSquare, DollarSign, ArrowUpRight,
-  Download, FileText, BarChart3, Clock, Eye, Zap, Target, RefreshCw
+  Download, FileText, BarChart3, Clock, Eye, Zap, Target, RefreshCw,
+  Filter, Calendar, TrendingDown, Phone, Mail, Share2,
 } from 'lucide-react';
 import {
-  BarChart, Bar, AreaChart, Area,
+  BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { analyticsAPI, leadsAPI } from '../lib/api';
@@ -41,12 +42,40 @@ interface TopLead {
 
 const ReportsPage: React.FC = () => {
   const { isDemoMode } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'export'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'roi' | 'funnel' | 'export'>('overview');
   const [loading, setLoading] = useState(true);
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
   const [leadScores, setLeadScores] = useState<LeadScoreData | null>(null);
   const [topLeads, setTopLeads] = useState<TopLead[]>([]);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter'>('week');
+
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444'];
+
+  const demoRoiData = [
+    { source: 'WhatsApp', spend: 5000, revenue: 125000, roi: 2400 },
+    { source: 'Instagram', spend: 8000, revenue: 85000, roi: 963 },
+    { source: 'Google Ads', spend: 15000, revenue: 180000, roi: 1100 },
+    { source: 'Facebook', spend: 10000, revenue: 95000, roi: 850 },
+    { source: 'Email', spend: 2000, revenue: 65000, roi: 3150 },
+  ];
+
+  const demoFunnelData = [
+    { stage: 'Visitors', count: 12500, color: '#3B82F6' },
+    { stage: 'Leads', count: 2800, color: '#8B5CF6' },
+    { stage: 'Qualified', count: 1200, color: '#F59E0B' },
+    { stage: 'Proposals', count: 450, color: '#10B981' },
+    { stage: 'Negotiation', count: 180, color: '#EC4899' },
+    { stage: 'Won', count: 85, color: '#10B981' },
+  ];
+
+  const demoSourceStats = [
+    { name: 'WhatsApp', value: 35, color: '#25D366' },
+    { name: 'Instagram', value: 25, color: '#E4405F' },
+    { name: 'Google', value: 20, color: '#4285F4' },
+    { name: 'Referral', value: 12, color: '#F59E0B' },
+    { name: 'Direct', value: 8, color: '#6B7280' },
+  ];
 
   // Demo mode data
   const demoOverviewData: OverviewData = {
@@ -218,16 +247,18 @@ const ReportsPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-2 flex gap-2 mb-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-2 flex gap-2 mb-6 overflow-x-auto">
         {[
           { id: 'overview' as const, label: 'Overview', icon: <BarChart3 size={16} /> },
+          { id: 'roi' as const, label: 'ROI Tracking', icon: <DollarSign size={16} /> },
+          { id: 'funnel' as const, label: 'Sales Funnel', icon: <TrendingUp size={16} /> },
           { id: 'leads' as const, label: 'AI Lead Scores', icon: <Target size={16} /> },
           { id: 'export' as const, label: 'Export Data', icon: <Download size={16} /> },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
               }`}
           >
             {tab.icon}{tab.label}
@@ -269,7 +300,7 @@ const ReportsPage: React.FC = () => {
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={weeklyData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="day" />
+                    <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
                     <Legend />
@@ -292,7 +323,7 @@ const ReportsPage: React.FC = () => {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={weeklyData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="day" />
+                    <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip formatter={(value) => formatCurrency(value as number)} />
                     <Bar dataKey="revenue" fill="#8B5CF6" name="Revenue" radius={[4, 4, 0, 0]} />
@@ -385,6 +416,124 @@ const ReportsPage: React.FC = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* ROI TRACKING */}
+      {activeTab === 'roi' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <DollarSign size={20} className="text-green-600" />ROI by Channel
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="p-4 bg-green-50 rounded-xl">
+                <p className="text-sm text-green-600 font-medium">Total Spend</p>
+                <p className="text-2xl font-bold text-green-700">{formatCurrency(demoRoiData.reduce((s, r) => s + r.spend, 0))}</p>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-xl">
+                <p className="text-sm text-blue-600 font-medium">Total Revenue</p>
+                <p className="text-2xl font-bold text-blue-700">{formatCurrency(demoRoiData.reduce((s, r) => s + r.revenue, 0))}</p>
+              </div>
+              <div className="p-4 bg-purple-50 rounded-xl">
+                <p className="text-sm text-purple-600 font-medium">Average ROI</p>
+                <p className="text-2xl font-bold text-purple-700">{Math.round(demoRoiData.reduce((s, r) => s + r.roi, 0) / demoRoiData.length)}%</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Channel</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Spend</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Revenue</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">ROI</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Performance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {demoRoiData.map((item, i) => (
+                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 font-medium text-gray-900">{item.source}</td>
+                      <td className="py-3 px-4 text-right text-gray-600">{formatCurrency(item.spend)}</td>
+                      <td className="py-3 px-4 text-right text-green-600 font-medium">{formatCurrency(item.revenue)}</td>
+                      <td className="py-3 px-4 text-right font-bold text-blue-600">{item.roi}%</td>
+                      <td className="py-3 px-4">
+                        <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(100, item.roi / 30)}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SALES FUNNEL */}
+      {activeTab === 'funnel' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+              <TrendingUp size={20} className="text-blue-600" />Sales Funnel Visualization
+            </h3>
+            <div className="flex flex-col items-center space-y-2">
+              {demoFunnelData.map((stage, i) => {
+                const width = 100 - (i * 15);
+                const convRate = i > 0 ? ((stage.count / demoFunnelData[i - 1].count) * 100).toFixed(1) : '100';
+                return (
+                  <div key={stage.stage} className="text-center" style={{ width: `${width}%` }}>
+                    <div
+                      className="py-4 px-6 rounded-lg text-white font-semibold text-sm transition-all hover:opacity-90 cursor-pointer"
+                      style={{ backgroundColor: stage.color }}
+                    >
+                      {stage.stage}: {stage.count.toLocaleString()}
+                    </div>
+                    {i > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">{convRate}% conversion</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Source Distribution */}
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Source Distribution</h3>
+            <div className="flex items-center gap-8">
+              <ResponsiveContainer width="50%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={demoSourceStats}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}%`}
+                  >
+                    {demoSourceStats.map((entry, i) => (
+                      <Cell key={`cell-${i}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-3">
+                {demoSourceStats.map((source, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: source.color }} />
+                      <span className="text-sm text-gray-700">{source.name}</span>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">{source.value}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* EXPORT DATA */}
