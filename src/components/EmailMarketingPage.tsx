@@ -852,17 +852,32 @@ const ComposeModal: React.FC<{
                 <option value="l3">E-Commerce Customers</option>
               </select></div>
 
-              {/* A/B Testing */}
+              {/* A/B Testing - Enhanced */}
               <div className="border border-gray-200 dark:border-gray-600 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2"><Target size={16} className="text-purple-600" /><span className="text-sm font-medium text-gray-900 dark:text-white">A/B Testing</span></div>
                   <button onClick={() => setEnableABTest(!enableABTest)} className={`relative w-10 h-5 rounded-full transition-colors ${enableABTest ? 'bg-purple-600' : 'bg-gray-300'}`}><span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${enableABTest ? 'translate-x-5 left-0.5' : 'left-0.5'}`} /></button>
                 </div>
                 {enableABTest && (
-                  <div className="space-y-3 ml-6">
-                    <div><label className="block text-xs text-gray-500 mb-1">Subject Line B</label><input type="text" value={subjectB} onChange={e => setSubjectB(e.target.value)} placeholder="Alternative subject line" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm" /></div>
-                    <div><label className="block text-xs text-gray-500 mb-1">Winner Based On</label><select value={abWinnerBy} onChange={e => setAbWinnerBy(e.target.value as any)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"><option value="opens">Open Rate</option><option value="clicks">Click Rate</option></select></div>
-                    <p className="text-xs text-gray-400">Test sends to 20% of your list, winner goes to remaining 80%</p>
+                  <div className="space-y-4 ml-6">
+                    {/* Subject Line Preview */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">Variant A (Original)</p>
+                        <p className="text-sm text-gray-900 dark:text-white font-medium truncate">{subject || 'No subject'}</p>
+                      </div>
+                      <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                        <p className="text-xs text-purple-600 dark:text-purple-400 font-medium mb-1">Variant B (Test)</p>
+                        <input type="text" value={subjectB} onChange={e => setSubjectB(e.target.value)} placeholder="Alternative subject line" className="w-full bg-transparent text-sm text-gray-900 dark:text-white font-medium focus:outline-none placeholder-gray-400" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs text-gray-500 mb-1">Winner Based On</label><select value={abWinnerBy} onChange={e => setAbWinnerBy(e.target.value as any)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"><option value="opens">Open Rate</option><option value="clicks">Click Rate</option></select></div>
+                      <div><label className="block text-xs text-gray-500 mb-1">Test Sample Size</label><select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"><option>20% of list</option><option>30% of list</option><option>50% of list</option></select></div>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">How it works: Variant A and B are sent to a test sample. After 1 hour, the winning variant (by {abWinnerBy}) is automatically sent to the remaining subscribers.</p>
+                    </div>
                   </div>
                 )}
               </div>
