@@ -166,6 +166,20 @@ model Business {
   reviewRequests  ReviewRequest[]
   reviewRequestCampaigns ReviewRequestCampaign[]
   subAccounts     SubAccount[]
+  liveChatSessions    LiveChatSession[]
+  liveChatWidget      LiveChatWidget?
+  smsMessages         SMSMessage[]
+  smsCampaigns        SMSCampaign[]
+  cartRecoveries      CartRecovery[]
+  appointmentReminders AppointmentReminder[]
+  loyaltyProgram      LoyaltyProgram?
+  loyaltyPoints       LoyaltyPoints[]
+  loyaltyRewards      LoyaltyReward[]
+  referralProgram     ReferralProgram?
+  referrals           Referral[]
+  aiFollowUps         AIFollowUp[]
+  whatsappCatalogs    WhatsAppCatalog[]
+  videoMeetings       VideoMeeting[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -286,6 +300,12 @@ model Contact {
   ledgerEntries LedgerEntry[]
   scheduledMessages ScheduledMessage[]
   dripQueueItems DripQueue[]
+  cartRecoveries CartRecovery[]
+  appointmentReminders AppointmentReminder[]
+  loyaltyPoints LoyaltyPoints[]
+  referredBy    Referral[] @relation("Referrer")
+  referredUsers Referral[] @relation("Referee")
+  aiFollowUps   AIFollowUp[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1849,4 +1869,294 @@ model SubAccount {
   updatedAt       DateTime @updatedAt
   @@unique([agencyId, businessId])
   @@index([agencyId])
+}
+
+// ==================== LIVE CHAT WIDGET ====================
+model LiveChatSession {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  visitorName     String?
+  visitorEmail    String?
+  visitorPhone    String?
+  visitorIP       String?
+  visitorUserAgent String?
+  status          String   @default("active") // active, waiting, closed
+  priority        String   @default("normal") // low, normal, high, urgent
+  assignedTo      String?  // team member userId
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+  satisfaction    Int?     // 1-5 rating
+  tags            String[]
+  metadata        Json?
+  messages        LiveChatMessage[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([businessId])
+  @@index([status])
+  @@index([assignedTo])
+}
+
+model LiveChatMessage {
+  id              String   @id @default(cuid())
+  sessionId       String
+  session         LiveChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  senderType      String   // visitor, agent, bot
+  senderId        String?
+  content         String
+  contentType     String   @default("text") // text, image, file, card
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  @@index([sessionId])
+}
+
+model LiveChatWidget {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  name            String
+  position        String   @default("bottom-right") // bottom-right, bottom-left
+  primaryColor    String   @default("#3B82F6")
+  greetingMessage String   @default("Hi! How can we help you?")
+  offlineMessage  String   @default("We're offline. Leave a message.")
+  workingHours    Json?    // { start: "09:00", end: "18:00", days: [1,2,3,4,5] }
+  autoResponses   Json?    // [{ trigger: "pricing", response: "..." }]
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@unique([businessId])
+}
+
+// ==================== SMS MARKETING ====================
+model SMSMessage {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  phone           String
+  content         String
+  status          String   @default("pending") // pending, sent, delivered, failed
+  campaignId      String?
+  campaign        SMSCampaign? @relation(fields: [campaignId], references: [id])
+  contactId       String?
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+  @@index([businessId])
+  @@index([phone])
+  @@index([status])
+  @@index([campaignId])
+}
+
+model SMSCampaign {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  name            String
+  message         String
+  status          String   @default("draft") // draft, scheduled, running, completed, cancelled
+  targetTags      String[]
+  targetCount     Int      @default(0)
+  sentCount       Int      @default(0)
+  deliveredCount  Int      @default(0)
+  failedCount     Int      @default(0)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  messages        SMSMessage[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([businessId])
+  @@index([status])
+}
+
+// ==================== ABANDONED CART RECOVERY ====================
+model CartRecovery {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  contactId       String?
+  contact         Contact? @relation(fields: [contactId], references: [id])
+  cartItems       Json     // [{ productId, name, price, quantity }]
+  cartValue       Float
+  status          String   @default("abandoned") // abandoned, reminded, recovered, lost
+  reminderCount   Int      @default(0)
+  lastReminderAt  DateTime?
+  recoveredAt     DateTime?
+  recoveredAmount Float?
+  channel         String   @default("whatsapp") // whatsapp, email, sms
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([businessId])
+  @@index([status])
+  @@index([contactId])
+}
+
+// ==================== APPOINTMENT REMINDERS ====================
+model AppointmentReminder {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  appointmentId   String
+  contactId       String?
+  contact         Contact? @relation(fields: [contactId], references: [id])
+  channel         String   @default("whatsapp") // whatsapp, email, sms
+  message         String
+  scheduledAt     DateTime
+  sentAt          DateTime?
+  status          String   @default("pending") // pending, sent, failed
+  reminderType    String   @default("before") // before, after, followup
+  createdAt       DateTime @default(now())
+  @@index([businessId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+// ==================== LOYALTY PROGRAM ====================
+model LoyaltyProgram {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  name            String
+  pointsPerRupee  Float    @default(1) // points earned per rupee spent
+  redemptionRate  Float    @default(0.01) // value per point in rupees
+  minRedemption   Int      @default(100) // minimum points to redeem
+  tierThresholds  Json?    // { silver: 1000, gold: 5000, platinum: 10000 }
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@unique([businessId])
+}
+
+model LoyaltyPoints {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  contactId       String
+  contact         Contact? @relation(fields: [contactId], references: [id])
+  points          Int
+  type            String   // earn, redeem, expire, adjust
+  description     String
+  orderId         String?
+  balance         Int      @default(0)
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  @@index([businessId])
+  @@index([contactId])
+  @@index([type])
+}
+
+model LoyaltyReward {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  name            String
+  description     String?
+  pointsRequired  Int
+  rewardType      String   // discount, free_product, free_shipping, custom
+  rewardValue     Float?
+  maxRedemptions  Int?
+  redemptionCount Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  @@index([businessId])
+}
+
+// ==================== REFERRAL PROGRAM ====================
+model ReferralProgram {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  referrerReward  Float    @default(100) // reward for referrer
+  refereeReward   Float    @default(50)  // reward for referee
+  rewardType      String   @default("credits") // credits, discount, cash
+  maxReferrals    Int?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@unique([businessId])
+}
+
+model Referral {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  referrerId      String
+  referrer        Contact? @relation("Referrer", fields: [referrerId], references: [id])
+  refereeId       String?
+  referee         Contact? @relation("Referee", fields: [refereeId], references: [id])
+  referralCode    String   @unique
+  status          String   @default("pending") // pending, completed, rewarded
+  referrerReward  Float    @default(0)
+  refereeReward   Float    @default(0)
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+  @@index([businessId])
+  @@index([referrerId])
+  @@index([referralCode])
+}
+
+// ==================== AI SALES AGENT ====================
+model AIFollowUp {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  contactId       String
+  contact         Contact? @relation(fields: [contactId], references: [id])
+  triggerType     String   // no_reply, deal_stale, payment_pending, appointment_missed
+  channel         String   @default("whatsapp")
+  message         String
+  scheduledAt     DateTime
+  sentAt          DateTime?
+  status          String   @default("pending") // pending, sent, cancelled
+  response        String?
+  nextAction      String?  // follow_up, escalate, close
+  createdAt       DateTime @default(now())
+  @@index([businessId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+// ==================== WHATSAPP CATALOG ====================
+model WhatsAppCatalog {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  productId       String
+  name            String
+  description     String
+  price           Float
+  currency        String   @default("INR")
+  imageUrl        String?
+  category        String?
+  availability    String   @default("in_stock") // in_stock, out_of_stock, preorder
+  link            String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([businessId])
+  @@index([productId])
+}
+
+// ==================== VIDEO MEETINGS ====================
+model VideoMeeting {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  title           String
+  description     String?
+  meetingUrl      String
+  meetingId       String
+  platform        String   @default("jitsi") // jitsi, google_meet, zoom
+  scheduledAt     DateTime
+  duration        Int      @default(30) // minutes
+  status          String   @default("scheduled") // scheduled, live, completed, cancelled
+  hostId          String?
+  participants    String[]
+  recordingUrl    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([businessId])
+  @@index([scheduledAt])
+  @@index([status])
 }

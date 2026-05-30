@@ -401,6 +401,29 @@ export const paymentLinksAPI = {
   send: (id: string) => apiClient.post(`/payment-links/${id}/send`),
 };
 
+// Live Chat API
+export const liveChatAPI = {
+  // Public (no auth)
+  getWidget: (businessId: string) =>
+    apiClient.get('/live-chat/widget', { params: { businessId } }),
+  createSession: (data: { businessId: string; visitorName?: string; visitorEmail?: string; visitorPhone?: string; metadata?: any }) =>
+    apiClient.post('/live-chat/sessions', data),
+  addMessage: (sessionId: string, data: { senderType?: string; senderId?: string; content: string; contentType?: string; metadata?: any }) =>
+    apiClient.post(`/live-chat/sessions/${sessionId}/messages`, data),
+  rateSession: (sessionId: string, satisfaction: number) =>
+    apiClient.patch(`/live-chat/sessions/${sessionId}/rate`, { satisfaction }),
+
+  // Authenticated (admin)
+  listSessions: (params?: { status?: string; assignedTo?: string; search?: string; page?: number; limit?: number }) =>
+    apiClient.get('/live-chat', { params }),
+  getStats: () => apiClient.get('/live-chat/stats'),
+  getSession: (id: string) => apiClient.get(`/live-chat/${id}`),
+  assignSession: (id: string, assignedTo: string) =>
+    apiClient.patch(`/live-chat/${id}/assign`, { assignedTo }),
+  closeSession: (id: string) => apiClient.patch(`/live-chat/${id}/close`),
+  saveWidget: (data: any) => apiClient.post('/live-chat/widget', data),
+};
+
 // Custom Fields API
 export const customFieldsAPI = {
   listAll: (params?: { entityType?: string; isVisible?: string; search?: string }) =>

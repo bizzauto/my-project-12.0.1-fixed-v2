@@ -45,6 +45,7 @@ import twoFactorRoutes from './routes/twoFactor.js';
 import webhooksRoutes from './routes/webhooks.js';
 import surveysRoutes from './routes/surveys.js';
 import whatsappRoutes from './routes/whatsapp.js';
+import whatsappCatalogRoutes from './routes/whatsapp-catalog.js';
 import workflowRoutes from './routes/workflows.js';
 import paymentLinksRoutes from './routes/payment-links.js';
 import blogRoutes from './routes/blog.js';
@@ -56,6 +57,11 @@ import triggerLinksRoutes from './routes/trigger-links.js';
 import reviewRequestsRoutes from './routes/review-requests.js';
 import customFieldsRoutes from './routes/custom-fields.js';
 import funnelsRoutes from './routes/funnels.js';
+import smsMarketingRoutes from './routes/sms-marketing.js';
+import cartRecoveryRoutes from './routes/cart-recovery.js';
+import liveChatRoutes from './routes/live-chat.js';
+import referralsRoutes from './routes/referrals.js';
+import videoMeetingsRoutes from './routes/video-meetings.js';
 import { securityHeaders, apiSecurityHeaders } from './middleware/security.js';
 
 dotenv.config();
@@ -187,6 +193,7 @@ app.use('/api/team', teamRoutes);
 app.use('/api/two-factor', twoFactorRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/whatsapp-catalog', whatsappCatalogRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/payment-links', paymentLinksRoutes);
 app.use('/api/blog', blogRoutes);
@@ -198,6 +205,11 @@ app.use('/api/trigger-links', triggerLinksRoutes);
 app.use('/api/review-requests', reviewRequestsRoutes);
 app.use('/api/custom-fields', customFieldsRoutes);
 app.use('/api/funnels', funnelsRoutes);
+app.use('/api/sms-marketing', smsMarketingRoutes);
+app.use('/api/cart-recovery', cartRecoveryRoutes);
+app.use('/api/live-chat', liveChatRoutes);
+app.use('/api/referrals', referralsRoutes);
+app.use('/api/video-meetings', videoMeetingsRoutes);
 
 // Test endpoints (development only)
 if (NODE_ENV !== 'production') {
