@@ -84,7 +84,8 @@ const AppointmentsPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [view, setView] = useState<'calendar' | 'list' | 'services'>('calendar');
+  const [view, setView] = useState<'calendar' | 'week' | 'day' | 'list' | 'services'>('calendar');
+  const [bufferTime, setBufferTime] = useState(15); // minutes between appointments
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>(() =>
@@ -258,10 +259,16 @@ const AppointmentsPage: React.FC = () => {
             <Settings size={18} />
           </button>
           <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-            {(['calendar', 'list', 'services'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${view === v ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
-                {v === 'services' ? 'Services' : v === 'calendar' ? 'Calendar' : 'List'}
+            {([
+              { key: 'calendar', label: 'Month' },
+              { key: 'week', label: 'Week' },
+              { key: 'day', label: 'Day' },
+              { key: 'list', label: 'List' },
+              { key: 'services', label: 'Services' },
+            ] as const).map(v => (
+              <button key={v.key} onClick={() => setView(v.key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === v.key ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
+                {v.label}
               </button>
             ))}
           </div>
@@ -395,6 +402,91 @@ const AppointmentsPage: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* WEEK VIEW */}
+      {view === 'week' && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Week View</h3>
+            <span className="text-sm text-gray-500">{bufferTime} min buffer between appointments</span>
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
+              const date = new Date();
+              date.setDate(date.getDate() - date.getDay() + i + 1);
+              const dateStr = date.toISOString().split('T')[0];
+              const dayAppts = getAppointmentsForDate(dateStr);
+              return (
+                <div key={day} className="min-h-[200px]">
+                  <div className={`text-center py-2 rounded-t-lg ${date.toDateString() === new Date().toDateString() ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
+                    <p className="text-xs font-medium">{day}</p>
+                    <p className="text-lg font-bold">{date.getDate()}</p>
+                  </div>
+                  <div className="space-y-1 p-1">
+                    {dayAppts.map(appt => (
+                      <div key={appt.id} className="p-1.5 bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 rounded text-xs">
+                        <p className="font-medium text-gray-900 dark:text-white truncate">{appt.title}</p>
+                        <p className="text-gray-500 dark:text-gray-400">{appt.time}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* DAY VIEW */}
+      {view === 'day' && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 dark:text-white">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Buffer: {bufferTime} min</span>
+              <select
+                value={bufferTime}
+                onChange={(e) => setBufferTime(Number(e.target.value))}
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+              >
+                <option value={0}>No buffer</option>
+                <option value={10}>10 min</option>
+                <option value={15}>15 min</option>
+                <option value={30}>30 min</option>
+                <option value={60}>60 min</option>
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {Array.from({ length: 12 }, (_, i) => i + 8).map(hour => {
+              const hourAppts = getAppointmentsForDate(new Date().toISOString().split('T')[0])
+                .filter(a => {
+                  const h = parseInt(a.time.split(':')[0]);
+                  return h === hour;
+                });
+              return (
+                <div key={hour} className="flex gap-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                  <span className="w-16 text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">{hour}:00</span>
+                  <div className="flex-1 min-h-[40px]">
+                    {hourAppts.map(appt => (
+                      <div key={appt.id} className="p-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-lg mb-1">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-gray-900 dark:text-white text-sm">{appt.title}</p>
+                          <span className="text-xs text-gray-500">{appt.time}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{appt.contact}</p>
+                      </div>
+                    ))}
+                    {hourAppts.length === 0 && <div className="h-8" />}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
