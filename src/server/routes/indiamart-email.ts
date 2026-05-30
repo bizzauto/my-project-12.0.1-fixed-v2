@@ -324,6 +324,135 @@ router.get('/debug', authenticate, async (req: any, res: Response) => {
 });
 
 /**
+ * POST /api/indiamart-email/import
+ * Manual email import - paste email content to create lead
+ * This is 100% reliable - no IMAP needed
+ */
+router.post('/import', authenticate, async (req: any, res: Response) => {
+  try {
+    const businessId = req.user.businessId;
+    const { name, phone, email, product, requirement, city, platform = 'indiamart' } = req.body;
+
+    if (!phone && !email) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least phone or email is required',
+      });
+    }
+
+    // Create lead directly
+    const { LeadCaptureService } = await import('../services/lead-capture.service.js');
+    const contact = await LeadCaptureService.captureIndiaMARTLead(businessId, {
+      name: name || `${platform} Customer`,
+      phone: phone || '',
+      email: email || undefined,
+      product: product || '',
+      requirement: requirement || '',
+      city: city || '',
+    });
+
+    res.json({
+      success: true,
+      message: 'Lead imported successfully',
+      data: contact,
+    });
+  } catch (error: any) {
+    console.error('Import error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/indiamart-email/bulk-import
+ * Bulk import multiple leads at once
+ */
+router.post('/bulk-import', authenticate, async (req: any, res: Response) => {
+  try {
+    const businessId = req.user.businessId;
+    const { leads, platform = 'indiamart' } = req.body;
+
+    if (!leads || !Array.isArray(leads) || leads.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'leads array is required',
+      });
+    }
+
+    const { LeadCaptureService } = await import('../services/lead-capture.service.js');
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
+
+    for (const lead of leads) {
+      try {
+        if (!lead.phone && !lead.email) {
+          results.failed++;
+          results.errors.push(`Skipped: No phone or email for ${lead.name || 'unknown'}`);
+          continue;
+        }
+
+        await LeadCaptureService.captureIndiaMARTLead(businessId, {
+          name: lead.name || `${platform} Customer`,
+          phone: lead.phone || '',
+          email: lead.email || undefined,
+          product: lead.product || '',
+          requirement: lead.requirement || '',
+          city: lead.city || '',
+        });
+
+        results.success++;
+      } catch (e: any) {
+        results.failed++;
+        results.errors.push(`Failed: ${lead.name || 'unknown'} - ${e.message}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Imported ${results.success} leads, ${results.failed} failed`,
+      data: results,
+    });
+  } catch (error: any) {
+    console.error('Bulk import error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/indiamart-email/test-email
+ * Test parsing a single email content
+ */
+router.post('/test-email', authenticate, async (req: any, res: Response) => {
+  try {
+    const { html, text, platform = 'indiamart' } = req.body;
+
+    if (!html && !text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Either html or text is required',
+      });
+    }
+
+    const { EmailLeadService } = await import('../services/email-lead.service.js');
+    const leadData = EmailLeadService.parseEmail(html || '', text || '', platform);
+
+    res.json({
+      success: true,
+      data: {
+        parsed: leadData,
+        hasPhone: !!leadData?.phone,
+        hasEmail: !!leadData?.email,
+        canCreateLead: !!(leadData?.phone || leadData?.email),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/indiamart/leads
  * Get leads captured from IndiaMART emails
  */
