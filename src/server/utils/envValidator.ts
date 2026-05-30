@@ -9,12 +9,12 @@ const REQUIRED_VARS = {
   JWT_SECRET: { description: 'JWT signing secret (min 32 chars)', minLength: 32 },
   JWT_REFRESH_SECRET: { description: 'JWT refresh secret (min 32 chars)', minLength: 32 },
   ENCRYPTION_KEY: { description: 'AES-256 encryption key (64 hex chars)', pattern: /^[a-f0-9]{64}$/i },
-  REDIS_URL: { description: 'Redis connection string', pattern: /^redis:\/\// },
-  CORS_ORIGIN: { description: 'Allowed CORS origin' },
-  FRONTEND_URL: { description: 'Frontend application URL' },
 };
 
 const RECOMMENDED_VARS = {
+  REDIS_URL: 'Caching & job queues (optional but recommended)',
+  CORS_ORIGIN: 'Allowed CORS origin',
+  FRONTEND_URL: 'Frontend application URL',
   SMTP_HOST: 'Email delivery',
   SMTP_PORT: 'Email port',
   SMTP_USER: 'Email username',
