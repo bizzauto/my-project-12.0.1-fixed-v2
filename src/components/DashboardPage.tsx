@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MessageSquare, Users, Calendar, Star, RefreshCw, Smartphone,
+  TrendingUp, DollarSign, Target, Clock, ArrowUpRight, ArrowDownRight,
+  Zap, Brain, Eye, BarChart3, Phone, Mail, Send,
 } from 'lucide-react';
 import {
-  LineChart, Line, PieChart, Pie, Cell,
+  LineChart, Line, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   Legend, ResponsiveContainer
 } from 'recharts';
@@ -114,9 +116,19 @@ export default function DashboardPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([]);
   const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
   const [recentLeads, setRecentLeads] = useState<LeadContact[]>([]);
+  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'quarter'>('week');
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [activityFeed, setActivityFeed] = useState<any[]>([]);
 
-  // Demo mode data
+  // Demo mode data - 8 KPI Cards
   const demoStats: StatCardProps[] = [
+    {
+      title: 'Revenue Today',
+      value: '₹45,200',
+      change: '+18%',
+      positive: true,
+      icon: <DollarSign size={24} />,
+    },
     {
       title: 'Leads Today',
       value: 24,
@@ -132,9 +144,23 @@ export default function DashboardPage() {
       icon: <MessageSquare size={24} />,
     },
     {
-      title: 'Scheduled Posts',
-      value: 8,
-      change: '+25%',
+      title: 'Conversion Rate',
+      value: '12.5%',
+      change: '+2.3%',
+      positive: true,
+      icon: <Target size={24} />,
+    },
+    {
+      title: 'Pipeline Value',
+      value: '₹8.5L',
+      change: '+15%',
+      positive: true,
+      icon: <TrendingUp size={24} />,
+    },
+    {
+      title: 'Appointments',
+      value: 6,
+      change: '+2',
       positive: true,
       icon: <Calendar size={24} />,
     },
@@ -144,6 +170,13 @@ export default function DashboardPage() {
       change: '+0.2',
       positive: true,
       icon: <Star size={24} />,
+    },
+    {
+      title: 'Pending Tasks',
+      value: 12,
+      change: '-3',
+      positive: true,
+      icon: <Clock size={24} />,
     },
   ];
 
@@ -155,6 +188,29 @@ export default function DashboardPage() {
     { name: 'Fri', messages: 78, posts: 15, leads: 22 },
     { name: 'Sat', messages: 42, posts: 8, leads: 14 },
     { name: 'Sun', messages: 35, posts: 5, leads: 11 },
+  ];
+
+  const demoRevenueData = [
+    { name: 'Jan', revenue: 120000, expenses: 45000 },
+    { name: 'Feb', revenue: 150000, expenses: 52000 },
+    { name: 'Mar', revenue: 180000, expenses: 48000 },
+    { name: 'Apr', revenue: 220000, expenses: 55000 },
+    { name: 'May', revenue: 195000, expenses: 50000 },
+    { name: 'Jun', revenue: 250000, expenses: 58000 },
+  ];
+
+  const demoActivityFeed = [
+    { id: 1, type: 'lead', icon: <Users size={16} />, color: 'blue', message: 'New lead captured from WhatsApp', time: '2 min ago' },
+    { id: 2, type: 'deal', icon: <TrendingUp size={16} />, color: 'green', message: 'Deal closed: ₹45,000 - Priya Enterprises', time: '15 min ago' },
+    { id: 3, type: 'message', icon: <MessageSquare size={16} />, color: 'purple', message: '12 new messages received', time: '30 min ago' },
+    { id: 4, type: 'review', icon: <Star size={16} />, color: 'orange', message: 'New 5-star review from Rahul Verma', time: '1 hour ago' },
+    { id: 5, type: 'appointment', icon: <Calendar size={16} />, color: 'indigo', message: 'Meeting scheduled with Sharma Corp', time: '2 hours ago' },
+  ];
+
+  const demoInsights = [
+    { id: 1, icon: <Brain size={18} />, title: 'Lead Response Time', value: '8 min avg', suggestion: 'Your response time is 40% faster than last week!', trend: 'up' },
+    { id: 2, icon: <Target size={18} />, title: 'Best Performing Source', value: 'WhatsApp', suggestion: '65% of conversions come from WhatsApp leads', trend: 'up' },
+    { id: 3, icon: <Zap size={18} />, title: 'Campaign Opportunity', value: 'Festival Season', suggestion: 'Run a Diwali campaign - last year saw 3x revenue', trend: 'up' },
   ];
 
   const demoPipelineData: PipelineData[] = [
@@ -292,37 +348,67 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Welcome back, {userName}!</h1>
           <p className="text-gray-500 dark:text-gray-400">Here's what's happening with your business today.</p>
         </div>
-        <button
-          onClick={fetchDashboard}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          title="Refresh dashboard"
-        >
-          <RefreshCw size={16} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Date Range Selector */}
+          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            {(['today', 'week', 'month', 'quarter'] as const).map((range) => (
+              <button
+                key={range}
+                onClick={() => setDateRange(range)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  dateRange === range
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                {range.charAt(0).toUpperCase() + range.slice(1)}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={fetchDashboard}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title="Refresh dashboard"
+          >
+            <RefreshCw size={16} />
+            Refresh
+          </button>
+        </div>
       </div>
 
+      {/* 8 KPI Cards - 2 rows of 4 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
         {stats.map((stat, index) => (
           <StatCard key={index} {...stat} />
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="modern-card rounded-2xl p-6">
+      {/* Charts Row: Activity + Revenue */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2 modern-card rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Activity Overview</h3>
           {analyticsData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={analyticsData}>
+              <AreaChart data={analyticsData}>
+                <defs>
+                  <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="name" stroke="#9CA3AF" />
                 <YAxis stroke="#9CA3AF" />
                 <RechartsTooltip />
                 <Legend />
-                <Line type="monotone" dataKey="messages" stroke="#3B82F6" strokeWidth={2} name="Messages" dot={{ r: 3 }} isAnimationActive={true} animationDuration={300} animationEasing="ease-in-out" />
-                <Line type="monotone" dataKey="posts" stroke="#10B981" strokeWidth={2} name="Posts" dot={{ r: 3 }} isAnimationActive={true} animationDuration={300} animationEasing="ease-in-out" />
-                <Line type="monotone" dataKey="leads" stroke="#F59E0B" strokeWidth={2} name="Leads" dot={{ r: 3 }} isAnimationActive={true} animationDuration={300} animationEasing="ease-in-out" />
-              </LineChart>
+                <Area type="monotone" dataKey="messages" stroke="#3B82F6" fill="url(#colorMessages)" strokeWidth={2} name="Messages" />
+                <Area type="monotone" dataKey="leads" stroke="#10B981" fill="url(#colorLeads)" strokeWidth={2} name="Leads" />
+                <Line type="monotone" dataKey="posts" stroke="#F59E0B" strokeWidth={2} name="Posts" dot={{ r: 3 }} />
+              </AreaChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-[300px] text-gray-400 dark:text-gray-500">
@@ -331,22 +417,89 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* Activity Feed */}
         <div className="modern-card rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pipeline Distribution</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Live Activity</h3>
+          <div className="space-y-3">
+            {demoActivityFeed.map((activity) => (
+              <div key={activity.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  activity.color === 'blue' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                  activity.color === 'green' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
+                  activity.color === 'purple' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' :
+                  activity.color === 'orange' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' :
+                  'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                }`}>
+                  {activity.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{activity.message}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{activity.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Revenue Chart + AI Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2 modern-card rounded-2xl p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Revenue Trend</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={demoRevenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="name" stroke="#9CA3AF" />
+              <YAxis stroke="#9CA3AF" />
+              <RechartsTooltip />
+              <Legend />
+              <Bar dataKey="revenue" fill="#3B82F6" radius={[4, 4, 0, 0]} name="Revenue" />
+              <Bar dataKey="expenses" fill="#EF4444" radius={[4, 4, 0, 0]} name="Expenses" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* AI Insights */}
+        <div className="modern-card rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Brain className="text-purple-600 dark:text-purple-400" size={20} />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Insights</h3>
+          </div>
+          <div className="space-y-4">
+            {demoInsights.map((insight) => (
+              <div key={insight.id} className="p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl border border-purple-200/50 dark:border-purple-800/30">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    {insight.icon}
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{insight.title}</span>
+                  </div>
+                  <span className="text-sm font-bold text-purple-600 dark:text-purple-400">{insight.value}</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{insight.suggestion}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Pipeline + Quick Actions + Recent Leads */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pipeline Distribution */}
+        <div className="modern-card rounded-2xl p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pipeline</h3>
           {pipelineData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
                   data={pipelineData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={100}
+                  innerRadius={50}
+                  outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                   labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  isAnimationActive={true}
-                  animationDuration={300}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
                   {pipelineData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -356,14 +509,13 @@ export default function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-[300px] text-gray-400 dark:text-gray-500">
-              No pipeline data available
+            <div className="flex items-center justify-center h-[200px] text-gray-400 dark:text-gray-500">
+              No pipeline data
             </div>
           )}
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Leads */}
         <div className="modern-card rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Leads</h3>
@@ -371,8 +523,8 @@ export default function DashboardPage() {
           </div>
           {recentLeads.length > 0 ? (
             <div className="space-y-3">
-              {recentLeads.map((contact) => (
-                <div key={contact.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              {recentLeads.slice(0, 4).map((contact) => (
+                <div key={contact.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm">
                       {contact.avatar}
@@ -382,9 +534,13 @@ export default function DashboardPage() {
                       <p className="text-sm text-gray-500 dark:text-gray-400">{contact.phone}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900 dark:text-white">{contact.dealValue ? `₹${contact.dealValue.toLocaleString()}` : '-'}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{contact.lastActivity}</p>
+                  <div className="flex items-center gap-2">
+                    <button className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="WhatsApp">
+                      <Phone size={14} className="text-green-600 dark:text-green-400" />
+                    </button>
+                    <button className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="Email">
+                      <Mail size={14} className="text-blue-600 dark:text-blue-400" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -397,26 +553,25 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* Quick Actions */}
         <div className="modern-card rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <button onClick={() => navigate('/whatsapp')} className="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl hover:from-green-100 hover:to-emerald-100 dark:hover:from-green-900/30 dark:hover:to-emerald-900/30 transition-all gap-2 border border-green-200/50 dark:border-green-800/30 hover-lift">
-              <MessageSquare className="text-green-600 dark:text-green-400" size={24} />
-              <span className="text-sm font-medium text-green-700 dark:text-green-400">WhatsApp Chat</span>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => navigate('/whatsapp')} className="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl hover:from-green-100 hover:to-emerald-100 dark:hover:from-green-900/30 dark:hover:to-emerald-900/30 transition-all gap-2 border border-green-200/50 dark:border-green-800/30">
+              <MessageSquare className="text-green-600 dark:text-green-400" size={20} />
+              <span className="text-xs font-medium text-green-700 dark:text-green-400">WhatsApp</span>
             </button>
-            <button onClick={() => navigate('/social')} className="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30 transition-all gap-2 border border-blue-200/50 dark:border-blue-800/30 hover-lift">
-              <Smartphone className="text-blue-600 dark:text-blue-400" size={24} />
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Create Post</span>
+            <button onClick={() => navigate('/social')} className="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30 transition-all gap-2 border border-blue-200/50 dark:border-blue-800/30">
+              <Smartphone className="text-blue-600 dark:text-blue-400" size={20} />
+              <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Social Post</span>
             </button>
-            <button onClick={() => navigate('/creative')} className="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 transition-all gap-2 border border-purple-200/50 dark:border-purple-800/30 hover-lift">
-              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-              </svg>
-              <span className="text-sm font-medium text-purple-700 dark:text-purple-400">Make Poster</span>
+            <button onClick={() => navigate('/campaigns')} className="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 transition-all gap-2 border border-purple-200/50 dark:border-purple-800/30">
+              <Send className="text-purple-600 dark:text-purple-400" size={20} />
+              <span className="text-xs font-medium text-purple-700 dark:text-purple-400">Campaign</span>
             </button>
-            <button onClick={() => navigate('/reviews')} className="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-xl hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-900/30 dark:hover:to-amber-900/30 transition-all gap-2 border border-orange-200/50 dark:border-orange-800/30 hover-lift">
-              <Star className="text-orange-600" size={24} />
-              <span className="text-sm font-medium text-orange-700">View Reviews</span>
+            <button onClick={() => navigate('/workflows')} className="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-xl hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-900/30 dark:hover:to-amber-900/30 transition-all gap-2 border border-orange-200/50 dark:border-orange-800/30">
+              <Zap className="text-orange-600 dark:text-orange-400" size={20} />
+              <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Workflow</span>
             </button>
           </div>
         </div>
