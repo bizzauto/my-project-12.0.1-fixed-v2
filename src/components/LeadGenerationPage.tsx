@@ -143,6 +143,7 @@ export default function LeadGenerationPage(){
  const [syncResult, setSyncResult] = useState<any>(null);
  const [imSyncDays, setImSyncDays] = useState(7);
  const [imPlatform, setImPlatform] = useState('indiamart');
+ const [imForm, setImForm] = useState({ imapHost: 'imap.gmail.com', imapPort: 993, email: '', password: '', useSSL: true, spreadsheetId: '', autoSync: true, syncInterval: 60 });
   const selc="px-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm";
   const btn="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors text-sm font-medium";
 
