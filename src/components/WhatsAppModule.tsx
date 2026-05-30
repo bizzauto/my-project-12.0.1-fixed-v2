@@ -5,7 +5,7 @@ import {
   Image as ImageIcon, Paperclip, Smile, Mic, Video,
   Check, CheckCheck, Clock, X, ArrowLeft, RefreshCw,
   Settings as SettingsIcon, Users, Zap, Copy, Trash2,
-  ChevronDown, ChevronRight, Edit3,
+  ChevronDown, ChevronRight, Edit3, Forward,
   MessageSquare, Radio, FileText, Bot, Bell, Shield,
   Wifi, WifiOff, QrCode, Smartphone, LogOut, Link2,
   Star, Tag, Calendar, BarChart3, ExternalLink,
@@ -28,6 +28,8 @@ interface WAContact {
   online: boolean;
   tags: string[];
   isGroup: boolean;
+  label?: 'open' | 'pending' | 'closed';
+  assignedTo?: string;
 }
 
 interface WAMessage {
@@ -572,7 +574,7 @@ const ChatView: React.FC<{
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'groups'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'groups' | 'open' | 'pending' | 'closed'>('all');
   const [templates, setTemplates] = useState<WATemplate[]>([]);
 
   useEffect(() => {
@@ -590,6 +592,9 @@ const ChatView: React.FC<{
       c.phone.includes(searchQuery);
     if (filter === 'unread') return matchesSearch && c.unreadCount > 0;
     if (filter === 'groups') return matchesSearch && c.isGroup;
+    if (filter === 'open') return matchesSearch && c.label === 'open';
+    if (filter === 'pending') return matchesSearch && c.label === 'pending';
+    if (filter === 'closed') return matchesSearch && c.label === 'closed';
     return matchesSearch;
   });
 
@@ -734,15 +739,21 @@ const ChatView: React.FC<{
         </div>
 
         {/* Filters */}
-        <div className="flex gap-1 p-2 border-b border-gray-100 bg-gray-50">
-          {(['all', 'unread', 'groups'] as const).map(f => (
+        <div className="flex gap-1 p-2 border-b border-gray-100 bg-gray-50 overflow-x-auto">
+          {([
+            { key: 'all', label: 'All' },
+            { key: 'unread', label: `Unread (${contacts.filter(c => c.unreadCount > 0).length})` },
+            { key: 'open', label: `Open (${contacts.filter(c => c.label === 'open').length})` },
+            { key: 'pending', label: `Pending (${contacts.filter(c => c.label === 'pending').length})` },
+            { key: 'groups', label: 'Groups' },
+          ] as const).map(f => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === f ? 'bg-green-500 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${filter === f.key ? 'bg-green-500 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
             >
-              {f === 'all' ? 'All' : f === 'unread' ? `Unread (${contacts.filter(c => c.unreadCount > 0).length})` : 'Groups'}
+              {f.label}
             </button>
           ))}
         </div>
@@ -810,8 +821,19 @@ const ChatView: React.FC<{
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">
-                  <h3 className="font-semibold text-gray-900 dark:text-white text-sm truncate">{contact.name}</h3>
-                  <span className={`text-xs ${contact.unreadCount > 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm truncate">{contact.name}</h3>
+                    {contact.label && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                        contact.label === 'open' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                        contact.label === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
+                        'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {contact.label}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-xs flex-shrink-0 ${contact.unreadCount > 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>
                     {contact.lastMessageTime}
                   </span>
                 </div>
@@ -918,18 +940,28 @@ const ChatView: React.FC<{
                         </div>
 
                         {/* Hover actions */}
-                        <div className="absolute -top-2 right-2 hidden group-hover:flex items-center gap-1 bg-white rounded-lg shadow-md p-1">
-                          <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="React">
-                            <Smile size={14} />
-                          </button>
-                          <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Reply">
+                        <div className="absolute -top-2 right-2 hidden group-hover:flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg shadow-md p-1">
+                          <button onClick={() => {
+                            setNewMessage((prev) => prev ? `> ${msg.content}\n\n${prev}` : `> ${msg.content}\n\n`);
+                            inputRef.current?.focus();
+                          }} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Reply">
                             <ArrowLeft size={14} />
                           </button>
-                          <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Star">
-                            <Star size={14} />
+                          <button onClick={() => {
+                            const emoji = '👍';
+                            setNewMessage((prev) => prev + emoji);
+                          }} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="React">
+                            <Smile size={14} />
                           </button>
-                          <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="More">
-                            <ChevronDown size={14} />
+                          <button onClick={() => {
+                            if (!msg.isStarred) {
+                              setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, isStarred: true } : m));
+                            }
+                          }} className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${msg.isStarred ? 'text-yellow-500' : 'text-gray-500 dark:text-gray-400'}`} title="Star">
+                            <Star size={14} fill={msg.isStarred ? 'currentColor' : 'none'} />
+                          </button>
+                          <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Forward">
+                            <Forward size={14} />
                           </button>
                         </div>
                       </div>
@@ -2201,6 +2233,7 @@ const WhatsAppModule: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
               online: false,
               tags: [],
               isGroup: chat.isGroup || false,
+              label: (chat.unreadCount || 0) > 0 ? 'open' : 'pending',
             }));
             if (apiContacts.length > 0) {
               setContacts(apiContacts);
