@@ -374,7 +374,16 @@ export class IndiaMARTEmailService {
             imap.search(
               [
                 ['SINCE', since],
-                ['FROM', 'indiamart'],
+                ['OR',
+                  ['FROM', 'indiamart.com'],
+                  ['OR',
+                    ['FROM', 'leadz@indiamart.com'],
+                    ['OR',
+                      ['FROM', 'noreply@indiamart.com'],
+                      ['FROM', 'enquiry@indiamart.com']
+                    ]
+                  ]
+                ],
               ],
               async (err, results) => {
                 if (err) {

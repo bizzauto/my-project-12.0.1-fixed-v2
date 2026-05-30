@@ -60,14 +60,20 @@ export default function LeadGenerationPage(){
  }, []);
 
  const syncIndiaMART = async () => {
-   setImSyncing(true); setSyncResult(null);
-   try {
-     const token = localStorage.getItem('token');
-     const r = await fetch(`${API}/indiamart-email/sync`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-     const d = await r.json();
-     if (d.success) { setSyncResult(d.data); toast_('Sync complete!', 'success'); fetchLeads(); } else { toast_(d.error || 'Sync failed', 'error'); }
-   } catch (e: any) { toast_(e.message || 'Sync failed', 'error'); }
-   setImSyncing(false);
+  setImSyncing(true);
+  try {
+   const token = localStorage.getItem('token');
+   const r = await fetch(`${API}/indiamart-email/sync`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ days: imSyncDays })
+   });
+   const d = await r.json();
+   setSyncResult(d.data || d);
+   if (d.success) toast_(`Synced ${d.data?.newLeads || 0} new leads!`, 'success');
+   else toast_(d.error || 'Sync failed', 'error');
+  } catch { toast_('Sync failed', 'error'); }
+  setImSyncing(false);
  };
 
  const testImConnection = async () => {
@@ -133,10 +139,9 @@ export default function LeadGenerationPage(){
  // IndiaMART Email Integration State
  const [imConfig, setImConfig] = useState<any>(null);
  const [showImSettings, setShowImSettings] = useState(false);
- const [imForm, setImForm] = useState({ imapHost: 'imap.indiamart.com', imapPort: 993, email: '', password: '', useSSL: true, spreadsheetId: '', autoSync: true, syncInterval: 60 });
- const [imTesting, setImTesting] = useState(false);
  const [imSyncing, setImSyncing] = useState(false);
  const [syncResult, setSyncResult] = useState<any>(null);
+ const [imSyncDays, setImSyncDays] = useState(7);
   const selc="px-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm";
   const btn="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors text-sm font-medium";
 
@@ -165,9 +170,25 @@ export default function LeadGenerationPage(){
     </div>
    </div>
    <div className="flex items-center gap-2">
-    {imConfig?.configured&&<button onClick={syncIndiaMART} disabled={imSyncing} className="flex items-center gap-2 px-4 py-2 bg-white text-orange-600 rounded-lg hover:bg-orange-50 text-sm font-medium">
-     <RefreshCw size={16} className={imSyncing?'animate-spin':''}/> {imSyncing?'Syncing...':'Sync Now'}
-    </button>}
+    {imConfig?.configured&&(
+     <div className="flex items-center gap-2">
+      <select
+       value={imSyncDays || 7}
+       onChange={e => setImSyncDays(Number(e.target.value))}
+       className="px-2 py-1.5 bg-white/20 text-white text-sm rounded-lg border border-white/30 focus:outline-none"
+      >
+       <option value={1}>Last 1 day</option>
+       <option value={7}>Last 7 days</option>
+       <option value={14}>Last 14 days</option>
+       <option value={30}>Last 30 days</option>
+       <option value={60}>Last 60 days</option>
+       <option value={90}>Last 90 days</option>
+      </select>
+      <button onClick={syncIndiaMART} disabled={imSyncing} className="flex items-center gap-2 px-4 py-2 bg-white text-orange-600 rounded-lg hover:bg-orange-50 text-sm font-medium">
+       <RefreshCw size={16} className={imSyncing?'animate-spin':''}/> {imSyncing?'Syncing...':'Sync Past Leads'}
+      </button>
+     </div>
+    )}
     <button onClick={()=>setShowImSettings(true)} className="flex items-center gap-2 px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 text-sm font-medium">
      <Settings size={16}/> {imConfig?.configured?'Settings':'Connect'}
     </button>

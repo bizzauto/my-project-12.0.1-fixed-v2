@@ -131,7 +131,7 @@ router.get('/config', authenticate, async (req: any, res: Response) => {
 router.post('/sync', authenticate, async (req: any, res: Response) => {
   try {
     const businessId = req.user.businessId;
-    const { since } = req.body; // Optional: specific date to start from
+    const { since, days = 30 } = req.body; // since: specific date, days: default 30 days
 
     // Get email config
     const integration = await prisma.integration.findFirst({
@@ -154,11 +154,21 @@ router.post('/sync', authenticate, async (req: any, res: Response) => {
       useSSL: config.useSSL,
     };
 
+    // Calculate since date - support both specific date and days range
+    let sinceDate: Date;
+    if (since) {
+      sinceDate = new Date(since);
+    } else {
+      sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    }
+
+    console.log(`[IndiaMART] Sync requested: since=${sinceDate.toISOString()}, days=${days}`);
+
     const result = await IndiaMARTEmailService.processIndiaMARTEmails(
       businessId,
       emailConfig,
       {
-        since: since ? new Date(since) : undefined,
+        since: sinceDate,
         saveToSheet: !!config.spreadsheetId,
         spreadsheetId: config.spreadsheetId,
       }
@@ -198,6 +208,109 @@ router.post('/sync', authenticate, async (req: any, res: Response) => {
       success: false,
       error: error.message,
       hint: 'Check email credentials and IMAP settings',
+    });
+  }
+});
+
+/**
+ * POST /api/indiamart/test-connection
+ * Test IMAP connection and count IndiaMART emails
+ */
+router.post('/test-connection', authenticate, async (req: any, res: Response) => {
+  try {
+    const businessId = req.user.businessId;
+
+    const integration = await prisma.integration.findFirst({
+      where: { businessId, type: 'indiamart_email', isActive: true },
+    });
+
+    if (!integration) {
+      return res.status(400).json({
+        success: false,
+        error: 'IndiaMART email not configured.',
+      });
+    }
+
+    const config = integration.config as any;
+    const emailConfig = {
+      imapHost: config.imapHost,
+      imapPort: config.imapPort,
+      email: config.email,
+      password: decrypt(config.password),
+      useSSL: config.useSSL,
+    };
+
+    // Test IMAP connection
+    const Imap = (await import('imap')).default as any;
+    const imap = new Imap({
+      user: emailConfig.email,
+      password: emailConfig.password,
+      host: emailConfig.imapHost,
+      port: emailConfig.imapPort,
+      tls: emailConfig.useSSL,
+      tlsOptions: { rejectUnauthorized: false },
+      connTimeout: 15000,
+      authTimeout: 10000,
+    });
+
+    const testResult = await new Promise<any>((resolve, reject) => {
+      imap.once('ready', () => {
+        imap.openBox('INBOX', true, (err, box) => {
+          if (err) {
+            imap.end();
+            reject(new Error(`Failed to open INBOX: ${err.message}`));
+            return;
+          }
+
+          // Search for IndiaMART emails in last 30 days
+          const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          imap.search(
+            [
+              ['SINCE', since],
+              ['OR',
+                ['FROM', 'indiamart.com'],
+                ['OR',
+                  ['FROM', 'leadz@indiamart.com'],
+                  ['OR',
+                    ['FROM', 'noreply@indiamart.com'],
+                    ['FROM', 'enquiry@indiamart.com']
+                  ]
+                ]
+              ],
+            ],
+            (err, results) => {
+              imap.end();
+              resolve({
+                connected: true,
+                mailbox: box.name,
+                totalEmails: box.messages.total,
+                indiamartEmails: results ? results.length : 0,
+                email: emailConfig.email,
+                host: emailConfig.imapHost,
+              });
+            }
+          );
+        });
+      });
+
+      imap.once('error', (err) => {
+        reject(new Error(`IMAP connection failed: ${err.message}`));
+      });
+
+      imap.connect();
+    });
+
+    res.json({
+      success: true,
+      message: 'IMAP connection successful',
+      data: testResult,
+    });
+  } catch (error: any) {
+    console.error('IndiaMART test connection error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      hint: 'Check IMAP host, port, email and password. For Gmail, use App Password.',
     });
   }
 });
