@@ -6,6 +6,7 @@ import { MobileApp } from './lib/capacitor-app';
 import PageSkeleton from './components/PageSkeleton';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
+import ThemeSelector from './components/ThemeSelector';
 
 // Public pages
 import LandingPage from './components/LandingPage';
@@ -626,6 +627,7 @@ function AppRoutes() {
       <Route path="/404" element={<NotFoundPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    <ThemeSelector />
     </ToastProvider>
   );
 }
