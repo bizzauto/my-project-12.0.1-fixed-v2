@@ -587,6 +587,56 @@ async function seed() {
   console.log('📧 Demo Login:  demo@bizzauto.com');
   console.log('🔑 Password:    demo123');
   console.log('═══════════════════════════════════════════');
+  // ===================================================================
+  // POSTER TEMPLATES for AI Creative Studio
+  // ===================================================================
+  const posterTemplates = [
+    { name: 'Diwali Special', category: 'Festival', description: 'Diwali festival poster with traditional colors', thumbnailUrl: null, isSystem: true },
+    { name: 'Holi Colors', category: 'Festival', description: 'Holi festival celebration poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Eid Mubarak', category: 'Festival', description: 'Eid Mubarak greeting poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Christmas', category: 'Festival', description: 'Christmas celebration poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Pongal Wishes', category: 'Festival', description: 'Pongal festival poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Flash Sale', category: 'Offer', description: 'Flash sale promotional poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Grand Opening', category: 'Offer', description: 'Grand opening event poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Buy 1 Get 1', category: 'Offer', description: 'Buy one get one free offer', thumbnailUrl: null, isSystem: true },
+    { name: '50% Off', category: 'Offer', description: '50 percent discount sale poster', thumbnailUrl: null, isSystem: true },
+    { name: 'New Arrival', category: 'Product', description: 'New product arrival announcement', thumbnailUrl: null, isSystem: true },
+    { name: 'Best Seller', category: 'Product', description: 'Best selling product showcase', thumbnailUrl: null, isSystem: true },
+    { name: 'Summer Deal', category: 'Seasonal', description: 'Summer season special offers', thumbnailUrl: null, isSystem: true },
+    { name: 'Monsoon Sale', category: 'Seasonal', description: 'Monsoon season sale poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Winter Collection', category: 'Seasonal', description: 'Winter collection showcase', thumbnailUrl: null, isSystem: true },
+    { name: 'Today Special', category: 'Menu', description: 'Today special menu item', thumbnailUrl: null, isSystem: true },
+    { name: 'Biryani Fest', category: 'Menu', description: 'Biryani festival promotion', thumbnailUrl: null, isSystem: true },
+    { name: 'Pizza Offer', category: 'Menu', description: 'Pizza deal promotional poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Price List', category: 'Price List', description: 'Product price list poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Rate Card', category: 'Price List', description: 'Service rate card poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Customer Review', category: 'Testimonial', description: 'Customer testimonial showcase', thumbnailUrl: null, isSystem: true },
+    { name: 'Happy Clients', category: 'Testimonial', description: 'Client happiness testimonial', thumbnailUrl: null, isSystem: true },
+    { name: 'Wedding Invite', category: 'Wedding', description: 'Wedding invitation poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Engagement', category: 'Wedding', description: 'Engagement ceremony poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Birthday Party', category: 'Birthday', description: 'Birthday celebration poster', thumbnailUrl: null, isSystem: true },
+    { name: 'Kids Party', category: 'Birthday', description: 'Kids birthday party poster', thumbnailUrl: null, isSystem: true },
+  ];
+
+  for (const pt of posterTemplates) {
+    await prisma.posterTemplate.upsert({
+      where: { id: `poster-${pt.name.replace(/\s+/g, '-').toLowerCase()}` },
+      update: {},
+      create: {
+        id: `poster-${pt.name.replace(/\s+/g, '-').toLowerCase()}`,
+        businessId: business.id,
+        name: pt.name,
+        category: pt.category,
+        description: pt.description,
+        content: JSON.stringify({ title: pt.name, subtitle: pt.description }),
+        variables: [{ name: 'title', type: 'text' }, { name: 'subtitle', type: 'text' }, { name: 'businessName', type: 'text' }, { name: 'phone', type: 'text' }],
+        isSystem: pt.isSystem,
+        usageCount: 0,
+      },
+    });
+  }
+  console.log(`✅ ${posterTemplates.length} poster templates seeded for Creative Studio`);
+
   console.log('\n📊 Seeded data summary:');
   console.log('  • 1 Business (PROFESSIONAL plan)');
   console.log('  • 1 User (Owner)');
@@ -602,6 +652,7 @@ async function seed() {
   console.log('  • 4 Reviews');
   console.log('  • 7 Ledger entries');
   console.log('  • 4 Social media posts');
+  console.log('  • 25 Poster templates for Creative Studio');
   console.log('  • 5 Auto-reply rules');
   console.log('  • 6 Activity log entries');
   console.log('───────────────────────────────────────────');

@@ -249,7 +249,7 @@ const PosterGallery: React.FC = () => {
             Generate your first AI poster to see it here. Head over to the Creative Studio to get started.
           </p>
           <button
-            onClick={() => window.location.href = '/creative-generator'}
+            onClick={() => window.location.href = '/creative'}
             className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all"
           >
             Create a Poster
