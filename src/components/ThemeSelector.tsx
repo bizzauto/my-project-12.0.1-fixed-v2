@@ -44,7 +44,7 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({ onClose }) => {
       {/* Theme Toggle Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 p-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 group"
+        className="fixed bottom-6 right-6 z-[100] p-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 group"
         title="Change Theme"
       >
         <Palette size={24} className="group-hover:rotate-180 transition-transform duration-500" />

@@ -1706,6 +1706,28 @@ model PosterTemplate {
   @@index([businessId])
 }
 
+// ==================== POSTER BACKGROUNDS ====================
+model PosterBackground {
+  id         String    @id @default(cuid())
+  uploadedBy String?
+
+  name         String
+  imageUrl     String
+  thumbnailUrl String?
+  category     String   @default("general")  // festival, offer, seasonal, general, custom
+  isActive     Boolean  @default(true)
+  isSystem     Boolean  @default(false)
+  scheduleType String   @default("manual")   // daily, weekly, manual
+  expiresAt    DateTime?
+  usageCount   Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([category])
+}
+
 // ==================== INVOICE ====================
 model Invoice {
   id         String   @id @default(cuid())

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Building2, Users, MessageSquare, TrendingUp,
-  ArrowUpRight, ArrowDownRight, Eye, Shield, DollarSign, RefreshCw
+  ArrowUpRight, ArrowDownRight, Eye, Shield, DollarSign, RefreshCw,
+  Image, Plus, Trash2, ExternalLink, Clock, Calendar
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -118,6 +119,7 @@ const StatCard: React.FC<{
 // ============================================================
 
 const SuperAdminDashboard: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'backgrounds'>('dashboard');
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [growthData, setGrowthData] = useState<GrowthDataPoint[]>([]);
   const [planData, setPlanData] = useState<PlanDataPoint[]>([]);
@@ -125,6 +127,12 @@ const SuperAdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Backgrounds state
+  const [backgrounds, setBackgrounds] = useState<any[]>([]);
+  const [bgLoading, setBgLoading] = useState(false);
+  const [showAddBg, setShowAddBg] = useState(false);
+  const [bgForm, setBgForm] = useState({ name: '', imageUrl: '', thumbnailUrl: '', category: 'general', scheduleType: 'manual', expiresAt: '' });
 
   const fetchData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -190,6 +198,41 @@ const SuperAdminDashboard: React.FC = () => {
   const formatCurrency = (val: number) =>
     val > 0 ? '\u20B9' + val.toLocaleString('en-IN') : '\u20B90';
 
+  // Background handlers
+  const fetchBackgrounds = useCallback(async () => {
+    setBgLoading(true);
+    try {
+      const res = await apiClient.get('/super-admin/backgrounds');
+      if (res.data?.success) setBackgrounds(res.data.data || []);
+    } catch { setBackgrounds([]); }
+    finally { setBgLoading(false); }
+  }, []);
+
+  const handleAddBg = async () => {
+    if (!bgForm.name.trim() || !bgForm.imageUrl.trim()) return;
+    try {
+      await apiClient.post('/super-admin/backgrounds', bgForm);
+      setShowAddBg(false);
+      setBgForm({ name: '', imageUrl: '', thumbnailUrl: '', category: 'general', scheduleType: 'manual', expiresAt: '' });
+      fetchBackgrounds();
+    } catch { alert('Failed to add background'); }
+  };
+
+  const handleDeleteBg = async (id: string) => {
+    if (!confirm('Delete this background?')) return;
+    try {
+      await apiClient.delete(`/super-admin/backgrounds/${id}`);
+      fetchBackgrounds();
+    } catch { alert('Failed to delete'); }
+  };
+
+  const handleToggleBg = async (bg: any) => {
+    try {
+      await apiClient.put(`/super-admin/backgrounds/${bg.id}`, { isActive: !bg.isActive });
+      fetchBackgrounds();
+    } catch { alert('Failed to update'); }
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -205,6 +248,20 @@ const SuperAdminDashboard: React.FC = () => {
 
   return (
     <div className="p-8">
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-2 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setActiveTab('dashboard')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          📊 Dashboard
+        </button>
+        <button onClick={() => { setActiveTab('backgrounds'); fetchBackgrounds(); }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'backgrounds' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          🖼️ Poster Backgrounds
+        </button>
+      </div>
+
+      {activeTab === 'dashboard' && (
+      <div>
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
@@ -482,6 +539,141 @@ const SuperAdminDashboard: React.FC = () => {
             )}
           </div>
         </>
+      )}
+      </div>
+      )}
+
+      {activeTab === 'backgrounds' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">🖼️ Poster Backgrounds</h2>
+              <p className="text-gray-500 text-sm mt-1">Upload background images that users can use in Creative Studio</p>
+            </div>
+            <button onClick={() => setShowAddBg(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
+              <Plus size={16} /> Add Background
+            </button>
+          </div>
+
+          {/* Add Background Modal */}
+          {showAddBg && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowAddBg(false)}>
+              <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">Add Poster Background</h3>
+                  <button onClick={() => setShowAddBg(false)} className="text-gray-400 hover:text-gray-600"><Trash2 size={18} /></button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Name *</label>
+                    <input type="text" value={bgForm.name} onChange={(e) => setBgForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder="e.g. Diwali 2026 Background"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Image URL *</label>
+                    <input type="url" value={bgForm.imageUrl} onChange={(e) => setBgForm(f => ({ ...f, imageUrl: e.target.value, thumbnailUrl: e.target.value }))}
+                      placeholder="https://example.com/background.jpg"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm" />
+                  </div>
+                  {bgForm.imageUrl && (
+                    <div className="rounded-xl overflow-hidden border border-gray-200 h-32">
+                      <img src={bgForm.imageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-1 block">Category</label>
+                      <select value={bgForm.category} onChange={(e) => setBgForm(f => ({ ...f, category: e.target.value }))}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm">
+                        <option value="general">General</option>
+                        <option value="festival">Festival</option>
+                        <option value="offer">Offer</option>
+                        <option value="seasonal">Seasonal</option>
+                        <option value="wedding">Wedding</option>
+                        <option value="birthday">Birthday</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-1 block">Schedule</label>
+                      <select value={bgForm.scheduleType} onChange={(e) => setBgForm(f => ({ ...f, scheduleType: e.target.value }))}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm">
+                        <option value="manual">Manual</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Expires At (optional)</label>
+                    <input type="date" value={bgForm.expiresAt} onChange={(e) => setBgForm(f => ({ ...f, expiresAt: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm" />
+                  </div>
+                  <button onClick={handleAddBg}
+                    className="w-full py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors">
+                    Add Background
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Backgrounds List */}
+          {bgLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw size={32} className="text-purple-500 animate-spin" />
+            </div>
+          ) : backgrounds.length === 0 ? (
+            <div className="text-center py-16 text-gray-400 bg-white rounded-xl border border-gray-100">
+              <Image size={48} className="mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium text-gray-600 mb-1">No backgrounds yet</p>
+              <p className="text-sm">Click "Add Background" to upload your first poster background</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {backgrounds.map(bg => (
+                <div key={bg.id} className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
+                  <div className="aspect-video bg-gray-100 relative overflow-hidden">
+                    <img src={bg.imageUrl} alt={bg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23ddd" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23999" font-size="10">No Image</text></svg>'; }} />
+                    <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-medium ${bg.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {bg.isActive ? 'Active' : 'Inactive'}
+                    </div>
+                    {bg.scheduleType !== 'manual' && (
+                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-medium flex items-center gap-1">
+                        <Clock size={10} /> {bg.scheduleType}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <h3 className="text-sm font-semibold text-gray-900 truncate">{bg.name}</h3>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{bg.category} · {bg.usageCount || 0} uses</p>
+                    {bg.expiresAt && (
+                      <p className="text-[10px] text-amber-500 mt-0.5 flex items-center gap-1">
+                        <Calendar size={10} /> Expires {new Date(bg.expiresAt).toLocaleDateString()}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                      <button onClick={() => handleToggleBg(bg)}
+                        className={`text-[10px] font-medium px-2 py-1 rounded-lg ${bg.isActive ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+                        {bg.isActive ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <a href={bg.imageUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-[10px] font-medium px-2 py-1 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 flex items-center gap-1">
+                        <ExternalLink size={10} /> View
+                      </a>
+                      <button onClick={() => handleDeleteBg(bg.id)}
+                        className="text-[10px] font-medium px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 ml-auto">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

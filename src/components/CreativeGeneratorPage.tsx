@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { postersAPI } from '../lib/api';
+import { useAuthStore } from '../lib/authStore';
 import html2canvas from 'html2canvas';
 
 interface Template {
@@ -197,6 +198,8 @@ const CreativeGeneratorPage: React.FC = () => {
   const [textColor, setTextColor] = useState('#FFFFFF');
   const [showQR, setShowQR] = useState(true);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [adminBackgrounds, setAdminBackgrounds] = useState<any[]>([]);
+  const [showAdminBgPicker, setShowAdminBgPicker] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(true);
   const [aiImageUrl, setAiImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -361,10 +364,32 @@ const CreativeGeneratorPage: React.FC = () => {
     }
   };
 
+  // Auto-fill business profile from user account
+  const business = useAuthStore((s: any) => s.business);
+  const user = useAuthStore((s: any) => s.user);
+
+  useEffect(() => {
+    if (business) {
+      if (!businessName && business.name) setBusinessName(business.name);
+      if (!phone && (business.phone || user?.phone)) setPhone(business.phone || user?.phone || '');
+    }
+  }, [business, user]);
+
   useEffect(() => {
     fetchTemplates();
     fetchHistory();
+    fetchAdminBackgrounds();
   }, []);
+
+  const fetchAdminBackgrounds = async () => {
+    try {
+      const res = await postersAPI.list(); // reuse posters API client
+      try {
+        const bgRes = await (await import('../lib/api')).default.get('/posters/backgrounds/active');
+        if (bgRes.data?.success) setAdminBackgrounds(bgRes.data.data || []);
+      } catch {}
+    } catch {}
+  };
 
   const fetchTemplates = async () => {
     try {
@@ -661,11 +686,30 @@ const CreativeGeneratorPage: React.FC = () => {
                         <button onClick={removeBackground} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"><X size={12} /></button>
                       </div>
                     ) : (
-                      <label className="flex items-center justify-center w-full h-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-purple-500">
-                        <Upload size={14} className="text-gray-400 mr-1" />
-                        <span className="text-[10px] text-gray-500">Upload BG</span>
-                        <input type="file" className="hidden" accept="image/*" onChange={handleBackgroundUpload} />
-                      </label>
+                      <div className="flex gap-2">
+                        <label className="flex-1 flex items-center justify-center h-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-purple-500">
+                          <Upload size={14} className="text-gray-400 mr-1" />
+                          <span className="text-[10px] text-gray-500">Upload</span>
+                          <input type="file" className="hidden" accept="image/*" onChange={handleBackgroundUpload} />
+                        </label>
+                        {adminBackgrounds.length > 0 && (
+                          <button onClick={() => setShowAdminBgPicker(!showAdminBgPicker)}
+                            className="flex items-center gap-1 px-3 h-12 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-[10px] font-medium hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all">
+                            <Image size={14} /> Admin
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {showAdminBgPicker && adminBackgrounds.length > 0 && (
+                      <div className="mt-2 grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        {adminBackgrounds.map((bg: any) => (
+                          <button key={bg.id} onClick={() => { setBackgroundImage(bg.imageUrl); setShowAdminBgPicker(false); }}
+                            className="aspect-video rounded-lg overflow-hidden border-2 border-transparent hover:border-purple-500 transition-all bg-gray-100">
+                            <img src={bg.imageUrl} alt={bg.name} className="w-full h-full object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                   {productImage && (

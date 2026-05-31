@@ -507,6 +507,86 @@ router.get('/subscriptions', async (req: any, res: any) => {
   }
 });
 
+// ==================== POSTER BACKGROUNDS ====================
+
+// List all backgrounds
+router.get('/backgrounds', async (req: any, res: any) => {
+  try {
+    const { category, isActive, page = '1', limit = '50' } = req.query;
+    const where: any = {};
+    if (category) where.category = category;
+    if (isActive !== undefined) where.isActive = isActive === 'true';
+
+    const [backgrounds, total] = await Promise.all([
+      prisma.posterBackground.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (parseInt(page) - 1) * parseInt(limit),
+        take: parseInt(limit),
+      }),
+      prisma.posterBackground.count({ where }),
+    ]);
+
+    res.json({ success: true, data: backgrounds, total });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to fetch backgrounds', details: error.message });
+  }
+});
+
+// Create background
+router.post('/backgrounds', async (req: any, res: any) => {
+  try {
+    const { name, imageUrl, thumbnailUrl, category, scheduleType, expiresAt } = req.body;
+    if (!name || !imageUrl) {
+      return res.status(400).json({ success: false, error: 'Name and imageUrl are required' });
+    }
+    const bg = await prisma.posterBackground.create({
+      data: {
+        name, imageUrl, thumbnailUrl: thumbnailUrl || imageUrl,
+        category: category || 'general',
+        scheduleType: scheduleType || 'manual',
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        isActive: true, isSystem: true,
+      },
+    });
+    res.status(201).json({ success: true, data: bg });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to create background', details: error.message });
+  }
+});
+
+// Update background
+router.put('/backgrounds/:id', async (req: any, res: any) => {
+  try {
+    const { name, imageUrl, thumbnailUrl, category, isActive, scheduleType, expiresAt } = req.body;
+    const bg = await prisma.posterBackground.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(imageUrl !== undefined && { imageUrl }),
+        ...(thumbnailUrl !== undefined && { thumbnailUrl }),
+        ...(category !== undefined && { category }),
+        ...(isActive !== undefined && { isActive }),
+        ...(scheduleType !== undefined && { scheduleType }),
+        ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
+      },
+    });
+    res.json({ success: true, data: bg });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to update background', details: error.message });
+  }
+});
+
+// Delete background
+router.delete('/backgrounds/:id', async (req: any, res: any) => {
+  try {
+    await prisma.posterBackground.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'Background deleted' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to delete background', details: error.message });
+  }
+});
+
 // ==================== PLATFORM SETTINGS ====================
 
 // Get platform-wide settings

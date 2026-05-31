@@ -307,4 +307,29 @@ router.get('/:id/download', authenticate, async (req: AuthRequest, res: Response
   }
 });
 
+// ==================== PUBLIC: GET ACTIVE BACKGROUNDS ====================
+// Users fetch backgrounds uploaded by admin
+router.get('/backgrounds/active', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { category } = req.query;
+    const where: any = { isActive: true };
+    if (category) where.category = category;
+
+    const backgrounds = await prisma.posterBackground.findMany({
+      where: {
+        ...where,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gte: new Date() } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ success: true, data: backgrounds });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to fetch backgrounds', details: error.message });
+  }
+});
+
 export default router;
