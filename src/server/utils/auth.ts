@@ -24,7 +24,7 @@ if (!JWT_SECRET) {
  * This ensures tokens don't invalidate on restart during development
  */
 function getDevJwtSecret(): string {
-  const seed = os.hostname() + '__' + __dirname;
+  const seed = os.hostname() + '__' + process.cwd();
   // Generate a 32-char hex from the seed
   return crypto.createHash('sha256').update(seed).digest('hex').slice(0, 32);
 }
