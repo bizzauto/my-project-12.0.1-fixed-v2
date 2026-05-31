@@ -1,5 +1,4 @@
 import speakeasy from 'speakeasy';
-import crypto from 'crypto';
 import QRCode from 'qrcode';
 import { prisma } from '../index.js';
 import { encrypt, decrypt } from '../utils/auth.js';
@@ -62,7 +61,7 @@ export class TwoFactorService {
       // Generate backup codes
       const backupCodes = this.generateBackupCodes();
       const hashedCodes = backupCodes.map(code =>
-        crypto.createHash('sha256').update(code).digest('hex')
+        require('crypto').createHash('sha256').update(code).digest('hex')
       );
 
       await prisma.user.update({
@@ -118,7 +117,7 @@ export class TwoFactorService {
     if (!backupCodesJson) return false;
 
     const hashedCodes: string[] = JSON.parse(backupCodesJson);
-    const hashedInput = crypto
+    const hashedInput = require('crypto')
       .createHash('sha256')
       .update(code)
       .digest('hex');
