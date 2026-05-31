@@ -386,14 +386,14 @@ export class EmailLeadService {
                   const p = (async () => {
                     try {
                       const parsed = await simpleParser(stream);
-                      const fromAddress = ((parsed as any).from?.[0]?.address || '').toLowerCase();
+                      const fromAddress = (parsed.from?.text || '').toLowerCase();
                       const subject = ((parsed as any).subject || '').toLowerCase();
                       const emailText = (parsed as any).text || '';
                       const emailHtml = (parsed as any).html || '';
                       emailCount++;
 
                       // Check if this email is from the platform
-                      const found = searchDomains.some(d => fromAddress.includes(d.replace('@', '').split('.')[0]));
+                      const found = fromAddress.includes(platform);
                       if (!found) {
                         console.log(`[${platformName}] Skipping non-platform email: ${fromAddress}`);
                         return;
