@@ -43,6 +43,9 @@ export class EmailLeadService {
     // Name - multiple patterns for IndiaMART format
     // Order matters: more specific patterns first, generic last
     const namePatterns = [
+      // Pattern for 'Regards,\nName' at signature (buyer-direct format)
+      // Use [^\S\n] (non-newline space) to prevent consuming across lines
+      /Regards,\s*\n+\s*([A-Z][a-z]+(?:[^\S\n]+[A-Z][a-z]+)*)/i,
       // Pattern for 'Buyer\'s Contact Details:' format (actual IndiaMART email)
       /Buyer'?s Contact Details:[\s\S]*?\n([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\n/i,
       /Buyer\s+Name[:\s]*([^\n]+)/i,
@@ -50,10 +53,10 @@ export class EmailLeadService {
       /Contact\s+Person[:\s]*([^\n]+)/i,
       /Enquiry\s+from[:\s]*([^\n]+)/i,
       /Query\s+from\s+([^\n]+)/i,
-      /Hi[,!\s]+([A-Z][a-z]+)/i,
-      // Generic fallback - last resort
+      // Generic fallback - last resort (must be at start of line to avoid mid-email matches)
       /(?:Dear\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
     ];
+    // Remove the misleading Hi pattern - it captures the receiver's name not the buyer's
     for (const pattern of namePatterns) {
       const match = content.match(pattern);
       if (match && match[1]) {
@@ -99,6 +102,8 @@ export class EmailLeadService {
 
     // Product - multiple patterns
     const productPatterns = [
+      // 'looking for X' format (buyer-direct email)
+      /looking\s+for\s+([\w\s\/\-\.\(\)\,]+?)(?:\.|\s+below|\s+I\s+am|\s*$)/i,
       // 'Buylead Details:' format (actual IndiaMART email)
       /Buylead\s+Details:\s*\n\s*\n?\s*([^\n]+)/i,
       /Requirement\s+for[:\s]*([^\n]+)/i,
@@ -119,6 +124,8 @@ export class EmailLeadService {
 
     // Requirement/Message - capture details from the product section
     const reqPatterns = [
+      // 'Below are my requirements' table format (buyer-direct email)
+      /Below\s+(?:are\s+)?my\s+requirements[\s:]*(.*?)(?:Chat|Regards|Reply|Email:|Call\s+Us|Visit|IndiaMART|$)/is,
       // First try to capture all details after Buylead Details
       /Buylead\s+Details:[\s\S]*?(Output[\s\S]*?)(?:Reply|Email:|Call|Visit|IndiaMART recommends)/i,
       /Requirement[:\s]*([^\n]+)/i,
@@ -136,10 +143,10 @@ export class EmailLeadService {
         result.requirement = match[1].trim().substring(0, 500);
         break;
       }
-    }
-
-    // City - multiple patterns
+    }      // City - multiple patterns
     const cityPatterns = [
+      // 'City, State, India' format (buyer-direct email signature)
+      /([A-Z][a-z]+),\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?,\s*India/i,
       // 'City - Pincode' format (actual IndiaMART email: 'Surat - 395013')
       // Use [^\S\n] (non-newline whitespace) to prevent matching across lines
       /([A-Z][a-z]+(?:[^\S\n]+[A-Z][a-z]+)*)[^\S\n]*-\s*\d{5,6}/i,
