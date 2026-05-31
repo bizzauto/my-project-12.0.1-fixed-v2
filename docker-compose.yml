@@ -17,6 +17,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      # === n8n (API key for app→n8n calls) ===
+      - N8N_URL=${N8N_URL:-http://n8n:5678}
+      - N8N_APP_API_KEY=${N8N_APP_API_KEY}
+      - N8N_API_KEY=${N8N_API_KEY}
       # === Evolution API (WhatsApp) ===
       - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://evolution-api:8080}
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}

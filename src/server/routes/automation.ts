@@ -6,77 +6,22 @@ import https from 'https';
 
 const router = Router();
 
-// Cache for n8n session cookie
-let n8nSessionCookie: string | null = null;
-let n8nSessionExpiry = 0;
-
-// Shared HTTPS agent for n8n API calls
+// Shared HTTPS agent for n8n API calls (skip SSL verification for internal Docker traffic)
 const n8nHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 
-// Login promise cache to prevent concurrent login stampede
-let loginPromise: Promise<string | null> | null = null;
-
 /**
- * Login to n8n and get a session cookie for API access
- * Uses N8N_USER_EMAIL and N8N_USER_PASSWORD env vars
- * Returns the session cookie string or null if login fails
+ * Get the n8n API key for app-to-n8n API calls.
+ * Uses N8N_APP_API_KEY env var, falls back to N8N_API_KEY for backwards compatibility.
+ * This key must be created in the n8n UI (Settings > n8n API) and has the X-N8N-API-KEY format.
  */
-async function getN8nSessionCookie(): Promise<string | null> {
-  const userEmail = process.env.N8N_USER_EMAIL;
-  const userPassword = process.env.N8N_USER_PASSWORD;
-  
-  if (!userEmail || !userPassword) {
-    console.warn('[n8n] N8N_USER_EMAIL or N8N_USER_PASSWORD not set');
-    return null;
+function getN8nApiKey(): string | null {
+  const key = process.env.N8N_APP_API_KEY || process.env.N8N_API_KEY || null;
+  if (!key) {
+    console.warn('[n8n] No API key configured. Set N8N_APP_API_KEY env var for n8n integration.');
+  } else if (!process.env.N8N_APP_API_KEY && process.env.N8N_API_KEY) {
+    console.warn('[n8n] Falling back to N8N_API_KEY for n8n calls. Recommended: set N8N_APP_API_KEY explicitly.');
   }
-
-  // Return cached cookie if still valid (refresh every 6 hours)
-  if (n8nSessionCookie && Date.now() < n8nSessionExpiry) {
-    return n8nSessionCookie;
-  }
-
-  try {
-    const n8nUrl = getN8nBaseUrl();
-    const loginUrl = `${n8nUrl}/rest/login`;
-    
-    // If another request is already logging in, wait for it
-    if (loginPromise) {
-      console.log('[n8n] Waiting for existing login attempt...');
-      return await loginPromise;
-    }
-    
-    loginPromise = (async () => {
-      const response = await axios.post(loginUrl, {
-        emailOrLdapLoginId: userEmail,
-        password: userPassword,
-      }, {
-        timeout: 10000,
-        httpsAgent: n8nHttpsAgent,
-      });
-
-      const setCookieHeader = response.headers['set-cookie'];
-      if (setCookieHeader && setCookieHeader.length > 0) {
-        const cookie = setCookieHeader[0].split(';')[0];
-        n8nSessionCookie = cookie;
-        n8nSessionExpiry = Date.now() + 6 * 60 * 60 * 1000; // 6 hours
-        console.log('[n8n] Session cookie obtained successfully');
-        return cookie;
-      }
-      
-      console.warn('[n8n] Login succeeded but no cookie returned');
-      return null;
-    })();
-    
-    const result = await loginPromise;
-    loginPromise = null;
-    return result;
-  } catch (error: any) {
-    console.error('[n8n] Login failed:', error.message);
-    n8nSessionCookie = null;
-    n8nSessionExpiry = 0;
-    loginPromise = null;
-    return null;
-  }
+  return key;
 }
 
 /**
@@ -320,36 +265,24 @@ router.post('/n8n/trigger/:workflowId', async (req: AuthRequest, res: Response) 
 router.get('/n8n/workflows', async (req: AuthRequest, res: Response) => {
   try {
     const n8nUrl = getN8nBaseUrl();
+    const apiKey = getN8nApiKey();
 
     try {
-      // Try with session cookie auth first
-      const cookie = await getN8nSessionCookie();
-      
-      if (cookie) {
-        const response = await axios.get(`${n8nUrl}/api/v1/workflows`, {
-          headers: {
-            'Cookie': cookie,
-          },
-          timeout: 5000,
-          httpsAgent: n8nHttpsAgent,
-        });
-
-        res.json({
-          success: true,
-          data: response.data.data || response.data.workflows || [],
-        });
-      } else {
-        // Fallback: try without auth (if Basic Auth is disabled)
-        const response = await axios.get(`${n8nUrl}/api/v1/workflows`, {
-          timeout: 5000,
-          httpsAgent: n8nHttpsAgent,
-        });
-
-        res.json({
-          success: true,
-          data: response.data.data || response.data.workflows || [],
-        });
+      const headers: Record<string, string> = {};
+      if (apiKey) {
+        headers['X-N8N-API-KEY'] = apiKey;
       }
+
+      const response = await axios.get(`${n8nUrl}/api/v1/workflows`, {
+        headers,
+        timeout: 5000,
+        httpsAgent: n8nHttpsAgent,
+      });
+
+      res.json({
+        success: true,
+        data: response.data.data || response.data.workflows || response.data || [],
+      });
     } catch (error: any) {
       console.warn('[n8n] Workflows fetch failed:', error.message);
       res.json({

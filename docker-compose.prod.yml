@@ -49,6 +49,8 @@ services:
 
       # === n8n (Workflow Automation) ===
       - N8N_URL=${N8N_URL:-http://n8n:5678}
+      - N8N_APP_API_KEY=${N8N_APP_API_KEY}
+      - N8N_API_KEY=${N8N_API_KEY}
       - N8N_PASSWORD=${N8N_PASSWORD}
 
       # === AI Services ===

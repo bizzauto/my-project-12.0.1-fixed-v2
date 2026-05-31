@@ -28,6 +28,12 @@
 | `API_URL` | `https://bizzautoai.com` | If same domain (reverse proxy handles `/api/*`) |
 | `N8N_URL` | `https://n8n.bizzautoai.com` | n8n workflow automation URL — backend uses this to trigger workflows |
 
+### n8n API Auth
+| Variable | Your Value | Notes |
+|----------|-----------|-------|
+| `N8N_APP_API_KEY` | Create in n8n UI (Settings → n8n API) | App→n8n outgoing API key (uses `X-N8N-API-KEY` header) |
+| `N8N_API_KEY` | Strong random key | n8n→App incoming auth — must match what `auth.ts` middleware expects |
+
 ---
 
 ## 🟡 EVOLUTION API VARS (New — must be added!)
@@ -63,6 +69,7 @@ These are wired automatically from the env vars above — you don't need to set 
 | `N8N_PASSWORD` | *(your password)* | For n8n admin login |
 | `N8N_ENCRYPTION_KEY` | *(your key)* | Required for n8n |
 | `N8N_USER_MANAGEMENT_JWT_SECRET` | *(your secret)* | Required for n8n |
+| `N8N_APP_API_KEY` | Create in n8n UI → Settings → n8n API | n8n's own API key for app→n8n calls |
 | `WEBHOOK_URL` | `https://n8n.bizzautoai.com` | n8n's own webhook URL (set in n8n resource) |
 | `OPENROUTER_API_KEY` | *(your key)* | For AI features in n8n workflows |
 

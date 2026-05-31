@@ -125,6 +125,9 @@ JWT_REFRESH_SECRET=generate_की_huyi_value
 ENCRYPTION_KEY=generate_की_huyi_value
 
 REDIS_PASSWORD=generate_की_huyi_value
+N8N_URL=http://n8n:5678
+N8N_APP_API_KEY=n8n_api_key_से_banao_n8n_UI_mai
+N8N_API_KEY=n8n_api_key_जो_auth.ts_se_milta_hai
 N8N_PASSWORD=generate_की_huyi_value
 
 OPENROUTER_API_KEY=अपनी_key

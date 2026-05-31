@@ -18,7 +18,8 @@ openssl rand -hex 32   # → N8N_USER_MANAGEMENT_JWT_SECRET
 ```
 
 Also pick:
-- `N8N_API_KEY` → a strong key like `n8n_key_YourRandomString123456789`
+- `N8N_APP_API_KEY` → API key created in n8n UI (Settings > n8n API) for app→n8n calls
+- `N8N_API_KEY` → a strong key like `n8n_key_YourRandomString123456789` for n8n→app auth
 - `N8N_PASSWORD` → strong admin password for n8n
 - `EVOLUTION_API_KEY` → `evol_` + `openssl rand -hex 16` output
 
@@ -66,7 +67,8 @@ Check if you have a Redis resource in Coolify. If not, create one.
 | Variable | Value | Notes |
 |---|---|---|
 | `N8N_URL` | `https://n8n.bizzautoai.com` | Set after Step 4 |
-| `N8N_API_KEY` | `<from Step 1>` | Service-to-service auth key |
+| `N8N_APP_API_KEY` | `<from Step 1>` | App→n8n API key (Settings > n8n API) |
+| `N8N_API_KEY` | `<from Step 1>` | n8n→App service-to-service auth key |
 
 ### 🟡 Evolution API (WhatsApp) — Connect App to WhatsApp
 
@@ -172,6 +174,8 @@ N8N_API_URL=https://bizzautoai.com
 N8N_OPENROUTER_KEY=<same as OPENROUTER_API_KEY from Step 2>
 ```
 
+> **Important:** After n8n is deployed, go to **Settings → n8n API** in the n8n UI and create an API key. Add it as `N8N_APP_API_KEY` in the App environment variables (Step 6).
+
 Deploy n8n, then verify:
 ```bash
 curl https://n8n.bizzautoai.com/healthz
@@ -227,6 +231,7 @@ After ALL subdomains are configured and deployed:
 2. Update n8n URLs if needed:
    ```env
    N8N_URL=https://n8n.bizzautoai.com
+   N8N_APP_API_KEY=<from Step 1>
    N8N_API_KEY=<from Step 1>
    ```
 3. Update Evolution API URLs:

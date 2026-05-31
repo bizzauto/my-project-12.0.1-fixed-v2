@@ -179,6 +179,8 @@ REDIS_PASSWORD=SECURE_REDIS_PASSWORD
 
 # ============ N8N ============
 N8N_URL=http://n8n:5678
+N8N_APP_API_KEY=your-n8n-api-key-from-n8n-ui  # App→n8n outgoing auth (create in n8n Settings → n8n API)
+N8N_API_KEY=your-n8n-api-key-for-app-auth     # n8n→App incoming auth (must match auth.ts)
 N8N_PASSWORD=YOUR_SECURE_N8N_PASSWORD
 
 # ============ LOGGING ============
