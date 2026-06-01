@@ -297,158 +297,22 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: A
   }
 });
 
-// Execute workflow manually
+// Execute workflow manually — REAL execution engine
 router.post('/:id/run', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const workflow = await prisma.workflow.findFirst({
-      where: {
-        id: req.params.id,
-        businessId: req.user.businessId,
-      },
-    });
-
-    if (!workflow) {
-      return res.status(404).json({
-        success: false,
-        error: 'Workflow not found',
-      });
-    }
-
-    const nodes = workflow.nodes as any[];
-    const edges = workflow.edges as any[];
-
-    if (!Array.isArray(nodes) || nodes.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Workflow has no nodes to execute',
-      });
-    }
-
-    // Create execution record
-    const execution = await prisma.workflowExecution.create({
-      data: {
-        businessId: req.user.businessId,
-        workflowId: workflow.id,
-        status: 'running',
-        triggerData: req.body.triggerData || { source: 'manual', triggeredBy: req.user.id },
-        nodeResults: {},
-      },
-    });
-
-    // Simulate node execution
-    const nodeResults: Record<string, any> = {};
-
-    // Build adjacency list from edges
-    const adjacencyList: Record<string, string[]> = {};
-    for (const edge of edges) {
-      const sourceId = edge.source || edge.sourceNodeId;
-      const targetId = edge.target || edge.targetNodeId;
-      if (sourceId && targetId) {
-        if (!adjacencyList[sourceId]) adjacencyList[sourceId] = [];
-        adjacencyList[sourceId].push(targetId);
-      }
-    }
-
-    // Find root nodes (no incoming edges)
-    const targetIds = new Set(edges.map((e: any) => e.target || e.targetNodeId));
-    const rootNodes = nodes.filter((n: any) => !targetIds.has(n.id));
-
-    // BFS traversal from root nodes
-    const queue: string[] = rootNodes.map((n: any) => n.id);
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-      const nodeId = queue.shift()!;
-      if (visited.has(nodeId)) continue;
-      visited.add(nodeId);
-
-      const node = nodes.find((n: any) => n.id === nodeId);
-      if (!node) continue;
-
-      const nodeType = node.type || node.data?.type || 'unknown';
-
-      // Simulate execution result based on node type
-      nodeResults[nodeId] = {
-        nodeType,
-        label: node.data?.label || node.label || nodeType,
-        status: 'completed',
-        executedAt: new Date().toISOString(),
-        output: simulateNodeOutput(nodeType, node.data),
-      };
-
-      // Enqueue children
-      const children = adjacencyList[nodeId] || [];
-      for (const childId of children) {
-        if (!visited.has(childId)) {
-          queue.push(childId);
-        }
-      }
-    }
-
-    // Mark unvisited nodes as skipped
-    for (const node of nodes) {
-      if (!visited.has(node.id)) {
-        nodeResults[node.id] = {
-          nodeType: node.type || node.data?.type || 'unknown',
-          label: node.data?.label || node.label || 'Unknown',
-          status: 'skipped',
-          executedAt: new Date().toISOString(),
-          output: null,
-        };
-      }
-    }
-
-    // Update execution with results
-    const completedExecution = await prisma.workflowExecution.update({
-      where: { id: execution.id },
-      data: {
-        status: 'completed',
-        nodeResults,
-        completedAt: new Date(),
-      },
-    });
-
-    // Update workflow run stats
-    await prisma.workflow.update({
-      where: { id: workflow.id },
-      data: {
-        runCount: { increment: 1 },
-        lastRunAt: new Date(),
-      },
-    });
+    const { executeWorkflow } = await import('../services/workflow-execution.service.js');
+    const result = await executeWorkflow(req.user.businessId, req.params.id, req.body.triggerData || { source: 'manual', triggeredBy: req.user.id });
 
     res.json({
       success: true,
       data: {
-        execution: completedExecution,
-        nodeResults,
+        execution: result,
+        nodeResults: result.nodeResults,
       },
     });
   } catch (error: any) {
     console.error('Run workflow error:', error);
-
-    // Mark execution as failed if it was created
-    try {
-      const executionId = (error as any).executionId;
-      if (executionId) {
-        await prisma.workflowExecution.update({
-          where: { id: executionId },
-          data: {
-            status: 'failed',
-            error: error.message,
-            completedAt: new Date(),
-          },
-        });
-      }
-    } catch (updateError) {
-      console.error('Failed to update execution status:', updateError);
-    }
-
-    res.status(500).json({
-      success: false,
-      error: 'Failed to run workflow',
-      details: error.message,
-    });
+    res.status(500).json({ success: false, error: 'Failed to run workflow', details: error.message });
   }
 });
 
@@ -548,168 +412,28 @@ router.get('/executions/:executionId', authenticate, async (req: AuthRequest, re
   }
 });
 
-// Execute workflow by trigger type (public/internal endpoint)
+// Execute workflow by trigger type — REAL execution engine
 router.post('/execute', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { businessId, triggerType, triggerData } = req.body;
 
     if (!businessId || !triggerType) {
-      return res.status(400).json({
-        success: false,
-        error: 'Business ID and trigger type are required',
-      });
+      return res.status(400).json({ success: false, error: 'Business ID and trigger type are required' });
     }
 
-    // Find active workflows matching the trigger type
-    const workflows = await prisma.workflow.findMany({
-      where: {
-        businessId,
-        triggerType,
-        isActive: true,
-      },
-    });
-
-    if (workflows.length === 0) {
-      return res.json({
-        success: true,
-        data: {
-          message: 'No active workflows found for this trigger type',
-          executionsCreated: 0,
-        },
-      });
-    }
-
-    const executions: any[] = [];
-
-    for (const workflow of workflows) {
-      const nodes = workflow.nodes as any[];
-      const edges = workflow.edges as any[];
-
-      if (!Array.isArray(nodes) || nodes.length === 0) continue;
-
-      // Check trigger config conditions
-      if (workflow.triggerConfig && typeof workflow.triggerConfig === 'object') {
-        const config = workflow.triggerConfig as any;
-        let shouldExecute = true;
-
-        // Keyword matching for message_received triggers
-        if (triggerType === 'message_received' && config.keywords && triggerData?.message) {
-          const keywords = Array.isArray(config.keywords) ? config.keywords : [config.keywords];
-          const messageText = (triggerData.message as string).toLowerCase();
-          shouldExecute = keywords.some((kw: string) => messageText.includes(kw.toLowerCase()));
-        }
-
-        // Tag matching for tag_added triggers
-        if (triggerType === 'tag_added' && config.tags && triggerData?.tag) {
-          const tags = Array.isArray(config.tags) ? config.tags : [config.tags];
-          shouldExecute = tags.includes(triggerData.tag);
-        }
-
-        if (!shouldExecute) continue;
-      }
-
-      // Create execution record
-      const execution = await prisma.workflowExecution.create({
-        data: {
-          businessId,
-          workflowId: workflow.id,
-          status: 'running',
-          triggerData: triggerData || { source: 'trigger', triggerType },
-          nodeResults: {},
-        },
-      });
-
-      // Simulate node execution
-      const nodeResults: Record<string, any> = {};
-
-      const adjacencyList: Record<string, string[]> = {};
-      for (const edge of edges) {
-        const sourceId = edge.source || edge.sourceNodeId;
-        const targetId = edge.target || edge.targetNodeId;
-        if (sourceId && targetId) {
-          if (!adjacencyList[sourceId]) adjacencyList[sourceId] = [];
-          adjacencyList[sourceId].push(targetId);
-        }
-      }
-
-      const targetIds = new Set(edges.map((e: any) => e.target || e.targetNodeId));
-      const rootNodes = nodes.filter((n: any) => !targetIds.has(n.id));
-
-      const queue: string[] = rootNodes.map((n: any) => n.id);
-      const visited = new Set<string>();
-
-      while (queue.length > 0) {
-        const nodeId = queue.shift()!;
-        if (visited.has(nodeId)) continue;
-        visited.add(nodeId);
-
-        const node = nodes.find((n: any) => n.id === nodeId);
-        if (!node) continue;
-
-        const nodeType = node.type || node.data?.type || 'unknown';
-
-        nodeResults[nodeId] = {
-          nodeType,
-          label: node.data?.label || node.label || nodeType,
-          status: 'completed',
-          executedAt: new Date().toISOString(),
-          output: simulateNodeOutput(nodeType, node.data),
-        };
-
-        const children = adjacencyList[nodeId] || [];
-        for (const childId of children) {
-          if (!visited.has(childId)) {
-            queue.push(childId);
-          }
-        }
-      }
-
-      for (const node of nodes) {
-        if (!visited.has(node.id)) {
-          nodeResults[node.id] = {
-            nodeType: node.type || node.data?.type || 'unknown',
-            label: node.data?.label || node.label || 'Unknown',
-            status: 'skipped',
-            executedAt: new Date().toISOString(),
-            output: null,
-          };
-        }
-      }
-
-      const completedExecution = await prisma.workflowExecution.update({
-        where: { id: execution.id },
-        data: {
-          status: 'completed',
-          nodeResults,
-          completedAt: new Date(),
-        },
-      });
-
-      await prisma.workflow.update({
-        where: { id: workflow.id },
-        data: {
-          runCount: { increment: 1 },
-          lastRunAt: new Date(),
-        },
-      });
-
-      executions.push(completedExecution);
-    }
+    const { triggerWorkflows } = await import('../services/workflow-execution.service.js');
+    const results = await triggerWorkflows(businessId, triggerType, triggerData || { source: 'trigger', triggerType });
 
     res.json({
       success: true,
       data: {
-        executionsCreated: executions.length,
-        executions,
+        executionsCreated: results.length,
+        executions: results,
       },
     });
   } catch (error: any) {
     console.error('Execute workflow error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to execute workflows',
-      details: error.message,
-    });
+    res.status(500).json({ success: false, error: 'Failed to execute workflows', details: error.message });
   }
 });
 

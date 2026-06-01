@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Download, Share2, Sparkles, Palette, Type, Image,
   Wand2, RefreshCw, Layout, Eye, Clock,
@@ -55,51 +55,51 @@ const FONT_OPTIONS = [
 ];
 
 const FORMAT_OPTIONS = [
-  { name: 'Square', desc: '1080Ã—1080', ratio: 'aspect-square', width: 1080, height: 1080 },
-  { name: 'Story', desc: '1080Ã—1920', ratio: 'aspect-[9/16]', width: 1080, height: 1920 },
-  { name: 'Landscape', desc: '1200Ã—628', ratio: 'aspect-[16/9]', width: 1200, height: 628 },
+  { name: 'Square', desc: '1080×1080', ratio: 'aspect-square', width: 1080, height: 1080 },
+  { name: 'Story', desc: '1080×1920', ratio: 'aspect-[9/16]', width: 1080, height: 1920 },
+  { name: 'Landscape', desc: '1200×628', ratio: 'aspect-[16/9]', width: 1200, height: 628 },
 ];
 
 const CATEGORIES = ['Festival', 'Offer', 'Product', 'Seasonal', 'Menu', 'Price List', 'Testimonial', 'Wedding', 'Birthday'];
 
 const DEFAULT_TEMPLATES: Template[] = [
-  { id: '1', name: 'Diwali Special', emoji: 'ðŸª”', gradient: 'from-orange-500 via-red-500 to-yellow-500', category: 'Festival' },
-  { id: '2', name: 'Holi Colors', emoji: 'ðŸŽ¨', gradient: 'from-pink-500 via-purple-500 to-blue-500', category: 'Festival' },
-  { id: '3', name: 'Eid Mubarak', emoji: 'ðŸŒ™', gradient: 'from-emerald-500 via-teal-500 to-cyan-500', category: 'Festival' },
-  { id: '4', name: 'Christmas', emoji: 'ðŸŽ„', gradient: 'from-red-600 via-green-600 to-red-700', category: 'Festival' },
-  { id: '5', name: 'Pongal Wishes', emoji: 'ðŸŒ¾', gradient: 'from-yellow-600 via-orange-500 to-red-500', category: 'Festival' },
-  { id: '6', name: 'Flash Sale', emoji: 'âš¡', gradient: 'from-blue-600 via-indigo-600 to-purple-600', category: 'Offer' },
-  { id: '7', name: 'Grand Opening', emoji: 'ðŸª', gradient: 'from-amber-500 via-orange-500 to-red-500', category: 'Offer' },
-  { id: '8', name: 'Buy 1 Get 1', emoji: 'ðŸŽ¯', gradient: 'from-green-500 via-teal-500 to-cyan-500', category: 'Offer' },
-  { id: '9', name: '50% Off', emoji: 'ðŸ·ï¸', gradient: 'from-pink-500 via-rose-500 to-red-500', category: 'Offer' },
-  { id: '10', name: 'New Arrival', emoji: 'ðŸ†•', gradient: 'from-violet-500 via-purple-500 to-fuchsia-500', category: 'Product' },
-  { id: '11', name: 'Best Seller', emoji: 'ðŸ†', gradient: 'from-amber-600 via-yellow-500 to-orange-500', category: 'Product' },
-  { id: '12', name: 'Summer Deal', emoji: 'â˜€ï¸', gradient: 'from-yellow-400 via-orange-400 to-red-400', category: 'Seasonal' },
-  { id: '13', name: 'Monsoon Sale', emoji: 'ðŸŒ§ï¸', gradient: 'from-slate-500 via-blue-500 to-indigo-500', category: 'Seasonal' },
-  { id: '14', name: 'Winter Collection', emoji: 'â„ï¸', gradient: 'from-blue-300 via-indigo-400 to-purple-500', category: 'Seasonal' },
-  { id: '15', name: 'Todays Special', emoji: 'ðŸ½ï¸', gradient: 'from-amber-600 via-orange-500 to-red-500', category: 'Menu' },
-  { id: '16', name: 'Biryani Fest', emoji: 'ðŸ›', gradient: 'from-red-700 via-orange-600 to-yellow-500', category: 'Menu' },
-  { id: '17', name: 'Pizza Offer', emoji: 'ðŸ•', gradient: 'from-green-600 via-yellow-500 to-red-500', category: 'Menu' },
-  { id: '18', name: 'Price List', emoji: 'ðŸ“‹', gradient: 'from-gray-600 via-slate-500 to-blue-600', category: 'Price List' },
-  { id: '19', name: 'Rate Card', emoji: 'ðŸ’°', gradient: 'from-emerald-600 via-green-500 to-teal-500', category: 'Price List' },
-  { id: '20', name: 'Customer Review', emoji: 'â­', gradient: 'from-purple-600 via-pink-500 to-rose-500', category: 'Testimonial' },
-  { id: '21', name: 'Happy Clients', emoji: 'ðŸ˜Š', gradient: 'from-teal-500 via-cyan-500 to-blue-500', category: 'Testimonial' },
-  { id: '22', name: 'Wedding Invite', emoji: 'ðŸ’', gradient: 'from-pink-400 via-rose-400 to-red-400', category: 'Wedding' },
-  { id: '23', name: 'Engagement', emoji: 'ðŸ’Ž', gradient: 'from-cyan-400 via-blue-400 to-indigo-400', category: 'Wedding' },
-  { id: '24', name: 'Birthday Party', emoji: 'ðŸŽ‚', gradient: 'from-pink-400 via-purple-400 to-indigo-400', category: 'Birthday' },
-  { id: '25', name: 'Kids Party', emoji: 'ðŸŽˆ', gradient: 'from-yellow-300 via-green-300 to-blue-300', category: 'Birthday' },
+  { id: '1', name: 'Diwali Special', emoji: '🪔', gradient: 'from-orange-500 via-red-500 to-yellow-500', category: 'Festival' },
+  { id: '2', name: 'Holi Colors', emoji: '🎨', gradient: 'from-pink-500 via-purple-500 to-blue-500', category: 'Festival' },
+  { id: '3', name: 'Eid Mubarak', emoji: '🌙', gradient: 'from-emerald-500 via-teal-500 to-cyan-500', category: 'Festival' },
+  { id: '4', name: 'Christmas', emoji: '🎄', gradient: 'from-red-600 via-green-600 to-red-700', category: 'Festival' },
+  { id: '5', name: 'Pongal Wishes', emoji: '🌾', gradient: 'from-yellow-600 via-orange-500 to-red-500', category: 'Festival' },
+  { id: '6', name: 'Flash Sale', emoji: '⚡', gradient: 'from-blue-600 via-indigo-600 to-purple-600', category: 'Offer' },
+  { id: '7', name: 'Grand Opening', emoji: '🏪', gradient: 'from-amber-500 via-orange-500 to-red-500', category: 'Offer' },
+  { id: '8', name: 'Buy 1 Get 1', emoji: '🎯', gradient: 'from-green-500 via-teal-500 to-cyan-500', category: 'Offer' },
+  { id: '9', name: '50% Off', emoji: '🏷', gradient: 'from-pink-500 via-rose-500 to-red-500', category: 'Offer' },
+  { id: '10', name: 'New Arrival', emoji: '🆕', gradient: 'from-violet-500 via-purple-500 to-fuchsia-500', category: 'Product' },
+  { id: '11', name: 'Best Seller', emoji: '🏆', gradient: 'from-amber-600 via-yellow-500 to-orange-500', category: 'Product' },
+  { id: '12', name: 'Summer Deal', emoji: '☀', gradient: 'from-yellow-400 via-orange-400 to-red-400', category: 'Seasonal' },
+  { id: '13', name: 'Monsoon Sale', emoji: '🌧', gradient: 'from-slate-500 via-blue-500 to-indigo-500', category: 'Seasonal' },
+  { id: '14', name: 'Winter Collection', emoji: '❄', gradient: 'from-blue-300 via-indigo-400 to-purple-500', category: 'Seasonal' },
+  { id: '15', name: 'Todays Special', emoji: '🍽', gradient: 'from-amber-600 via-orange-500 to-red-500', category: 'Menu' },
+  { id: '16', name: 'Biryani Fest', emoji: '🍛', gradient: 'from-red-700 via-orange-600 to-yellow-500', category: 'Menu' },
+  { id: '17', name: 'Pizza Offer', emoji: '🍕', gradient: 'from-green-600 via-yellow-500 to-red-500', category: 'Menu' },
+  { id: '18', name: 'Price List', emoji: '📋', gradient: 'from-gray-600 via-slate-500 to-blue-600', category: 'Price List' },
+  { id: '19', name: 'Rate Card', emoji: '💰', gradient: 'from-emerald-600 via-green-500 to-teal-500', category: 'Price List' },
+  { id: '20', name: 'Customer Review', emoji: '⭐', gradient: 'from-purple-600 via-pink-500 to-rose-500', category: 'Testimonial' },
+  { id: '21', name: 'Happy Clients', emoji: '😊', gradient: 'from-teal-500 via-cyan-500 to-blue-500', category: 'Testimonial' },
+  { id: '22', name: 'Wedding Invite', emoji: '💍', gradient: 'from-pink-400 via-rose-400 to-red-400', category: 'Wedding' },
+  { id: '23', name: 'Engagement', emoji: '💎', gradient: 'from-cyan-400 via-blue-400 to-indigo-400', category: 'Wedding' },
+  { id: '24', name: 'Birthday Party', emoji: '🎂', gradient: 'from-pink-400 via-purple-400 to-indigo-400', category: 'Birthday' },
+  { id: '25', name: 'Kids Party', emoji: '🎈', gradient: 'from-yellow-300 via-green-300 to-blue-300', category: 'Birthday' },
 ];
 
 const LOGO_STYLES: LogoStyle[] = [
-  { id: 'modern', name: 'Modern', icon: 'â¬¡', gradient: 'from-blue-500 to-purple-500' },
-  { id: 'classic', name: 'Classic', icon: 'âœ¦', gradient: 'from-amber-500 to-red-500' },
-  { id: 'minimal', name: 'Minimal', icon: 'â—ˆ', gradient: 'from-gray-500 to-slate-500' },
-  { id: 'playful', name: 'Playful', icon: 'â˜…', gradient: 'from-pink-500 to-yellow-500' },
-  { id: 'nature', name: 'Nature', icon: 'ðŸŒ¿', gradient: 'from-green-500 to-emerald-500' },
-  { id: 'luxury', name: 'Luxury', icon: 'â™¦', gradient: 'from-yellow-600 to-amber-700' },
+  { id: 'modern', name: 'Modern', icon: '🔷', gradient: 'from-blue-500 to-purple-500' },
+  { id: 'classic', name: 'Classic', icon: '✨', gradient: 'from-amber-500 to-red-500' },
+  { id: 'minimal', name: 'Minimal', icon: '⭕', gradient: 'from-gray-500 to-slate-500' },
+  { id: 'playful', name: 'Playful', icon: '⭐', gradient: 'from-pink-500 to-yellow-500' },
+  { id: 'nature', name: 'Nature', icon: '🌿', gradient: 'from-green-500 to-emerald-500' },
+  { id: 'luxury', name: 'Luxury', icon: '👑', gradient: 'from-yellow-600 to-amber-700' },
 ];
 
-const STICKERS = ['â­', 'ðŸ”¥', 'â¤ï¸', 'âœ¨', 'ðŸŽ‰', 'ðŸ’¥', 'ðŸŽ¯', 'âœ…', 'ðŸš€', 'ðŸ’°', 'ðŸ’Ž', 'ðŸ†', 'ðŸŒŸ', 'ðŸŽª', 'ðŸŽ¨', 'ðŸ›’', 'ðŸ“±', 'ðŸŽ', 'ðŸ’¡', 'ðŸ””', 'ðŸ¥‡', 'ðŸ“¢', 'ðŸ’«', 'ðŸŽŠ'];
+const STICKERS = ['⭐', '🔥', '❤️', '✨', '🎉', '💥', '🎯', '✅', '🚀', '💰', '💎', '🏆', '🌟', '🎪', '🎨', '🛍️', '📱', '🎁', '💡', '📢', '🥇', '📣', '💫', '🎊'];
 
 const AI_PROMPTS: Record<string, string[]> = {
   Festival: [
@@ -120,7 +120,7 @@ const AI_PROMPTS: Record<string, string[]> = {
     'Festival special combo offer',
     'First time customer discount 20%',
     'Loyalty reward points program',
-    'Refer a friend and get â‚¹500 off',
+    'Refer a friend and get ₹500 off',
   ],
   Product: [
     'New smartphone launch with specs',
@@ -413,8 +413,8 @@ const CreativeGeneratorPage: React.FC = () => {
   };
 
   const getEmojiForCategory = (cat: string): string => {
-    const map: Record<string, string> = { Festival: 'ðŸŽ‰', Offer: 'ðŸŽ', Product: 'ðŸ“¦', Seasonal: 'ðŸŒ¸', Testimonial: 'â­', Menu: 'ðŸ½ï¸', 'Price List': 'ðŸ’°', Wedding: 'ðŸ’', Birthday: 'ðŸŽ‚' };
-    return map[cat] || 'ðŸŽ¨';
+    const map: Record<string, string> = { Festival: '🎉', Offer: '🎁', Product: '📦', Seasonal: '🌸', Testimonial: '⭐', Menu: '🍽', 'Price List': '💰', Wedding: '💍', Birthday: '🎂' };
+    return map[cat] || '🎨';
   };
   const getGradientForCategory = (cat: string): string => {
     const map: Record<string, string> = { Festival: 'from-orange-500 via-red-500 to-yellow-500', Offer: 'from-blue-600 via-indigo-600 to-purple-600', Product: 'from-violet-500 via-purple-500 to-fuchsia-500', Seasonal: 'from-yellow-400 via-orange-400 to-red-400', Testimonial: 'from-green-500 via-teal-500 to-cyan-500', Menu: 'from-amber-500 via-orange-500 to-red-500', 'Price List': 'from-slate-500 via-blue-500 to-indigo-500', Wedding: 'from-pink-400 via-rose-400 to-red-400', Birthday: 'from-pink-400 via-purple-400 to-indigo-400' };
@@ -459,7 +459,7 @@ const CreativeGeneratorPage: React.FC = () => {
   };
 
   const handleWhatsAppShare = () => {
-    const text = encodeURIComponent(`*${headline || 'Check this!'}*\n${subtitle || ''}\n\n${businessName ? `ðŸª ${businessName}` : ''}\n${phone ? `ðŸ“ž ${phone}` : ''}`);
+    const text = encodeURIComponent(`*${headline || 'Check this!'}*\n${subtitle || ''}\n\n${businessName ? `🏪 ${businessName}` : ''}\n${phone ? `📞 ${phone}` : '' }`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
@@ -528,7 +528,7 @@ const CreativeGeneratorPage: React.FC = () => {
           {(['create', 'history'] as const).map(v => (
             <button key={v} onClick={() => setActiveView(v)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeView === v ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}>
-              {v === 'create' ? 'âœ¨ Create' : 'ðŸ“‚ History'}
+              {v === 'create' ? '✨ Create' : 'ðŸ“‚ History'}
             </button>
           ))}
         </div>
@@ -634,10 +634,10 @@ const CreativeGeneratorPage: React.FC = () => {
                 {(['basic', 'filters', 'effects', 'stickers'] as const).map(tab => (
                   <button key={tab} onClick={() => setActiveDesignTab(tab)}
                     className={`px-3 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all ${activeDesignTab === tab ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
-                    {tab === 'basic' && 'ðŸŽ¨ Basic'}
+                    {tab === 'basic' && '🎨 Basic'}
                     {tab === 'filters' && 'ðŸ”„ Filters'}
-                    {tab === 'effects' && 'âœ¨ Effects'}
-                    {tab === 'stickers' && 'ðŸ˜Š Stickers'}
+                    {tab === 'effects' && '✨ Effects'}
+                    {tab === 'stickers' && '😊 Stickers'}
                   </button>
                 ))}
               </div>
@@ -767,7 +767,7 @@ const CreativeGeneratorPage: React.FC = () => {
                       <button onClick={() => setShowPremiumBadge(!showPremiumBadge)} className={`w-9 h-4.5 rounded-full transition-all ${showPremiumBadge ? 'bg-purple-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
                         <div className={`w-3.5 h-3.5 bg-white rounded-full shadow-sm transition-all ${showPremiumBadge ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
                       </button>
-                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">â­ Badge</span>
+                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">⭐ Badge</span>
                     </label>
                   </div>
                   {/* Brand Kit */}
@@ -913,7 +913,7 @@ const CreativeGeneratorPage: React.FC = () => {
                     {/* Premium Badge */}
                     {showPremiumBadge && (
                       <div className="absolute top-3 right-3 z-20">
-                        <div className="px-2.5 py-1 bg-gradient-to-r from-yellow-400 to-amber-500 text-black text-[10px] font-bold rounded-full shadow-lg flex items-center gap-1">â­ PREMIUM</div>
+                        <div className="px-2.5 py-1 bg-gradient-to-r from-yellow-400 to-amber-500 text-black text-[10px] font-bold rounded-full shadow-lg flex items-center gap-1">⭐ PREMIUM</div>
                       </div>
                     )}
 
@@ -1003,7 +1003,7 @@ const CreativeGeneratorPage: React.FC = () => {
                 <button onClick={handleGenerateAIImage} disabled={isGeneratingImage}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiImageUrl ? 'bg-green-500/20 text-green-600 hover:bg-green-500/30' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/25'}`}>
                   {isGeneratingImage ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
-                  {isGeneratingImage ? 'Generating...' : aiImageUrl ? 'âœ¨ Regenerate' : 'ðŸš€ Generate AI Poster'}
+                  {isGeneratingImage ? 'Generating...' : aiImageUrl ? '✨ Regenerate' : '🚀 Generate AI Poster'}
                 </button>
               </div>
             </div>

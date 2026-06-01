@@ -109,20 +109,35 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
               createdBy: 'system',
             },
           });
+        } else {
+          // Existing contact - update last activity
+          await prisma.contact.update({
+            where: { id: contact.id },
+            data: { 
+              lastMessageAt: new Date(),
+              lastActivity: new Date(),
+            },
+          });
+        }
 
-          // Send auto-reply if enabled
+        // AI Auto-Reply + Workflow Triggers (new intelligent handler)
+        try {
+          const { handleIncomingMessage } = await import('../services/ai-auto-reply.service.js');
+          const messageText = message.text?.body || '';
+          const autoResult = await handleIncomingMessage(businessId, senderPhone, messageText, message.id);
+          console.log(`[WhatsApp] Auto-reply result: replied=${autoResult.replied}, channel=${autoResult.channel}, workflow=${autoResult.workflowTriggered}`);
+        } catch (aiError: any) {
+          console.error(`[WhatsApp] AI auto-reply failed, falling back to static:`, aiError.message);
+          // Fallback to static auto-reply
           try {
             const business = await prisma.business.findUnique({
               where: { id: businessId },
               select: { autoReplyEnabled: true, autoReplyMessage: true, name: true },
             });
-
             if (business?.autoReplyEnabled && business?.autoReplyMessage) {
               const autoReply = business.autoReplyMessage
-                .replace(/{{name}}/g, 'Customer')
+                .replace(/{{name}}/g, contact.name || 'Customer')
                 .replace(/{{business}}/g, business.name || 'Business');
-
-              // Send auto-reply via WhatsApp API
               const creds = await getWhatsAppCredentials(businessId);
               await axios.post(
                 `${WHATSAPP_API_BASE}/${creds.phoneNumberId}/messages`,
@@ -134,20 +149,10 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
                 },
                 { headers: { Authorization: `Bearer ${creds.accessToken}` } }
               );
-              console.log(`[WhatsApp] Auto-reply sent to ${senderPhone}`);
             }
-          } catch (autoReplyError: any) {
-            console.error(`[WhatsApp] Auto-reply failed:`, autoReplyError.message);
+          } catch (fallbackError: any) {
+            console.error(`[WhatsApp] Static auto-reply also failed:`, fallbackError.message);
           }
-        } else {
-          // Existing contact - update last activity
-          await prisma.contact.update({
-            where: { id: contact.id },
-            data: { 
-              lastMessageAt: new Date(),
-              lastActivity: new Date(),
-            },
-          });
         }
 
         // Save message
