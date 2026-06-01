@@ -1,4 +1,3 @@
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './lib/authStore';
@@ -664,13 +663,10 @@ function AppRoutes() {
   );
 }
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-
 export { ProtectedRoute, SuperAdminRoute };
 
 export default function AppWrapper() {
   return (
-    <GoogleOAuthProvider clientId={googleClientId}>
       <ErrorBoundary>
         <UIModeProvider>
           <BrowserRouter>
@@ -678,6 +674,5 @@ export default function AppWrapper() {
           </BrowserRouter>
         </UIModeProvider>
       </ErrorBoundary>
-    </GoogleOAuthProvider>
   );
 }

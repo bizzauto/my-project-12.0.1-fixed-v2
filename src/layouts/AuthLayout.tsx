@@ -469,22 +469,12 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           </div>
         </div>
 
-        {/* ===== PAGE CONTENT =====
-            CRITICAL for Android scroll: parent is fixed `height: 100dvh` (not
-            min-h-screen), so this child gets a constrained height and overflow
-            can actually kick in. Without a constrained parent, `flex-1` on
-            Android Chrome doesn't trigger scroll on long pages. */}
+        {/* ===== PAGE CONTENT ===== */}
         <div
-          className="flex-1 overflow-y-auto touch-scroll overscroll-contain"
+          className="flex-1 overflow-y-auto"
           style={{
-            height: '100%',
-            maxHeight: '100dvh',
             minHeight: 0,
             WebkitOverflowScrolling: 'touch',
-            transform: 'translateZ(0)',
-            WebkitTransform: 'translateZ(0)',
-            contain: 'layout paint',
-            willChange: 'scroll-position',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
