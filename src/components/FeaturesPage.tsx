@@ -138,7 +138,7 @@ export default function FeaturesPage() {
               Join thousands of businesses already using BizzAuto to grow their customer base.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-6 mb-8">
-              {['No Credit Card Required', '14-Day Free Trial', 'Cancel Anytime'].map((item, i) => (
+              {['No Credit Card Required', '7-Day Free Trial', 'Cancel Anytime'].map((item, i) => (
                 <div key={i} className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                   <CheckCircle size={16} className="text-emerald-500" />
                   <span className="text-sm">{item}</span>

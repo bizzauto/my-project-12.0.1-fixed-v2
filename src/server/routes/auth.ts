@@ -437,7 +437,7 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
         phone,
         plan: 'FREE',
         planStartedAt: new Date(),
-        planExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days free trial
+        planExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days free trial
       },
     });
 

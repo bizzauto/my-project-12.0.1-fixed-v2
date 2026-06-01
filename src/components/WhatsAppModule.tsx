@@ -10,9 +10,10 @@ import {
   Wifi, WifiOff, QrCode, Smartphone, LogOut, Link2,
   Star, Tag, Calendar, BarChart3, ExternalLink,
   AlertCircle, CheckCircle, VolumeX
-, Loader} from 'lucide-react';
+, Loader, Server} from 'lucide-react';
 import apiClient, { whatsappAPI } from '../lib/api';
 import ClaudeWhatsAppSettings from './ClaudeWhatsAppSettings';
+import UnofficialWhatsAppSettings from './UnofficialWhatsAppSettings';
 
 // ============================================================
 // TYPES
@@ -71,7 +72,7 @@ interface AutoReplyRule {
   matchType: 'exact' | 'contains' | 'startsWith';
 }
 
-type WAView = 'connect' | 'chats' | 'broadcast' | 'templates' | 'campaigns' | 'scheduled' | 'settings' | 'chatbot' | 'claude';
+type WAView = 'connect' | 'chats' | 'broadcast' | 'templates' | 'campaigns' | 'scheduled' | 'settings' | 'chatbot' | 'claude' | 'unofficial';
 type ConnectionStatus = 'disconnected' | 'scanning' | 'connecting' | 'connected';
 type ConnectionMode = 'meta' | 'evolution';
 
@@ -2500,6 +2501,7 @@ const WhatsAppModule: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
     { id: 'templates', label: 'Templates', icon: <FileText size={18} /> },
     { id: 'connect', label: 'Connection', icon: connectionStatus === 'connected' ? <Wifi size={18} /> : <WifiOff size={18} /> },
     { id: 'claude', label: 'Claude AI', icon: <Bot size={18} /> },
+    { id: 'unofficial', label: 'Unofficial', icon: <Server size={18} /> },
     { id: 'settings', label: 'Settings', icon: <SettingsIcon size={18} /> },
   ];
 
@@ -2602,6 +2604,11 @@ const WhatsAppModule: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
         {currentView === 'claude' && (
           <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
             <ClaudeWhatsAppSettings />
+          </div>
+        )}
+        {currentView === 'unofficial' && (
+          <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+            <UnofficialWhatsAppSettings />
           </div>
         )}
       </div>

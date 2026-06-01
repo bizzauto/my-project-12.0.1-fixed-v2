@@ -513,6 +513,22 @@ export const claudeWhatsAppAPI = {
     apiClient.get('/claude-whatsapp/cost-stats', { params: { from, to } }),
 };
 
+// ====================================================================
+// Unofficial WhatsApp Provider - SMS Gate Hub / WPPConnect / Baileys wrappers
+// ====================================================================
+export const unofficialWhatsAppAPI = {
+  getConfig: () => apiClient.get('/unofficial-whatsapp/config'),
+  saveConfig: (config: any) => apiClient.post('/unofficial-whatsapp/config', config),
+  getProviders: () => apiClient.get('/unofficial-whatsapp/providers'),
+  getStatus: () => apiClient.get('/unofficial-whatsapp/status'),
+  connect: () => apiClient.post('/unofficial-whatsapp/connect', {}),
+  logout: () => apiClient.post('/unofficial-whatsapp/logout', {}),
+  test: () => apiClient.post('/unofficial-whatsapp/test', {}),
+  checkNumber: (phone: string) => apiClient.get(`/unofficial-whatsapp/check/${encodeURIComponent(phone)}`),
+  send: (message: any) => apiClient.post('/unofficial-whatsapp/send', message),
+  sendBulk: (messages: any[]) => apiClient.post('/unofficial-whatsapp/send-bulk', { messages }),
+};
+
 // SMS Marketing API
 export const smsMarketingAPI = {
   listCampaigns: (params?: any) => apiClient.get('/sms-marketing/campaigns', { params }),
