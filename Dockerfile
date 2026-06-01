@@ -9,8 +9,12 @@ COPY prisma ./prisma/
 RUN npm install && npx prisma generate
 
 COPY . .
+
+# Increase memory limit for Vite build (prevents OOM in Docker)
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
+# ---- Production stage ----
 FROM node:22-alpine
 
 RUN apk add --no-cache openssl wget
@@ -19,7 +23,7 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY prisma ./prisma/
-RUN npm install --omit=dev && npx prisma generate
+RUN npm install --omit=dev && npx prisma generate && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
