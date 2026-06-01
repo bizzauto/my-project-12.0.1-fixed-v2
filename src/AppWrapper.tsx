@@ -9,7 +9,8 @@ import { ToastProvider } from './components/Toast';
 import ThemeSelector from './components/ThemeSelector';
 import { UIModeProvider, useUIMode } from './contexts/UIModeContext';
 import UIModeToggle from './components/UIModeToggle';
-import ModernPage from './components/ModernPage';
+import { lazy, Suspense } from 'react';
+const ModernPage = lazy(() => import('./components/ModernPage'));
 
 // Public pages
 import LandingPage from './components/LandingPage';
@@ -43,7 +44,11 @@ const ModeAwareAuthLayout: React.FC<{ children: React.ReactNode }> = ({ children
   const { mode } = useUIMode();
   const location = useLocation();
   if (mode === 'ai' && AI_ROUTES.has(location.pathname)) {
-    return <ModernPage />;
+    return (
+      <Suspense fallback={<PageSkeleton />}>
+        <ModernPage />
+      </Suspense>
+    );
   }
   return <AuthLayout>{children}</AuthLayout>;
 };
