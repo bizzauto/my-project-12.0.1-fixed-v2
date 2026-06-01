@@ -7,6 +7,7 @@ import PageSkeleton from './components/PageSkeleton';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import ThemeSelector from './components/ThemeSelector';
+import NetworkStatus from './components/NetworkStatus';
 import { UIModeProvider, useUIMode } from './contexts/UIModeContext';
 import UIModeToggle from './components/UIModeToggle';
 import { lazy, Suspense } from 'react';
@@ -656,6 +657,7 @@ function AppRoutes() {
       <Route path="/404" element={<NotFoundPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    <NetworkStatus />
     <ThemeSelector />
     <UIModeToggle />
     </ToastProvider>

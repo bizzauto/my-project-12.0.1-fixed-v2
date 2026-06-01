@@ -1,18 +1,18 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.indiacrm.app',
-  appName: 'IndiaCRM',
+  appId: 'com.bizzauto.app',
+  appName: 'BizzAuto',
   webDir: '../dist/client',
 
   // Server URL for production - change to your actual domain
   server: {
-    cleartext: true,
+    cleartext: false,
     androidScheme: 'https',
   },
 
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
   },
@@ -25,16 +25,13 @@ const config: CapacitorConfig = {
 
   plugins: {
     SplashScreen: {
-      launchShowDuration: 3000,
+      launchShowDuration: 1500,
       launchAutoHide: true,
-      launchFadeOutDuration: 500,
+      launchFadeOutDuration: 400,
       backgroundColor: '#0F172A',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
-      showSpinner: true,
-      androidSpinnerStyle: 'large',
-      iosSpinnerStyle: 'small',
-      spinnerColor: '#10B981',
+      showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true,
     },

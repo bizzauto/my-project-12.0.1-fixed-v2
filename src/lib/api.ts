@@ -1,8 +1,18 @@
 // API Client for Frontend - Connects to Backend
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
+
+// On Capacitor native, the webview serves from a custom scheme and `/api`
+// would 404. Use the production URL from VITE_API_URL when on native.
+// On web, use the relative `/api` path so the same bundle works with the
+// Vite dev-server proxy and the production web reverse-proxy.
+const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+const API_BASE_URL = isNative
+  ? (import.meta.env.VITE_API_URL || 'https://bizzauto.com/api')
+  : '/api';
 
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
