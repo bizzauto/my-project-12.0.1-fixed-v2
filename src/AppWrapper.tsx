@@ -7,6 +7,9 @@ import PageSkeleton from './components/PageSkeleton';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import ThemeSelector from './components/ThemeSelector';
+import { UIModeProvider, useUIMode } from './contexts/UIModeContext';
+import UIModeToggle from './components/UIModeToggle';
+import ModernPage from './components/ModernPage';
 
 // Public pages
 import LandingPage from './components/LandingPage';
@@ -23,6 +26,27 @@ import NotFoundPage from './components/NotFoundPage';
 
 // Authenticated layout
 import AuthLayout from './layouts/AuthLayout';
+
+const AI_ROUTES = new Set([
+  '/dashboard', '/whatsapp', '/crm', '/leads', '/appointments', '/ecommerce',
+  '/social', '/google-business', '/ai-chatbot', '/voice-call', '/creative',
+  '/automation', '/reports', '/analytics', '/reviews', '/email-marketing',
+  '/workflows', '/trigger-links', '/surveys', '/blog', '/review-requests',
+  '/payment-links', '/courses', '/funnels', '/conversations', '/custom-fields',
+  '/client-portal', '/agency', '/missed-call-settings', '/dograh-settings',
+  '/snapshots', '/bulk-import', '/import-leads', '/shipping-settings',
+  '/documents', '/profile', '/settings', '/billing', '/team', '/api-keys',
+  '/audit-log', '/store-share',
+]);
+
+const ModeAwareAuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { mode } = useUIMode();
+  const location = useLocation();
+  if (mode === 'ai' && AI_ROUTES.has(location.pathname)) {
+    return <ModernPage />;
+  }
+  return <AuthLayout>{children}</AuthLayout>;
+};
 
 // Authenticated pages
 import Dashboard from './components/DashboardPage';
@@ -164,9 +188,9 @@ function AppRoutes() {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <Dashboard />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -174,9 +198,9 @@ function AppRoutes() {
         path="/whatsapp"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <WhatsAppModule />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -184,9 +208,9 @@ function AppRoutes() {
         path="/crm"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <CRMPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -194,9 +218,9 @@ function AppRoutes() {
         path="/leads"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <LeadGenerationPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -204,9 +228,9 @@ function AppRoutes() {
         path="/appointments"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <AppointmentsPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -214,9 +238,9 @@ function AppRoutes() {
         path="/ecommerce"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <ECommercePage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -239,16 +263,16 @@ function AppRoutes() {
       } />
       <Route path="/store-share" element={
         <ProtectedRoute>
-          <AuthLayout>
+          <ModeAwareAuthLayout>
             <StoreSharePage />
-          </AuthLayout>
+          </ModeAwareAuthLayout>
         </ProtectedRoute>
       } />
       <Route path="/analytics" element={
         <ProtectedRoute>
-          <AuthLayout>
+          <ModeAwareAuthLayout>
             <SalesAnalyticsPage />
-          </AuthLayout>
+          </ModeAwareAuthLayout>
         </ProtectedRoute>
       } />
       <Route path="/my-account" element={
@@ -258,25 +282,25 @@ function AppRoutes() {
       } />
       <Route path="/bulk-import" element={
         <ProtectedRoute>
-          <AuthLayout>
+          <ModeAwareAuthLayout>
             <BulkImportExport />
-          </AuthLayout>
+          </ModeAwareAuthLayout>
         </ProtectedRoute>
       } />
       <Route path="/shipping-settings" element={
         <ProtectedRoute>
-          <AuthLayout>
+          <ModeAwareAuthLayout>
             <ShippingSettings />
-          </AuthLayout>
+          </ModeAwareAuthLayout>
         </ProtectedRoute>
       } />
       <Route
         path="/documents"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <DocumentsPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -284,9 +308,9 @@ function AppRoutes() {
         path="/social"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <SocialMediaPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -294,9 +318,9 @@ function AppRoutes() {
         path="/google-business"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <GoogleBusinessPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -304,9 +328,9 @@ function AppRoutes() {
         path="/ai-chatbot"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <AIChatbotPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -314,9 +338,9 @@ function AppRoutes() {
         path="/voice-call"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <VoiceCallPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -324,9 +348,9 @@ function AppRoutes() {
         path="/creative"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <CreativeGeneratorPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -334,9 +358,9 @@ function AppRoutes() {
         path="/automation"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <AutomationPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -344,9 +368,9 @@ function AppRoutes() {
         path="/analytics"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <ReportsPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -354,9 +378,9 @@ function AppRoutes() {
         path="/reports"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <ReportsPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -364,9 +388,9 @@ function AppRoutes() {
         path="/bulk-import"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <BulkImportPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -374,9 +398,9 @@ function AppRoutes() {
         path="/import-leads"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <EmailLeadImporter />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -384,9 +408,9 @@ function AppRoutes() {
         path="/reviews"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <ReviewsPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -396,9 +420,9 @@ function AppRoutes() {
         path="/email-marketing"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <EmailMarketingPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -408,9 +432,9 @@ function AppRoutes() {
         path="/workflows"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <WorkflowBuilder />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -418,9 +442,9 @@ function AppRoutes() {
         path="/trigger-links"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <TriggerLinks />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -430,9 +454,9 @@ function AppRoutes() {
         path="/surveys"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <SurveyBuilder />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -440,9 +464,9 @@ function AppRoutes() {
         path="/blog"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <BlogManager />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -450,9 +474,9 @@ function AppRoutes() {
         path="/review-requests"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <ReviewRequests />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -460,9 +484,9 @@ function AppRoutes() {
         path="/payment-links"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <PaymentLinks />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -472,9 +496,9 @@ function AppRoutes() {
         path="/courses"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <CourseBuilder />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -482,9 +506,9 @@ function AppRoutes() {
         path="/funnels"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <FunnelBuilder />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -492,9 +516,9 @@ function AppRoutes() {
         path="/conversations"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <ConversationsPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -504,9 +528,9 @@ function AppRoutes() {
         path="/custom-fields"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <CustomFieldsBuilder />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -514,9 +538,9 @@ function AppRoutes() {
         path="/client-portal"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <ClientPortal />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -524,9 +548,9 @@ function AppRoutes() {
         path="/agency"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <AgencyDashboard />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -534,9 +558,9 @@ function AppRoutes() {
         path="/missed-call-settings"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <MissedCallSettings />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -544,9 +568,9 @@ function AppRoutes() {
         path="/dograh-settings"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <DograhSettings />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -554,9 +578,9 @@ function AppRoutes() {
         path="/snapshots"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <SnapshotManager />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -566,9 +590,9 @@ function AppRoutes() {
         path="/profile"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <UserProfile />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -576,9 +600,9 @@ function AppRoutes() {
         path="/settings"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <SettingsPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -586,9 +610,9 @@ function AppRoutes() {
         path="/billing"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <BillingPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -596,9 +620,9 @@ function AppRoutes() {
         path="/team"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <TeamManagement />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -606,9 +630,9 @@ function AppRoutes() {
         path="/api-keys"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <ApiKeysPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -616,9 +640,9 @@ function AppRoutes() {
         path="/audit-log"
         element={
           <ProtectedRoute>
-            <AuthLayout>
+            <ModeAwareAuthLayout>
               <AuditLogPage />
-            </AuthLayout>
+            </ModeAwareAuthLayout>
           </ProtectedRoute>
         }
       />
@@ -628,6 +652,7 @@ function AppRoutes() {
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
     <ThemeSelector />
+    <UIModeToggle />
     </ToastProvider>
   );
 }
@@ -640,9 +665,11 @@ export default function AppWrapper() {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <ErrorBoundary>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <UIModeProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </UIModeProvider>
       </ErrorBoundary>
     </GoogleOAuthProvider>
   );
