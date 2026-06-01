@@ -68,7 +68,27 @@ const SalesAnalyticsPage: React.FC = () => {
     setError(null);
     try {
       const res = await apiClient.get('/store-features/analytics', { params: { period } });
-      setData(res.data);
+      const payload = res.data?.data || res.data || {};
+      // Backend uses topCategories + paymentMethodBreakdown; ordersByStatus is a Record<string, number>
+      // Normalize to what the UI expects
+      const rawStatus = payload.ordersByStatus;
+      const ordersByStatus = Array.isArray(rawStatus)
+        ? rawStatus
+        : rawStatus && typeof rawStatus === 'object'
+        ? Object.entries(rawStatus).map(([status, count]) => ({ status, count: Number(count) || 0, color: '' }))
+        : [];
+      const normalized: AnalyticsData = {
+        totalRevenue: payload.totalRevenue || 0,
+        totalOrders: payload.totalOrders || 0,
+        averageOrderValue: payload.averageOrderValue || 0,
+        revenueGrowth: payload.revenueGrowth || 0,
+        dailyRevenue: payload.dailyRevenue || [],
+        topProducts: payload.topProducts || [],
+        categories: payload.topCategories || payload.categories || [],
+        ordersByStatus,
+        paymentMethods: payload.paymentMethodBreakdown || payload.paymentMethods || [],
+      };
+      setData(normalized);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load analytics');
     } finally {
@@ -160,7 +180,7 @@ const SalesAnalyticsPage: React.FC = () => {
                   <span className="text-sm text-gray-500 dark:text-gray-400">Total Revenue</span>
                   <DollarSign size={20} className="text-green-600" />
                 </div>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(data.totalRevenue)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(data.totalRevenue || 0)}</p>
               </div>
               <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-3">
@@ -174,15 +194,15 @@ const SalesAnalyticsPage: React.FC = () => {
                   <span className="text-sm text-gray-500 dark:text-gray-400">Avg Order Value</span>
                   <TrendingUp size={20} className="text-purple-600" />
                 </div>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(data.averageOrderValue)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(data.averageOrderValue || 0)}</p>
               </div>
               <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Revenue Growth</span>
                   <TrendingUp size={20} className={data.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'} />
                 </div>
-                <p className={`text-xl sm:text-2xl font-bold ${data.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {data.revenueGrowth >= 0 ? '+' : ''}{data.revenueGrowth.toFixed(1)}%
+                <p className={`text-xl sm:text-2xl font-bold ${(data.revenueGrowth || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {(data.revenueGrowth || 0) >= 0 ? '+' : ''}{Number(data.revenueGrowth || 0).toFixed(1)}%
                 </p>
               </div>
             </div>
@@ -263,7 +283,7 @@ const SalesAnalyticsPage: React.FC = () => {
                         cx="50%"
                         cy="50%"
                         outerRadius={100}
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        label={({ name, percent }) => `${name || ''} (${((percent || 0) * 100).toFixed(0)}%)`}
                       >
                         {data.categories.map((_, i) => (
                           <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
