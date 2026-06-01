@@ -238,19 +238,19 @@ const QRConnectView: React.FC<{
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
               <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">1,247</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Messages Sent</p>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
               <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">98.5%</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Delivery Rate</p>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
               <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">856</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Contacts</p>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
               <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">12</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Active Campaigns</p>
             </div>
@@ -1193,7 +1193,7 @@ const ChatView: React.FC<{
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-green-50 dark:from-gray-800 to-emerald-50 dark:to-gray-900">
+      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-green-50 dark:from-green-900/20 to-emerald-50 dark:to-emerald-900/20">
             <div className="text-center max-w-md px-4 sm:px-6 md:px-8">
               <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <MessageSquare size={48} className="text-green-500" />
@@ -1231,6 +1231,16 @@ const BroadcastView: React.FC = () => {
   const [filterTag, setFilterTag] = useState('all');
   const [broadcastContacts, setBroadcastContacts] = useState<WAContact[]>([]);
   const [broadcastTemplates, setBroadcastTemplates] = useState<WATemplate[]>([]);
+  // Anti-blocking drip settings
+  const [dripEnabled, setDripEnabled] = useState(true);
+  const [dripMinDelay, setDripMinDelay] = useState(30);
+  const [dripMaxDelay, setDripMaxDelay] = useState(120);
+  const [dripBatchSize, setDripBatchSize] = useState(10);
+  const [dripBatchPause, setDripBatchPause] = useState(5);
+  const [dripTypingSim, setDripTypingSim] = useState(true);
+  const [dripRandomJitter, setDripRandomJitter] = useState(true);
+  const [dripMaxPerHour, setDripMaxPerHour] = useState(50);
+  const [dripMaxPerDay, setDripMaxPerDay] = useState(500);
 
   useEffect(() => {
     whatsappAPI.getContacts().then(res => {
@@ -1273,6 +1283,16 @@ const BroadcastView: React.FC = () => {
           templateName: selectedTemplate.name,
           phones,
           templateId: selectedTemplate.id,
+          drip: dripEnabled ? {
+            minDelay: dripMinDelay,
+            maxDelay: dripMaxDelay,
+            batchSize: dripBatchSize,
+            batchPauseMinutes: dripBatchPause,
+            typingSimulation: dripTypingSim,
+            randomJitter: dripRandomJitter,
+            maxPerHour: dripMaxPerHour,
+            maxPerDay: dripMaxPerDay,
+          } : undefined,
         });
       }
       setStep('sent');
@@ -1294,9 +1314,9 @@ const BroadcastView: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-300 mb-2">Successfully sent to {selectedContacts.length} contacts</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Template: {selectedTemplate?.name.replace(/_/g, ' ')}</p>
           <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className="bg-blue-50 rounded-lg p-3"><p className="text-lg font-bold text-blue-600 dark:text-blue-400">{selectedContacts.length}</p><p className="text-xs text-gray-500 dark:text-gray-400">Sent</p></div>
-            <div className="bg-green-50 rounded-lg p-3"><p className="text-lg font-bold text-green-600 dark:text-green-400">{Math.floor(selectedContacts.length * 0.95)}</p><p className="text-xs text-gray-500 dark:text-gray-400">Delivered</p></div>
-            <div className="bg-purple-50 rounded-lg p-3"><p className="text-lg font-bold text-purple-600 dark:text-purple-400">{Math.floor(selectedContacts.length * 0.72)}</p><p className="text-xs text-gray-500 dark:text-gray-400">Read</p></div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3"><p className="text-lg font-bold text-blue-600 dark:text-blue-400">{selectedContacts.length}</p><p className="text-xs text-gray-500 dark:text-gray-400">Sent</p></div>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3"><p className="text-lg font-bold text-green-600 dark:text-green-400">{Math.floor(selectedContacts.length * 0.95)}</p><p className="text-xs text-gray-500 dark:text-gray-400">Delivered</p></div>
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3"><p className="text-lg font-bold text-purple-600 dark:text-purple-400">{Math.floor(selectedContacts.length * 0.72)}</p><p className="text-xs text-gray-500 dark:text-gray-400">Read</p></div>
           </div>
           <button onClick={() => { setStep('select'); setSelectedContacts([]); setSelectedTemplate(null); }} className="px-4 sm:px-5 md:px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-medium">
             Send Another Broadcast
@@ -1307,9 +1327,9 @@ const BroadcastView: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800">
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><Radio size={22} className="text-blue-500" /> Broadcast Message</h2>
@@ -1317,7 +1337,7 @@ const BroadcastView: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
             {(['select', 'compose', 'preview'] as const).map((s, i) => (
-              <button key={s} className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all ${step === s ? 'bg-white shadow-sm text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+              <button key={s} className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all ${step === s ? 'bg-white dark:bg-gray-700 shadow-sm text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === s ? 'bg-green-500 text-white' : 'bg-gray-300 text-white'}`}>{i + 1}</span>
                 {s === 'select' ? 'Select Contacts' : s === 'compose' ? 'Choose Template' : 'Preview & Send'}
               </button>
@@ -1329,7 +1349,7 @@ const BroadcastView: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         {step === 'select' && (
           <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Broadcast Name</label>
@@ -1355,7 +1375,7 @@ const BroadcastView: React.FC = () => {
               </div>
 
               <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
+                <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
                   <div className="w-10"><input type="checkbox" checked={selectedContacts.length === filteredContacts.length && filteredContacts.length > 0} onChange={selectAll} className="rounded border-gray-300 text-green-500 focus:ring-green-500" /></div>
                   <div className="flex-1">Contact</div>
                   <div className="w-40">Phone</div>
@@ -1363,7 +1383,7 @@ const BroadcastView: React.FC = () => {
                 </div>
                 <div className="max-h-80 overflow-y-auto">
                   {filteredContacts.map(contact => (
-                    <label key={contact.id} className={`flex items-center px-4 py-3 border-b border-gray-50 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${selectedContacts.includes(contact.id) ? 'bg-green-50' : ''}`}>
+                    <label key={contact.id} className={`flex items-center px-4 py-3 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${selectedContacts.includes(contact.id) ? 'bg-green-50 dark:bg-green-900/20' : ''}`}>
                       <div className="w-10"><input type="checkbox" checked={selectedContacts.includes(contact.id)} onChange={() => toggleContact(contact.id)} className="rounded border-gray-300 text-green-500 focus:ring-green-500" /></div>
                       <div className="flex-1 flex items-center gap-3">
                         <div className="w-9 h-9 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">{contact.avatar}</div>
@@ -1387,7 +1407,7 @@ const BroadcastView: React.FC = () => {
 
         {step === 'compose' && (
           <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Select Message Template</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">WhatsApp requires approved templates for broadcast messages.</p>
 
@@ -1396,7 +1416,7 @@ const BroadcastView: React.FC = () => {
                   <button
                     key={template.id}
                     onClick={() => setSelectedTemplate(template)}
-                    className={`text-left p-4 rounded-xl border-2 transition-all ${selectedTemplate?.id === template.id ? 'border-green-500 bg-green-50 ring-2 ring-green-500/20' : 'border-gray-200 hover:border-gray-300'}`}
+                    className={`text-left p-4 rounded-xl border-2 transition-all ${selectedTemplate?.id === template.id ? 'border-green-500 bg-green-50 dark:bg-green-900/20 ring-2 ring-green-500/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -1434,19 +1454,107 @@ const BroadcastView: React.FC = () => {
           <div className="max-w-4xl mx-auto">
             <div className="grid lg:grid-cols-2 gap-6">
               {/* Summary */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Broadcast Summary</h3>
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between p-3 bg-gray-50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Campaign Name:</span><span className="font-medium">{broadcastName || 'Untitled'}</span></div>
-                  <div className="flex justify-between p-3 bg-gray-50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Recipients:</span><span className="font-medium text-green-600 dark:text-green-400">{selectedContacts.length} contacts</span></div>
-                  <div className="flex justify-between p-3 bg-gray-50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Template:</span><span className="font-medium">{selectedTemplate.name.replace(/_/g, ' ')}</span></div>
-                  <div className="flex justify-between p-3 bg-gray-50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Category:</span><span className="font-medium">{selectedTemplate.category}</span></div>
-                  <div className="flex justify-between p-3 bg-gray-50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Est. Cost:</span><span className="font-medium">â‚¹{(selectedContacts.length * 0.76).toFixed(2)}</span></div>
+                  <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Campaign Name:</span><span className="font-medium">{broadcastName || 'Untitled'}</span></div>
+                  <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Recipients:</span><span className="font-medium text-green-600 dark:text-green-400">{selectedContacts.length} contacts</span></div>
+                  <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Template:</span><span className="font-medium">{selectedTemplate.name.replace(/_/g, ' ')}</span></div>
+                  <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Category:</span><span className="font-medium">{selectedTemplate.category}</span></div>
+                  <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"><span className="text-gray-600 dark:text-gray-300">Est. Cost:</span><span className="font-medium">â‚¹{(selectedContacts.length * 0.76).toFixed(2)}</span></div>
                 </div>
 
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Schedule (Optional)</label>
                   <input type="datetime-local" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500" />
+                </div>
+
+                {/* Anti-Blocking Drip Settings */}
+                <div className="mt-4 p-4 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Shield size={18} className="text-orange-500" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Anti-Blocking Protection</h4>
+                        <p className="text-[10px] text-orange-600 dark:text-orange-300">Drip mode prevents WhatsApp bans</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setDripEnabled(!dripEnabled)} className={`relative w-12 h-6 rounded-full transition-colors ${dripEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                      <div className={`absolute w-5 h-5 bg-white rounded-full top-0.5 transition-transform shadow-sm ${dripEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+
+                  {dripEnabled && (
+                    <div className="space-y-3">
+                      {/* Delay Range */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Delay Between Messages</label>
+                        <div className="flex items-center gap-2">
+                          <input type="number" min={10} max={300} value={dripMinDelay} onChange={e => setDripMinDelay(Number(e.target.value))} className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700" />
+                          <span className="text-xs text-gray-500">to</span>
+                          <input type="number" min={10} max={600} value={dripMaxDelay} onChange={e => setDripMaxDelay(Number(e.target.value))} className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700" />
+                          <span className="text-xs text-gray-500">sec</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">Random delay between {dripMinDelay}-{dripMaxDelay}s per message</p>
+                      </div>
+
+                      {/* Batch Settings */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Batch Size</label>
+                          <input type="number" min={1} max={100} value={dripBatchSize} onChange={e => setDripBatchSize(Number(e.target.value))} className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700" />
+                          <p className="text-[10px] text-gray-500 mt-0.5">Messages per batch</p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Batch Pause</label>
+                          <input type="number" min={1} max={30} value={dripBatchPause} onChange={e => setDripBatchPause(Number(e.target.value))} className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700" />
+                          <p className="text-[10px] text-gray-500 mt-0.5">Min pause between batches</p>
+                        </div>
+                      </div>
+
+                      {/* Rate Limits */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Max Per Hour</label>
+                          <input type="number" min={5} max={200} value={dripMaxPerHour} onChange={e => setDripMaxPerHour(Number(e.target.value))} className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Max Per Day</label>
+                          <input type="number" min={10} max={2000} value={dripMaxPerDay} onChange={e => setDripMaxPerDay(Number(e.target.value))} className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700" />
+                        </div>
+                      </div>
+
+                      {/* Toggle Options */}
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={dripTypingSim} onChange={e => setDripTypingSim(e.target.checked)} className="w-3.5 h-3.5 rounded text-orange-500 focus:ring-orange-500" />
+                          <span className="text-xs text-gray-700 dark:text-gray-300">Typing simulation</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={dripRandomJitter} onChange={e => setDripRandomJitter(e.target.checked)} className="w-3.5 h-3.5 rounded text-orange-500 focus:ring-orange-500" />
+                          <span className="text-xs text-gray-700 dark:text-gray-300">Random jitter (+/- 30%)</span>
+                        </label>
+                      </div>
+
+                      {/* ETA */}
+                      <div className="p-2.5 bg-white/70 dark:bg-gray-800/70 rounded-lg border border-orange-100 dark:border-orange-800/50">
+                        <p className="text-[10px] text-gray-500">
+                          Estimated time: <span className="font-semibold text-orange-600 dark:text-orange-400">
+                            {(() => {
+                              const avgDelay = (dripMinDelay + dripMaxDelay) / 2;
+                              const batchSize = dripBatchSize;
+                              const batches = Math.ceil(selectedContacts.length / batchSize);
+                              const totalSec = selectedContacts.length * avgDelay + (batches - 1) * dripBatchPause * 60;
+                              const hrs = Math.floor(totalSec / 3600);
+                              const mins = Math.floor((totalSec % 3600) / 60);
+                              return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                            })()}
+                          </span>
+                          {' '}for {selectedContacts.length} messages • {Math.ceil(selectedContacts.length / dripBatchSize)} batches
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 mt-6">
@@ -1460,7 +1568,7 @@ const BroadcastView: React.FC = () => {
               </div>
 
               {/* Preview */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Message Preview</h3>
                 <div className="bg-[#efeae2] dark:bg-gray-800 rounded-xl p-4" style={{
                   backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23d5cec5\' fill-opacity=\'0.15\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
@@ -1520,8 +1628,8 @@ const TemplateManagerView: React.FC = () => {
   const statusColors: Record<string, string> = { approved: 'bg-green-100 text-green-700 dark:text-green-300', pending: 'bg-yellow-100 text-yellow-700', rejected: 'bg-red-100 text-red-700' };
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800">
-      <div className="bg-white border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><FileText size={22} className="text-blue-500" /> Message Templates</h2>
@@ -1542,7 +1650,7 @@ const TemplateManagerView: React.FC = () => {
             { label: 'Pending', value: templates.filter(t => t.status === 'pending').length, color: 'bg-yellow-500' },
             { label: 'Rejected', value: templates.filter(t => t.status === 'rejected').length, color: 'bg-red-500' },
           ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-xl p-4 border border-gray-200 dark:border-gray-700 flex items-center gap-4">
+            <div key={stat.label} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 flex items-center gap-4">
               <div className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center text-white font-bold text-lg`}>{stat.value}</div>
               <div><p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p><p className="text-lg font-bold text-gray-900 dark:text-white">{stat.label} Templates</p></div>
             </div>
@@ -1560,7 +1668,7 @@ const TemplateManagerView: React.FC = () => {
 
         {/* Create Template Modal */}
         {showCreate && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Create New Template</h3>
               <button onClick={() => setShowCreate(false)} className="text-gray-400 hover:text-gray-600 dark:text-gray-300"><X size={20} /></button>
@@ -1620,7 +1728,7 @@ const TemplateManagerView: React.FC = () => {
         {/* Templates List */}
         <div className="space-y-3">
           {filtered.map(template => (
-            <div key={template.id} className="bg-white rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
+            <div key={template.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${template.category === 'MARKETING' ? 'bg-orange-100 text-orange-600 dark:text-orange-300' : 'bg-blue-100 text-blue-600 dark:text-blue-400'}`}>
@@ -1642,7 +1750,7 @@ const TemplateManagerView: React.FC = () => {
                   <button className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16} /></button>
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{template.content}</div>
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{template.content}</div>
               {template.buttons && (
                 <div className="flex gap-2 mt-2">
                   {template.buttons.map((btn, i) => (
@@ -1678,8 +1786,8 @@ const WhatsAppSettingsView: React.FC = () => {
   const [businessHoursEnabled, setBusinessHoursEnabled] = useState(true);
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800">
-      <div className="bg-white border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><SettingsIcon size={22} className="text-gray-500 dark:text-gray-400" /> WhatsApp Settings</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Configure auto-replies, business hours, and chatbot settings</p>
       </div>
@@ -1687,7 +1795,7 @@ const WhatsAppSettingsView: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="max-w-3xl mx-auto space-y-6">
           {/* Auto Reply */}
-          <div className="bg-white rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center"><Bot size={20} className="text-green-600 dark:text-green-400" /></div>
@@ -1717,7 +1825,7 @@ const WhatsAppSettingsView: React.FC = () => {
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Keyword Auto-Replies</h4>
                   <div className="space-y-2 mb-4">
                     {autoReplies.map(rule => (
-                      <div key={rule.id} className={`flex items-start gap-3 p-3 rounded-lg border ${rule.isActive ? 'bg-green-50 border-green-200' : 'bg-gray-50 dark:bg-gray-800/50 dark:border-gray-700 border-gray-200'}`}>
+                      <div key={rule.id} className={`flex items-start gap-3 p-3 rounded-lg border ${rule.isActive ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-900/50 dark:border-gray-700 border-gray-200'}`}>
                         <button
                           onClick={() => setAutoReplies(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: !r.isActive } : r))}
                           className={`mt-1 w-8 h-4 rounded-full flex-shrink-0 transition-colors ${rule.isActive ? 'bg-green-500' : 'bg-gray-300'}`}
@@ -1737,7 +1845,7 @@ const WhatsAppSettingsView: React.FC = () => {
                   </div>
 
                   {/* Add New Rule */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                     <h5 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Add New Auto-Reply Rule</h5>
                     <div className="grid grid-cols-3 gap-3">
                       <input type="text" value={newKeyword} onChange={e => setNewKeyword(e.target.value)} placeholder="Keyword (e.g., hours)" className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm" />
@@ -1762,7 +1870,7 @@ const WhatsAppSettingsView: React.FC = () => {
           </div>
 
           {/* Business Hours */}
-          <div className="bg-white rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center"><Clock size={20} className="text-blue-600 dark:text-blue-400" /></div>
@@ -1792,7 +1900,7 @@ const WhatsAppSettingsView: React.FC = () => {
           </div>
 
           {/* Notification Settings */}
-          <div className="bg-white rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center"><Bell size={20} className="text-purple-600 dark:text-purple-400" /></div>
               <div><h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3><p className="text-xs text-gray-500 dark:text-gray-400">Configure message notifications</p></div>
@@ -1804,7 +1912,7 @@ const WhatsAppSettingsView: React.FC = () => {
                 { label: 'Campaign completion', desc: 'Notify when a broadcast campaign completes', defaultChecked: true },
                 { label: 'Negative keyword alert', desc: 'Alert when customer uses negative words', defaultChecked: false },
               ].map((setting, i) => (
-                <label key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+                <label key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
                   <div>
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{setting.label}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{setting.desc}</p>
@@ -1847,8 +1955,8 @@ const CampaignsView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800">
-      <div className="bg-white border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><Zap size={22} className="text-yellow-500" /> Campaigns</h2>
@@ -1863,19 +1971,19 @@ const CampaignsView: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 sm:gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-gray-200 dark:border-gray-700 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 text-center">
             <p className="text-xl sm:text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">2,050</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">Total Sent</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200 dark:border-gray-700 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 text-center">
             <p className="text-xl sm:text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">96.5%</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">Delivery Rate</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200 dark:border-gray-700 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 text-center">
             <p className="text-xl sm:text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">72.8%</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">Read Rate</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200 dark:border-gray-700 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 text-center">
             <p className="text-xl sm:text-2xl sm:text-3xl font-bold text-orange-600 dark:text-orange-300">13.4%</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">Reply Rate</p>
           </div>
@@ -1884,10 +1992,10 @@ const CampaignsView: React.FC = () => {
         {/* Campaigns List */}
         <div className="space-y-3">
           {campaigns.map(campaign => (
-            <div key={campaign.id} className="bg-white rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
+            <div key={campaign.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${campaign.status === 'active' ? 'bg-green-100' : campaign.status === 'scheduled' ? 'bg-blue-100' : campaign.status === 'draft' ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${campaign.status === 'active' ? 'bg-green-100 dark:bg-green-900/30' : campaign.status === 'scheduled' ? 'bg-blue-100 dark:bg-blue-900/30' : campaign.status === 'draft' ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-gray-100 dark:bg-gray-700'}`}>
                     {campaign.status === 'active' ? <Radio size={20} className="text-green-600 dark:text-green-400 animate-pulse" /> : campaign.status === 'scheduled' ? <Clock size={20} className="text-blue-600 dark:text-blue-400" /> : campaign.status === 'draft' ? <Edit3 size={20} className="text-orange-600 dark:text-orange-300" /> : <CheckCircle size={20} className="text-gray-600 dark:text-gray-300" />}
                   </div>
                   <div>
@@ -1903,10 +2011,10 @@ const CampaignsView: React.FC = () => {
 
               {campaign.sent > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
-                  <div className="bg-blue-50 rounded-lg p-2.5 text-center"><p className="text-lg font-bold text-blue-600 dark:text-blue-400">{campaign.sent.toLocaleString()}</p><p className="text-xs text-gray-500 dark:text-gray-400">Sent</p></div>
-                  <div className="bg-green-50 rounded-lg p-2.5 text-center"><p className="text-lg font-bold text-green-600 dark:text-green-400">{campaign.delivered.toLocaleString()}</p><p className="text-xs text-gray-500 dark:text-gray-400">Delivered</p></div>
-                  <div className="bg-purple-50 rounded-lg p-2.5 text-center"><p className="text-lg font-bold text-purple-600 dark:text-purple-400">{campaign.read.toLocaleString()}</p><p className="text-xs text-gray-500 dark:text-gray-400">Read</p></div>
-                  <div className="bg-orange-50 rounded-lg p-2.5 text-center"><p className="text-lg font-bold text-orange-600 dark:text-orange-300">{campaign.replied.toLocaleString()}</p><p className="text-xs text-gray-500 dark:text-gray-400">Replied</p></div>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2.5 text-center"><p className="text-lg font-bold text-blue-600 dark:text-blue-400">{campaign.sent.toLocaleString()}</p><p className="text-xs text-gray-500 dark:text-gray-400">Sent</p></div>
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2.5 text-center"><p className="text-lg font-bold text-green-600 dark:text-green-400">{campaign.delivered.toLocaleString()}</p><p className="text-xs text-gray-500 dark:text-gray-400">Delivered</p></div>
+                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2.5 text-center"><p className="text-lg font-bold text-purple-600 dark:text-purple-400">{campaign.read.toLocaleString()}</p><p className="text-xs text-gray-500 dark:text-gray-400">Read</p></div>
+                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2.5 text-center"><p className="text-lg font-bold text-orange-600 dark:text-orange-300">{campaign.replied.toLocaleString()}</p><p className="text-xs text-gray-500 dark:text-gray-400">Replied</p></div>
                 </div>
               )}
             </div>
@@ -2000,9 +2108,9 @@ const ScheduledMessagesView: React.FC = () => {
   const filtered = filter === 'all' ? messages : messages.filter(m => m.status === filter);
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800">
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -2021,7 +2129,7 @@ const ScheduledMessagesView: React.FC = () => {
 
       {/* Schedule Form */}
       {showScheduleForm && (
-        <div className="bg-white border-b border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
           <div className="max-w-2xl mx-auto space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -2075,12 +2183,12 @@ const ScheduledMessagesView: React.FC = () => {
       )}
 
       {/* Filter Tabs */}
-      <div className="bg-white border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-2 flex gap-2">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 md:px-6 py-2 flex gap-2">
         {(['all', 'pending', 'sent', 'failed'] as const).map(s => (
           <button
             key={s}
             onClick={() => setFilter(s)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-all ${filter === s ? 'bg-green-100 text-green-700 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-all ${filter === s ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
           >
             {s} {s === 'all' ? `(${messages.length})` : `(${messages.filter(m => m.status === s).length})`}
@@ -2096,7 +2204,7 @@ const ScheduledMessagesView: React.FC = () => {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
               <Calendar size={40} className="text-green-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Scheduled Messages</h3>
@@ -2111,7 +2219,7 @@ const ScheduledMessagesView: React.FC = () => {
         ) : (
           <div className="max-w-4xl mx-auto space-y-3">
             {filtered.map(msg => (
-              <div key={msg.id} className="bg-white rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-sm transition-shadow">
+              <div key={msg.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-sm transition-shadow">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -2131,7 +2239,7 @@ const ScheduledMessagesView: React.FC = () => {
                   {msg.status === 'pending' && (
                     <button
                       onClick={() => handleCancel(msg.id)}
-                      className="ml-3 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                      className="ml-3 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                     >
                       Cancel
                     </button>
@@ -2396,7 +2504,7 @@ const WhatsAppModule: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Top Navigation Bar */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between h-14 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -2483,7 +2591,7 @@ const WhatsAppModule: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
         {currentView === 'campaigns' && <CampaignsView />}
         {currentView === 'settings' && <WhatsAppSettingsView />}
         {currentView === 'chatbot' && (
-          <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+          <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
             <div className="text-center">
               <Bot size={64} className="mx-auto text-gray-300 mb-4" />
               <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">Chatbot Builder</h2>

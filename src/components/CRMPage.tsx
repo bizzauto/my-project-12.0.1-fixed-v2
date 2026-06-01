@@ -627,7 +627,7 @@ export default function CRMPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {contacts
               .filter(c => c.leadScore === 'hot')
-              .sort((a, b) => b.dealValue - a.dealValue)
+              .sort((a, b) => (b.dealValue ?? 0) - (a.dealValue ?? 0))
               .slice(0, 4)
               .map(c => (
                 <div key={c.id} className="flex items-center gap-2.5 p-2 bg-red-50/50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-800/30">
@@ -636,7 +636,7 @@ export default function CRMPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">{c.name}</p>
-                    <p className="text-[10px] sm:text-xs text-gray-500 truncate">₹{(c.dealValue / 1000).toFixed(0)}K • {c.lastActivity}</p>
+                        <p className="text-[10px] sm:text-xs text-gray-500 truncate">₹{((c.dealValue ?? 0) / 1000).toFixed(0)}K • {c.lastActivity}</p>
                   </div>
                   <button className="flex-shrink-0 p-1.5 bg-emerald-500 text-white rounded-md hover:bg-emerald-600">
                     <MessageSquare size={12} />
@@ -752,7 +752,7 @@ export default function CRMPage() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 hidden md:table-cell">{contact.company}</td>
                         <td className="px-4 py-3"><StageBadge stage={contact.stage} /></td>
-                        <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">â‚¹{contact.dealValue.toLocaleString()}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">â‚¹{(contact.dealValue ?? 0).toLocaleString()}</td>
                         <td className="px-4 py-3 hidden lg:table-cell"><LeadScoreBadge score={contact.leadScore} /></td>
                         <td className="px-4 py-3 hidden lg:table-cell">
                           <span className="text-xs text-gray-500">{contact.source || 'Direct'}</span>
@@ -805,7 +805,7 @@ export default function CRMPage() {
                   <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400 mb-3">
                     <p className="flex items-center gap-1.5"><Mail size={13} /> {contact.email}</p>
                     <p className="flex items-center gap-1.5"><Phone size={13} /> {contact.phone}</p>
-                    <p className="flex items-center gap-1.5"><DollarSign size={13} /> â‚¹{contact.dealValue.toLocaleString()}</p>
+                    <p className="flex items-center gap-1.5"><DollarSign size={13} /> â‚¹{(contact.dealValue ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="flex items-center justify-between">
                     <StageBadge stage={contact.stage} />
@@ -1284,7 +1284,7 @@ const ContactDetailModal: React.FC<{ contact: Contact; onClose: () => void }> = 
                 <div><p className="text-xs text-gray-500 uppercase mb-1">Phone</p><p className="font-medium flex items-center gap-1"><Phone size={14} /> {contact.phone}</p></div>
                 {contact.address && <div><p className="text-xs text-gray-500 uppercase mb-1">Address</p><p className="font-medium flex items-center gap-1"><MapPin size={14} /> {contact.address}</p></div>}
                 {contact.website && <div><p className="text-xs text-gray-500 uppercase mb-1">Website</p><p className="font-medium flex items-center gap-1"><Globe size={14} /> {contact.website}</p></div>}
-                <div><p className="text-xs text-gray-500 uppercase mb-1">Deal Value</p><p className="font-bold text-green-600 text-xl">â‚¹{contact.dealValue.toLocaleString()}</p></div>
+                <div><p className="text-xs text-gray-500 uppercase mb-1">Deal Value</p><p className="font-bold text-green-600 text-xl">â‚¹{(contact.dealValue ?? 0).toLocaleString()}</p></div>
                 <div><p className="text-xs text-gray-500 uppercase mb-1">Lead Score</p><LeadScoreBadge score={contact.leadScore} /></div>
                 <div><p className="text-xs text-gray-500 uppercase mb-1">Source</p><p className="font-medium">{contact.source || 'Direct'}</p></div>
                 <div><p className="text-xs text-gray-500 uppercase mb-1">Created</p><p className="font-medium">{contact.createdAt}</p></div>

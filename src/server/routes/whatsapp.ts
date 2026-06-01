@@ -1176,10 +1176,19 @@ router.delete('/auto-replies/:id', authenticate, requireBusinessOwner, async (re
   }
 });
 
+// Anti-blocking helper: sleep with random jitter
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function randomInRange(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 // Send broadcast
 router.post('/broadcast', authenticate, requireBusinessOwner, async (req: AuthRequest, res: Response) => {
   try {
-    const { templateName, languageCode = 'en', components, contactIds } = req.body;
+    const { templateName, languageCode = 'en', components, contactIds, drip } = req.body;
 
     if (!templateName || !contactIds || !Array.isArray(contactIds)) {
       return res.status(400).json({
@@ -1209,8 +1218,60 @@ router.post('/broadcast', authenticate, requireBusinessOwner, async (req: AuthRe
       },
     });
 
+    // Drip mode settings with defaults
+    const dripEnabled = !!drip;
+    const minDelay = drip?.minDelay ?? 30;
+    const maxDelay = drip?.maxDelay ?? 120;
+    const batchSize = drip?.batchSize ?? 10;
+    const batchPauseMin = drip?.batchPauseMinutes ?? 5;
+    const typingSim = drip?.typingSimulation ?? true;
+    const randomJitter = drip?.randomJitter ?? true;
+    const maxPerHour = drip?.maxPerHour ?? 50;
+    const maxPerDay = drip?.maxPerDay ?? 500;
+
     const results = [];
-    for (const contact of contacts) {
+    let sentThisHour = 0;
+    let hourStart = Date.now();
+
+    for (let i = 0; i < contacts.length; i++) {
+      const contact = contacts[i];
+
+      // Rate limit: max per hour
+      if (dripEnabled) {
+        const elapsed = Date.now() - hourStart;
+        if (elapsed >= 3600000) {
+          sentThisHour = 0;
+          hourStart = Date.now();
+        }
+        if (sentThisHour >= maxPerHour) {
+          console.log(`[Drip] Hourly limit reached (${maxPerHour}). Waiting 60s...`);
+          await sleep(60000);
+          sentThisHour = 0;
+          hourStart = Date.now();
+        }
+
+        // Typing simulation delay before each message
+        if (typingSim) {
+          const typingMs = randomInRange(1500, 4000);
+          await sleep(typingMs);
+        }
+
+        // Random delay between messages
+        let delayMs = randomInRange(minDelay * 1000, maxDelay * 1000);
+        if (randomJitter) {
+          const jitter = delayMs * 0.3;
+          delayMs += randomInRange(-jitter, jitter);
+          delayMs = Math.max(5000, delayMs);
+        }
+        await sleep(delayMs);
+
+        // Batch pause
+        if (batchSize > 0 && (i + 1) % batchSize === 0 && i + 1 < contacts.length) {
+          console.log(`[Drip] Batch ${Math.floor(i / batchSize) + 1} complete. Pausing ${batchPauseMin}min...`);
+          await sleep(batchPauseMin * 60 * 1000);
+        }
+      }
+
       try {
         const response = await axios.post(
           `https://graph.facebook.com/v18.0/${business.waPhoneNumberId}/messages`,
@@ -1237,6 +1298,7 @@ router.post('/broadcast', authenticate, requireBusinessOwner, async (req: AuthRe
           success: true,
           messageId: response.data.messages?.[0]?.id,
         });
+        sentThisHour++;
       } catch (err: any) {
         results.push({
           contactId: contact.id,
@@ -1252,6 +1314,7 @@ router.post('/broadcast', authenticate, requireBusinessOwner, async (req: AuthRe
         total: contacts.length,
         successful: results.filter((r: any) => r.success).length,
         failed: results.filter((r: any) => !r.success).length,
+        drip: dripEnabled,
         results,
       },
     });
