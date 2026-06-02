@@ -592,8 +592,172 @@ const CreativeGeneratorPage: React.FC = () => {
 
       {activeView === 'create' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* ============ RIGHT PANEL - PREVIEW (Mobile: UPAR, Desktop: RIGHT) ============ */}
+          <div className="lg:col-span-8 space-y-4 order-1 lg:order-2" id="poster-preview">
+            {/* Preview */}
+            <div className="modern-card rounded-2xl p-4 sm:p-5 md:p-6">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Eye size={18} className="text-gray-500" />
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Preview</h3>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button onClick={handleWhatsAppShare} className="p-2 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="WhatsApp"><MessageCircle size={15} className="text-green-500" /></button>
+                  <button onClick={() => window.open('https://www.instagram.com/', '_blank')} className="p-2 hover:bg-pink-100 dark:hover:bg-pink-900/30 rounded-lg transition-colors" title="Instagram"><Instagram size={15} className="text-pink-500" /></button>
+                  <button onClick={handleDownloadImage} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" title="Download PNG"><Download size={15} className="text-gray-500" /></button>
+                  <button onClick={handleSave} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">Save</button>
+                </div>
+              </div>
+
+              {/* Poster Preview Canvas */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 md:p-4 sm:p-6 md:p-8 flex items-center justify-center min-h-[400px] md:min-h-[500px]">
+                <div ref={previewRef}
+                  className={`w-full max-w-md rounded-2xl overflow-hidden shadow-2xl ${FORMAT_OPTIONS[selectedFormat].ratio} relative select-none`}
+                  style={{
+                    background: backgroundImage
+                      ? `url(${backgroundImage}) center/cover no-repeat`
+                      : appliedBackground || `linear-gradient(135deg, ${getPaletteColors().join(', ')})`,
+                  }}
+                >
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-black/25" />
+
+                  {/* Premium Badge */}
+                  {showPremiumBadge && (
+                    <div className="absolute top-3 right-3 z-20">
+                      <div className="px-2.5 py-1 bg-gradient-to-r from-yellow-400 to-amber-500 text-black text-[10px] font-bold rounded-full shadow-lg flex items-center gap-1">⭐ PREMIUM</div>
+                    </div>
+                  )}
+
+                  {/* Stickers */}
+                  {stickers.map(s => (
+                    <div key={s.id}
+                      className="absolute z-10 cursor-grab active:cursor-grabbing"
+                      style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}px` }}
+                      draggable
+                      onDragEnd={(e) => {
+                        const rect = previewRef.current?.getBoundingClientRect();
+                        if (rect) {
+                          const x = ((e.clientX - rect.left) / rect.width) * 100;
+                          const y = ((e.clientY - rect.top) / rect.height) * 100;
+                          updateStickerPos(s.id, Math.max(0, Math.min(100, x)), Math.max(0, Math.min(100, y)));
+                        }
+                      }}
+                    >
+                      {s.emoji}
+                    </div>
+                  ))}
+
+                  {/* Content */}
+                  <div className="relative z-10 p-5 md:p-7 flex flex-col items-center justify-center h-full text-center">
+                    {/* Product Image with Filters */}
+                    {productImage ? (
+                      <div className="mb-3 w-20 h-20 md:w-28 md:h-28 rounded-2xl overflow-hidden border-3 border-white/30 shadow-xl">
+                        <img src={productImage} alt={productName} className="w-full h-full object-cover" style={filterStyle} />
+                      </div>
+                    ) : (
+                      <div className="text-3xl sm:text-4xl md:text-6xl mb-3 drop-shadow-lg">{selectedTemplate?.emoji || '🎨'}</div>
+                    )}
+
+                    {productName && productImage && (
+                      <p className="text-white/80 text-xs font-medium mb-1.5 drop-shadow-md"
+                        style={{ fontFamily: FONT_OPTIONS[selectedFont].family }}>{productName}</p>
+                    )}
+
+                    <h2 className="font-bold leading-tight drop-shadow-md px-2"
+                      style={{
+                        fontSize: `${textSize * 0.26}px`,
+                        color: textColor,
+                        fontFamily: FONT_OPTIONS[selectedFont].family,
+                        textTransform: textEffects.uppercase ? 'uppercase' : 'none',
+                        ...getTextEffectStyle(),
+                      }}
+                    >
+                      {headline || 'Your Headline'}
+                    </h2>
+
+                    <p className="mt-1.5 opacity-90 drop-shadow-md px-2 max-w-xs"
+                      style={{
+                        fontSize: `${textSize * 0.15}px`,
+                        color: textColor,
+                        fontFamily: FONT_OPTIONS[selectedFont].family,
+                        textTransform: textEffects.uppercase ? 'uppercase' : 'none',
+                      }}
+                    >
+                      {subtitle || 'Your subtitle goes here'}
+                    </p>
+
+                    <div className="mt-auto pt-3 w-full px-3">
+                      <div className="border-t border-white/20 pt-2.5 flex items-center justify-between">
+                        <div className="text-left">
+                          <p className="font-semibold text-xs drop-shadow-md"
+                            style={{ color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family }}>
+                            {businessName || (language === 'hi' ? 'à¤µà¥à¤¯à¤µà¤¸à¤¾à¤¯' : 'Business Name')}
+                          </p>
+                          <p className="text-[11px] opacity-80 drop-shadow-md" style={{ color: textColor }}>{phone || '+91 XXXXX XXXXX'}</p>
+                        </div>
+                        {showQR && phone?.replace(/\D/g, '').length >= 10 && (
+                          <div className="bg-white rounded-xl p-1.5 shadow-lg flex-shrink-0">
+                            <QRCodeSVG value={`https://wa.me/91${phone.replace(/\D/g, '').slice(-10)}`} size={44} level="M" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Image Gen */}
+              <div className="mt-3 flex justify-end">
+                <button onClick={handleGenerateAIImage} disabled={isGeneratingImage}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiImageUrl ? 'bg-green-500/20 text-green-600 hover:bg-green-500/30' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/25'}`}>
+                  {isGeneratingImage ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
+                  {isGeneratingImage ? 'Generating...' : aiImageUrl ? '✨ Regenerate' : '🚀 Generate AI Poster'}
+                </button>
+              </div>
+            </div>
+
+            {/* Content Inputs */}
+            <div className="modern-card rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Type size={18} className="text-indigo-500" />
+                <h3 className="font-semibold text-gray-900 dark:text-white">Content</h3>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{'Headline'}</label>
+                  <input type="text" value={headline} onChange={(e) => setHeadline(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder='Enter headline...'
+                    style={{ fontFamily: language === 'hi' ? "'Noto Sans Devanagari', sans-serif" : 'inherit' }} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{language === 'hi' ? 'à¤‰à¤ªà¤¶à¥€à¤°à¥à¤·à¤•' : 'Subtitle'}</label>
+                  <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder={language === 'hi' ? 'à¤‰à¤ªà¤¶à¥€à¤°à¥à¤·à¤• à¤²à¤¿à¤–à¥‡à¤‚...' : 'Enter subtitle...'}
+                    style={{ fontFamily: language === 'hi' ? "'Noto Sans Devanagari', sans-serif" : 'inherit' }} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{language === 'hi' ? 'à¤µà¥à¤¯à¤µà¤¸à¤¾à¤¯ à¤•à¤¾ à¤¨à¤¾à¤®' : 'Business Name'}</label>
+                    <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder={language === 'hi' ? 'à¤µà¥à¤¯à¤µà¤¸à¤¾à¤¯ à¤•à¤¾ à¤¨à¤¾à¤®...' : 'Business name...'} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{language === 'hi' ? 'à¤«à¤¼à¥‹à¤¨ à¤¨à¤‚à¤¬à¤°' : 'Phone'}</label>
+                    <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="+91 XXXXX XXXXX" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* ============ LEFT PANEL ============ */}
-          <div className="lg:col-span-4 space-y-4">
+          <div className="lg:col-span-4 space-y-4 order-2 lg:order-1">
             {/* AI Assistant */}
             <div className="modern-card rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -965,174 +1129,6 @@ const CreativeGeneratorPage: React.FC = () => {
                   className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-violet-500/25 transition-all">
                   <Layers size={14} /> Add Background
                 </button>
-              </div>
-            </div>
-          </div>
-
-          {/* ============ RIGHT PANEL - PREVIEW ============ */}
-          <div className="lg:col-span-8 space-y-4">
-            {/* Preview */}
-            <div className="modern-card rounded-2xl p-4 sm:p-5 md:p-6">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Eye size={18} className="text-gray-500" />
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Preview</h3>
-                </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button onClick={handleWhatsAppShare} className="p-2 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="WhatsApp"><MessageCircle size={15} className="text-green-500" /></button>
-                  <button onClick={() => window.open('https://www.instagram.com/', '_blank')} className="p-2 hover:bg-pink-100 dark:hover:bg-pink-900/30 rounded-lg transition-colors" title="Instagram"><Instagram size={15} className="text-pink-500" /></button>
-                  <button onClick={handleDownloadImage} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" title="Download PNG"><Download size={15} className="text-gray-500" /></button>
-                  <button onClick={handleSave} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">Save</button>
-                </div>
-              </div>
-
-              {/* Poster Preview Canvas */}
-              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 md:p-4 sm:p-6 md:p-8 flex items-center justify-center min-h-[400px] md:min-h-[500px]">
-                {selectedTemplate ? (
-                  <div ref={previewRef}
-                    className={`w-full max-w-md rounded-2xl overflow-hidden shadow-2xl ${FORMAT_OPTIONS[selectedFormat].ratio} relative select-none`}
-                    style={{
-                      background: backgroundImage
-                        ? `url(${backgroundImage}) center/cover no-repeat`
-                        : appliedBackground || `linear-gradient(135deg, ${getPaletteColors().join(', ')})`,
-                    }}
-                  >
-                    {/* Overlay */}
-                    <div className="absolute inset-0 bg-black/25" />
-
-                    {/* Premium Badge */}
-                    {showPremiumBadge && (
-                      <div className="absolute top-3 right-3 z-20">
-                        <div className="px-2.5 py-1 bg-gradient-to-r from-yellow-400 to-amber-500 text-black text-[10px] font-bold rounded-full shadow-lg flex items-center gap-1">⭐ PREMIUM</div>
-                      </div>
-                    )}
-
-                    {/* Stickers */}
-                    {stickers.map(s => (
-                      <div key={s.id}
-                        className="absolute z-10 cursor-grab active:cursor-grabbing"
-                        style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}px` }}
-                        draggable
-                        onDragEnd={(e) => {
-                          const rect = previewRef.current?.getBoundingClientRect();
-                          if (rect) {
-                            const x = ((e.clientX - rect.left) / rect.width) * 100;
-                            const y = ((e.clientY - rect.top) / rect.height) * 100;
-                            updateStickerPos(s.id, Math.max(0, Math.min(100, x)), Math.max(0, Math.min(100, y)));
-                          }
-                        }}
-                      >
-                        {s.emoji}
-                      </div>
-                    ))}
-
-                    {/* Content */}
-                    <div className="relative z-10 p-5 md:p-7 flex flex-col items-center justify-center h-full text-center">
-                      {/* Product Image with Filters */}
-                      {productImage ? (
-                        <div className="mb-3 w-20 h-20 md:w-28 md:h-28 rounded-2xl overflow-hidden border-3 border-white/30 shadow-xl">
-                          <img src={productImage} alt={productName} className="w-full h-full object-cover" style={filterStyle} />
-                        </div>
-                      ) : (
-                        <div className="text-3xl sm:text-4xl md:text-6xl mb-3 drop-shadow-lg">{selectedTemplate.emoji}</div>
-                      )}
-
-                      {productName && productImage && (
-                        <p className="text-white/80 text-xs font-medium mb-1.5 drop-shadow-md"
-                          style={{ fontFamily: FONT_OPTIONS[selectedFont].family }}>{productName}</p>
-                      )}
-
-                      <h2 className="font-bold leading-tight drop-shadow-md px-2"
-                        style={{
-                          fontSize: `${textSize * 0.26}px`,
-                          color: textColor,
-                          fontFamily: FONT_OPTIONS[selectedFont].family,
-                          textTransform: textEffects.uppercase ? 'uppercase' : 'none',
-                          ...getTextEffectStyle(),
-                        }}
-                      >
-                        {headline || 'Your Headline'}
-                      </h2>
-
-                      <p className="mt-1.5 opacity-90 drop-shadow-md px-2 max-w-xs"
-                        style={{
-                          fontSize: `${textSize * 0.15}px`,
-                          color: textColor,
-                          fontFamily: FONT_OPTIONS[selectedFont].family,
-                          textTransform: textEffects.uppercase ? 'uppercase' : 'none',
-                        }}
-                      >
-                        {subtitle || 'Your subtitle goes here'}
-                      </p>
-
-                      <div className="mt-auto pt-3 w-full px-3">
-                        <div className="border-t border-white/20 pt-2.5 flex items-center justify-between">
-                          <div className="text-left">
-                            <p className="font-semibold text-xs drop-shadow-md"
-                              style={{ color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family }}>
-                              {businessName || (language === 'hi' ? 'à¤µà¥à¤¯à¤µà¤¸à¤¾à¤¯' : 'Business Name')}
-                            </p>
-                            <p className="text-[11px] opacity-80 drop-shadow-md" style={{ color: textColor }}>{phone || '+91 XXXXX XXXXX'}</p>
-                          </div>
-                          {showQR && phone?.replace(/\D/g, '').length >= 10 && (
-                            <div className="bg-white rounded-xl p-1.5 shadow-lg flex-shrink-0">
-                              <QRCodeSVG value={`https://wa.me/91${phone.replace(/\D/g, '').slice(-10)}`} size={44} level="M" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-500"><Layout size={48} className="mx-auto mb-4 opacity-50" /><p>Select a template</p></div>
-                )}
-              </div>
-
-              {/* AI Image Gen */}
-              <div className="mt-3 flex justify-end">
-                <button onClick={handleGenerateAIImage} disabled={isGeneratingImage}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiImageUrl ? 'bg-green-500/20 text-green-600 hover:bg-green-500/30' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/25'}`}>
-                  {isGeneratingImage ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
-                  {isGeneratingImage ? 'Generating...' : aiImageUrl ? '✨ Regenerate' : '🚀 Generate AI Poster'}
-                </button>
-              </div>
-            </div>
-
-            {/* Content Inputs */}
-            <div className="modern-card rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Type size={18} className="text-indigo-500" />
-                <h3 className="font-semibold text-gray-900 dark:text-white">Content</h3>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{'Headline'}</label>
-                  <input type="text" value={headline} onChange={(e) => setHeadline(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder='Enter headline...'
-                    style={{ fontFamily: language === 'hi' ? "'Noto Sans Devanagari', sans-serif" : 'inherit' }} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{language === 'hi' ? 'à¤‰à¤ªà¤¶à¥€à¤°à¥à¤·à¤•' : 'Subtitle'}</label>
-                  <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder={language === 'hi' ? 'à¤‰à¤ªà¤¶à¥€à¤°à¥à¤·à¤• à¤²à¤¿à¤–à¥‡à¤‚...' : 'Enter subtitle...'}
-                    style={{ fontFamily: language === 'hi' ? "'Noto Sans Devanagari', sans-serif" : 'inherit' }} />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{language === 'hi' ? 'à¤µà¥à¤¯à¤µà¤¸à¤¾à¤¯ à¤•à¤¾ à¤¨à¤¾à¤®' : 'Business Name'}</label>
-                    <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder={language === 'hi' ? 'à¤µà¥à¤¯à¤µà¤¸à¤¾à¤¯ à¤•à¤¾ à¤¨à¤¾à¤®...' : 'Business name...'} />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{language === 'hi' ? 'à¤«à¤¼à¥‹à¤¨ à¤¨à¤‚à¤¬à¤°' : 'Phone'}</label>
-                    <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="+91 XXXXX XXXXX" />
-                  </div>
-                </div>
               </div>
             </div>
           </div>
