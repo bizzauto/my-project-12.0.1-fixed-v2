@@ -235,6 +235,12 @@ const CreativeGeneratorPage: React.FC = () => {
 
   // Active design tab
   const [activeDesignTab, setActiveDesignTab] = useState<'basic' | 'filters' | 'effects' | 'stickers'>('basic');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const filterStyle = {
     filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) blur(${filters.blur}px) saturate(${filters.saturate}%)`,
@@ -454,7 +460,12 @@ const CreativeGeneratorPage: React.FC = () => {
     try {
       const res = await postersAPI.generate({ templateId: selectedTemplate?.id || '', userData: { headline, subtitle, businessName, phone, productName } });
       if (res.data?.url) setAiImageUrl(res.data.url);
-    } catch { setAiImageUrl(null); }
+    } catch (err: any) {
+      setAiImageUrl(null);
+      const msg = err?.response?.data?.error || err?.message || 'AI poster generation failed. Try again later.';
+      showToast(msg, 'error');
+      console.error('Poster generation error:', err);
+    }
     finally { setIsGeneratingImage(false); }
   };
 
@@ -1135,6 +1146,12 @@ const CreativeGeneratorPage: React.FC = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[100] flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white ${toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+          {toast.message}
+          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80"><X size={16} /></button>
         </div>
       )}
     </div>

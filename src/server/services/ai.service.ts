@@ -105,11 +105,18 @@ export class AIService {
     const { size = '1024x1024', style = 'natural' } = options;
 
     try {
-      // Try Replicate first
+      // Try OpenRouter first (image generation via Stable Diffusion)
+      return await this.tryOpenRouterImage(prompt, { size, style });
+    } catch (error: any) {
+      console.warn('OpenRouter image failed:', error.message);
+    }
+
+    try {
+      // Fallback: Replicate
       return await this.tryReplicateImage(prompt, { size, style });
     } catch (error: any) {
-      console.warn('Replicate failed:', error.message);
-      throw new Error('Image generation failed');
+      console.warn('Replicate also failed:', error.message);
+      throw new Error('Image generation failed: All providers unavailable');
     }
   }
 
@@ -183,6 +190,39 @@ export class AIService {
     );
 
     return response.data.response || '';
+  }
+
+  /**
+   * Try OpenRouter for image generation
+   */
+  private static async tryOpenRouterImage(
+    prompt: string,
+    options: { size: string; style: string }
+  ): Promise<string> {
+    if (!process.env.OPENROUTER_API_KEY) {
+      throw new Error('OpenRouter API key not configured');
+    }
+
+    const response = await axios.post(
+      'https://openrouter.ai/api/v1/images/generations',
+      {
+        model: providers.openrouter.models.image,
+        prompt,
+        n: 1,
+        size: options.size,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://bizzautoai.com',
+          'X-Title': 'BizzAuto',
+        },
+        timeout: 120000,
+      }
+    );
+
+    return response.data.data[0].url;
   }
 
   /**
