@@ -210,6 +210,19 @@ const CreativeGeneratorPage: React.FC = () => {
   const [filters, setFilters] = useState({ brightness: 100, contrast: 100, grayscale: 0, sepia: 0, blur: 0, saturate: 100 });
   const [showFilters, setShowFilters] = useState(false);
 
+  // Photo Edit
+  const [photoRotation, setPhotoRotation] = useState(0);
+  const [photoFlipH, setPhotoFlipH] = useState(false);
+  const [photoFlipV, setPhotoFlipV] = useState(false);
+  const [photoBorder, setPhotoBorder] = useState(0);
+  const [photoBorderColor, setPhotoBorderColor] = useState('#FFFFFF');
+  const [photoBorderRadius, setPhotoBorderRadius] = useState(16);
+  const [photoOpacity, setPhotoOpacity] = useState(100);
+  const [photoBrightness, setPhotoBrightness] = useState(100);
+  const [photoContrast, setPhotoContrast] = useState(100);
+  const [photoSaturation, setPhotoSaturation] = useState(100);
+  const [photoHue, setPhotoHue] = useState(0);
+
   // Text Effects
   const [textEffects, setTextEffects] = useState({ shadow: false, glow: false, outline: false, uppercase: false });
 
@@ -235,16 +248,65 @@ const CreativeGeneratorPage: React.FC = () => {
   const [showPrompts, setShowPrompts] = useState(false);
 
   // Active design tab
-  const [activeDesignTab, setActiveDesignTab] = useState<'basic' | 'filters' | 'effects' | 'stickers'>('basic');
+  const [activeDesignTab, setActiveDesignTab] = useState<'basic' | 'photo' | 'filters' | 'effects' | 'stickers'>('basic');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Text alignment
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center');
+
+  // Background opacity
+  const [bgOpacity, setBgOpacity] = useState(25);
+
+  // Fullscreen preview
+  const [fullscreenPreview, setFullscreenPreview] = useState(false);
+
+  // Download quality
+  const [downloadQuality, setDownloadQuality] = useState<'low' | 'medium' | 'high'>('high');
+
+  // Undo history
+  const [undoHistory, setUndoHistory] = useState<any[]>([]);
+  const undoRef = useRef(0);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   };
 
+  // Save state for undo
+  const saveState = () => {
+    const state = { headline, subtitle, businessName, phone, selectedPalette, selectedFont, textColor, textSize, textAlign, bgOpacity };
+    setUndoHistory(prev => [...prev.slice(-19), state]);
+    undoRef.current = undoHistory.length + 1;
+  };
+
+  // Undo last action
+  const handleUndo = () => {
+    if (undoHistory.length === 0) return;
+    const last = undoHistory[undoHistory.length - 1];
+    setHeadline(last.headline);
+    setSubtitle(last.subtitle);
+    setBusinessName(last.businessName);
+    setPhone(last.phone);
+    setSelectedPalette(last.selectedPalette);
+    setSelectedFont(last.selectedFont);
+    setTextColor(last.textColor);
+    setTextSize(last.textSize);
+    setTextAlign(last.textAlign);
+    setBgOpacity(last.bgOpacity);
+    setUndoHistory(prev => prev.slice(0, -1));
+    showToast('Undone!', 'success');
+  };
+
   const filterStyle = {
     filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) blur(${filters.blur}px) saturate(${filters.saturate}%)`,
+  };
+
+  const photoFilterStyle = {
+    filter: `brightness(${photoBrightness}%) contrast(${photoContrast}%) saturate(${photoSaturation}%) hue-rotate(${photoHue}deg)`,
+    transform: `rotate(${photoRotation}deg) scaleX(${photoFlipH ? -1 : 1}) scaleY(${photoFlipV ? -1 : 1})`,
+    opacity: photoOpacity / 100,
+    borderRadius: `${photoBorderRadius}px`,
+    border: photoBorder > 0 ? `${photoBorder}px solid ${photoBorderColor}` : 'none',
   };
 
   const getTextEffectStyle = (): React.CSSProperties => {
@@ -602,6 +664,7 @@ const CreativeGeneratorPage: React.FC = () => {
                   <h3 className="font-semibold text-gray-900 dark:text-white">Preview</h3>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
+                  <button onClick={handleUndo} disabled={undoHistory.length === 0} title="Undo" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-30"><RefreshCw size={15} className="text-gray-500" /></button>
                   <button onClick={handleWhatsAppShare} className="p-2 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="WhatsApp"><MessageCircle size={15} className="text-green-500" /></button>
                   <button onClick={() => window.open('https://www.instagram.com/', '_blank')} className="p-2 hover:bg-pink-100 dark:hover:bg-pink-900/30 rounded-lg transition-colors" title="Instagram"><Instagram size={15} className="text-pink-500" /></button>
                   <button onClick={handleDownloadImage} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" title="Download PNG"><Download size={15} className="text-gray-500" /></button>
@@ -612,15 +675,16 @@ const CreativeGeneratorPage: React.FC = () => {
               {/* Poster Preview Canvas */}
               <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 md:p-4 sm:p-6 md:p-8 flex items-center justify-center min-h-[400px] md:min-h-[500px]">
                 <div ref={previewRef}
-                  className={`w-full max-w-md rounded-2xl overflow-hidden shadow-2xl ${FORMAT_OPTIONS[selectedFormat].ratio} relative select-none`}
+                  className={`w-full max-w-md rounded-2xl overflow-hidden shadow-2xl ${FORMAT_OPTIONS[selectedFormat].ratio} relative select-none cursor-pointer`}
+                  onClick={() => setFullscreenPreview(true)}
                   style={{
                     background: backgroundImage
                       ? `url(${backgroundImage}) center/cover no-repeat`
                       : appliedBackground || `linear-gradient(135deg, ${getPaletteColors().join(', ')})`,
                   }}
                 >
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-black/25" />
+                    {/* Overlay */}
+                    <div className="absolute inset-0" style={{ backgroundColor: `rgba(0,0,0,${bgOpacity / 100})` }} />
 
                   {/* Premium Badge */}
                   {showPremiumBadge && (
@@ -653,7 +717,7 @@ const CreativeGeneratorPage: React.FC = () => {
                     {/* Product Image with Filters */}
                     {productImage ? (
                       <div className="mb-3 w-20 h-20 md:w-28 md:h-28 rounded-2xl overflow-hidden border-3 border-white/30 shadow-xl">
-                        <img src={productImage} alt={productName} className="w-full h-full object-cover" style={filterStyle} />
+                        <img src={productImage} alt={productName} className="w-full h-full object-cover" style={photoFilterStyle} />
                       </div>
                     ) : (
                       <div className="text-3xl sm:text-4xl md:text-6xl mb-3 drop-shadow-lg">{selectedTemplate?.emoji || '🎨'}</div>
@@ -670,6 +734,7 @@ const CreativeGeneratorPage: React.FC = () => {
                         color: textColor,
                         fontFamily: FONT_OPTIONS[selectedFont].family,
                         textTransform: textEffects.uppercase ? 'uppercase' : 'none',
+                        textAlign: textAlign,
                         ...getTextEffectStyle(),
                       }}
                     >
@@ -682,6 +747,7 @@ const CreativeGeneratorPage: React.FC = () => {
                         color: textColor,
                         fontFamily: FONT_OPTIONS[selectedFont].family,
                         textTransform: textEffects.uppercase ? 'uppercase' : 'none',
+                        textAlign: textAlign,
                       }}
                     >
                       {subtitle || 'Your subtitle goes here'}
@@ -833,13 +899,29 @@ const CreativeGeneratorPage: React.FC = () => {
                 ))}
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {filteredTemplates.map(t => (
-                  <button key={t.id} onClick={() => applyTemplateGradient(t)}
-                    className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${selectedTemplate?.id === t.id ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                    <span className="text-2xl">{t.emoji}</span>
-                    <span className="text-[10px] text-gray-600 dark:text-gray-400 truncate w-full px-1 leading-tight text-center">{t.name}</span>
-                  </button>
-                ))}
+                {filteredTemplates.map(t => {
+                  const gradientMap: Record<string, string> = {
+                    'Festival': 'from-orange-500 via-red-500 to-yellow-500',
+                    'Offer': 'from-blue-600 via-indigo-600 to-purple-600',
+                    'Product': 'from-violet-500 via-purple-500 to-fuchsia-500',
+                    'Seasonal': 'from-yellow-400 via-orange-400 to-red-400',
+                    'Menu': 'from-amber-600 via-orange-500 to-red-500',
+                    'Price List': 'from-gray-600 via-slate-500 to-blue-600',
+                    'Testimonial': 'from-purple-600 via-pink-500 to-rose-500',
+                    'Wedding': 'from-pink-400 via-rose-400 to-red-400',
+                    'Birthday': 'from-pink-400 via-purple-400 to-indigo-400',
+                  };
+                  const gradient = gradientMap[t.category] || 'from-purple-500 to-pink-500';
+                  return (
+                    <button key={t.id} onClick={() => applyTemplateGradient(t)}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 transition-all relative overflow-hidden ${selectedTemplate?.id === t.id ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900' : 'hover:scale-105'}`}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-80`} />
+                      <span className="text-2xl relative z-10 drop-shadow-lg">{t.emoji}</span>
+                      <span className="text-[10px] text-white font-medium truncate w-full px-1 leading-tight text-center relative z-10 drop-shadow-md">{t.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -851,10 +933,11 @@ const CreativeGeneratorPage: React.FC = () => {
               </div>
               {/* Tabs */}
               <div className="flex gap-1 mb-4 overflow-x-auto">
-                {(['basic', 'filters', 'effects', 'stickers'] as const).map(tab => (
+                {(['basic', 'photo', 'filters', 'effects', 'stickers'] as const).map(tab => (
                   <button key={tab} onClick={() => setActiveDesignTab(tab)}
                     className={`px-3 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all ${activeDesignTab === tab ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
                     {tab === 'basic' && '🎨 Basic'}
+                    {tab === 'photo' && '📸 Photo'}
                     {tab === 'filters' && '🔄 Filters'}
                     {tab === 'effects' && '✨ Effects'}
                     {tab === 'stickers' && '😊 Stickers'}
@@ -955,6 +1038,25 @@ const CreativeGeneratorPage: React.FC = () => {
                       className="w-full h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full appearance-none cursor-pointer accent-purple-500" />
                   </div>
                   <div className="mb-3">
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Text Align</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button onClick={() => setTextAlign('left')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${textAlign === 'left' ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                        ☰ Left
+                      </button>
+                      <button onClick={() => setTextAlign('center')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${textAlign === 'center' ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                        ☰ Center
+                      </button>
+                      <button onClick={() => setTextAlign('right')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${textAlign === 'right' ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                        ☰ Right
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1"><Sliders size={12} /> BG Opacity: {bgOpacity}%</label>
+                    <input type="range" min="0" max="80" value={bgOpacity} onChange={(e) => setBgOpacity(Number(e.target.value))}
+                      className="w-full h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full appearance-none cursor-pointer accent-purple-500" />
+                  </div>
+                  <div className="mb-3">
                     <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1"><Paintbrush size={12} /> Text Color</label>
                     <div className="flex gap-1.5 flex-wrap">
                       {TEXT_COLORS.map((c, i) => (
@@ -1017,6 +1119,54 @@ const CreativeGeneratorPage: React.FC = () => {
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* PHOTO EDIT TAB */}
+              {activeDesignTab === 'photo' && productImage && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-purple-500 mb-2">📸 Photo Editor</p>
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-1 block">Rotate: {photoRotation}°</label>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => setPhotoRotation(r => r - 90)} className="flex-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-[10px] font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30">↺ -90°</button>
+                      <button onClick={() => setPhotoRotation(0)} className="flex-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-[10px] font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30">Reset</button>
+                      <button onClick={() => setPhotoRotation(r => r + 90)} className="flex-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-[10px] font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30">↻ +90°</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-1 block">Flip</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button onClick={() => setPhotoFlipH(!photoFlipH)} className={`px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all ${photoFlipH ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                        ⇔ Horizontal {photoFlipH ? '✓' : ''}
+                      </button>
+                      <button onClick={() => setPhotoFlipV(!photoFlipV)} className={`px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all ${photoFlipV ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                        ⇕ Vertical {photoFlipV ? '✓' : ''}
+                      </button>
+                    </div>
+                  </div>
+                  <div><label className="text-[10px] text-gray-500">Brightness: {photoBrightness}%</label><input type="range" min="0" max="200" value={photoBrightness} onChange={(e) => setPhotoBrightness(Number(e.target.value))} className="w-full h-1 accent-purple-500" /></div>
+                  <div><label className="text-[10px] text-gray-500">Contrast: {photoContrast}%</label><input type="range" min="0" max="200" value={photoContrast} onChange={(e) => setPhotoContrast(Number(e.target.value))} className="w-full h-1 accent-purple-500" /></div>
+                  <div><label className="text-[10px] text-gray-500">Saturation: {photoSaturation}%</label><input type="range" min="0" max="200" value={photoSaturation} onChange={(e) => setPhotoSaturation(Number(e.target.value))} className="w-full h-1 accent-purple-500" /></div>
+                  <div><label className="text-[10px] text-gray-500">Hue Rotate: {photoHue}°</label><input type="range" min="0" max="360" value={photoHue} onChange={(e) => setPhotoHue(Number(e.target.value))} className="w-full h-1 accent-purple-500" /></div>
+                  <div><label className="text-[10px] text-gray-500">Opacity: {photoOpacity}%</label><input type="range" min="0" max="100" value={photoOpacity} onChange={(e) => setPhotoOpacity(Number(e.target.value))} className="w-full h-1 accent-purple-500" /></div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-1 block">Border: {photoBorder}px</label>
+                    <input type="range" min="0" max="20" value={photoBorder} onChange={(e) => setPhotoBorder(Number(e.target.value))} className="w-full h-1 accent-purple-500" />
+                    {photoBorder > 0 && (
+                      <div className="flex gap-1.5 mt-1.5">
+                        {['#FFFFFF', '#000000', '#FFD700', '#FF4444', '#4488FF', '#44DD66'].map(c => (
+                          <button key={c} onClick={() => setPhotoBorderColor(c)} className={`w-5 h-5 rounded-full ${photoBorderColor === c ? 'ring-2 ring-purple-500' : ''}`} style={{ backgroundColor: c, border: c === '#FFFFFF' ? '1px solid #ccc' : 'none' }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div><label className="text-[10px] text-gray-500">Round Corners: {photoBorderRadius}px</label><input type="range" min="0" max="50" value={photoBorderRadius} onChange={(e) => setPhotoBorderRadius(Number(e.target.value))} className="w-full h-1 accent-purple-500" /></div>
+                  <button onClick={() => { setPhotoRotation(0); setPhotoFlipH(false); setPhotoFlipV(false); setPhotoBorder(0); setPhotoBorderColor('#FFFFFF'); setPhotoBorderRadius(16); setPhotoOpacity(100); setPhotoBrightness(100); setPhotoContrast(100); setPhotoSaturation(100); setPhotoHue(0); }}
+                    className="w-full py-1.5 text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">Reset All Photo Edits</button>
+                </div>
+              )}
+              {activeDesignTab === 'photo' && !productImage && (
+                <p className="text-xs text-gray-400 text-center py-6">📸 Upload a product image first to edit it</p>
               )}
 
               {/* FILTERS TAB */}
@@ -1223,6 +1373,76 @@ const CreativeGeneratorPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Fullscreen Preview Modal */}
+      {fullscreenPreview && (
+        <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center p-4" onClick={() => setFullscreenPreview(false)}>
+          <div className="flex items-center justify-between w-full max-w-lg mb-4">
+            <h3 className="text-white font-bold text-lg">📸 Full Preview</h3>
+            <div className="flex items-center gap-2">
+              <select value={downloadQuality} onChange={(e) => setDownloadQuality(e.target.value as any)} onClick={(e) => e.stopPropagation()}
+                className="px-3 py-1.5 bg-white/10 text-white rounded-lg text-sm border border-white/20">
+                <option value="low">Low (720p)</option>
+                <option value="medium">Medium (1080p)</option>
+                <option value="high">High (2K)</option>
+              </select>
+              <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(); }} className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 flex items-center gap-1"><Download size={14} /> Download</button>
+              <button onClick={() => setFullscreenPreview(false)} className="p-2 bg-white/10 text-white rounded-lg hover:bg-white/20"><X size={20} /></button>
+            </div>
+          </div>
+          <div className="max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div ref={previewRef}
+              className={`w-full rounded-2xl overflow-hidden shadow-2xl ${FORMAT_OPTIONS[selectedFormat].ratio} relative select-none`}
+              style={{
+                background: backgroundImage
+                  ? `url(${backgroundImage}) center/cover no-repeat`
+                  : appliedBackground || `linear-gradient(135deg, ${getPaletteColors().join(', ')})`,
+              }}
+            >
+              <div className="absolute inset-0 bg-black/25" />
+              {showPremiumBadge && (
+                <div className="absolute top-3 right-3 z-20">
+                  <div className="px-2.5 py-1 bg-gradient-to-r from-yellow-400 to-amber-500 text-black text-[10px] font-bold rounded-full shadow-lg flex items-center gap-1">⭐ PREMIUM</div>
+                </div>
+              )}
+              {stickers.map(s => (
+                <div key={s.id} className="absolute z-10" style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}px` }}>{s.emoji}</div>
+              ))}
+              <div className="relative z-10 p-5 md:p-7 flex flex-col items-center justify-center h-full text-center">
+                {productImage ? (
+                  <div className="mb-3 w-24 h-24 md:w-32 md:h-32 rounded-2xl overflow-hidden border-3 border-white/30 shadow-xl">
+                    <img src={productImage} alt={productName} className="w-full h-full object-cover" style={photoFilterStyle} />
+                  </div>
+                ) : (
+                  <div className="text-4xl sm:text-5xl md:text-7xl mb-3 drop-shadow-lg">{selectedTemplate?.emoji || '🎨'}</div>
+                )}
+                {productName && productImage && (
+                  <p className="text-white/80 text-sm font-medium mb-1.5 drop-shadow-md" style={{ fontFamily: FONT_OPTIONS[selectedFont].family }}>{productName}</p>
+                )}
+                <h2 className="font-bold leading-tight drop-shadow-md px-2" style={{ fontSize: `${textSize * 0.26}px`, color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family, textTransform: textEffects.uppercase ? 'uppercase' : 'none', textAlign: textAlign, ...getTextEffectStyle() }}>
+                  {headline || 'Your Headline'}
+                </h2>
+                <p className="mt-1.5 opacity-90 drop-shadow-md px-2 max-w-xs" style={{ fontSize: `${textSize * 0.15}px`, color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family, textTransform: textEffects.uppercase ? 'uppercase' : 'none', textAlign: textAlign }}>
+                  {subtitle || 'Your subtitle goes here'}
+                </p>
+                <div className="mt-auto pt-3 w-full px-3">
+                  <div className="border-t border-white/20 pt-2.5 flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="font-semibold text-xs drop-shadow-md" style={{ color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family }}>{businessName || 'Business Name'}</p>
+                      <p className="text-[11px] opacity-80 drop-shadow-md" style={{ color: textColor }}>{phone || '+91 XXXXX XXXXX'}</p>
+                    </div>
+                    {showQR && phone?.replace(/\D/g, '').length >= 10 && (
+                      <div className="bg-white rounded-xl p-1.5 shadow-lg flex-shrink-0">
+                        <QRCodeSVG value={`https://wa.me/91${phone.replace(/\D/g, '').slice(-10)}`} size={56} level="M" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hidden file inputs for Quick Add buttons */}
       <input type="file" id="product-image-input" className="hidden" accept="image/*" onChange={handleProductImageUpload} />
       <input type="file" id="bg-image-input" className="hidden" accept="image/*" onChange={handleBackgroundUpload} />
