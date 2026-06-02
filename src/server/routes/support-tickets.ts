@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { createTicketSchema, updateTicketSchema, replyTicketSchema } from '../validations/remaining-schemas.js';
 
 const router = Router();
 
@@ -75,7 +77,7 @@ router.get('/:id', authenticate, async (req: any, res: Response) => {
 });
 
 // Create ticket (admin)
-router.post('/', authenticate, async (req: any, res: Response) => {
+router.post('/', authenticate, validate(createTicketSchema), async (req: any, res: Response) => {
   try {
     const businessId = req.user.businessId;
     const { contactId, name, email, phone, subject, description, category, priority, tags } = req.body;

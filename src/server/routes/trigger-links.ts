@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { createTriggerLinkSchema, updateTriggerLinkSchema } from '../validations/remaining-schemas.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -162,7 +164,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
 });
 
 // Create trigger link
-router.post('/', authenticate, async (req: Request, res: Response) => {
+router.post('/', authenticate, validate(createTriggerLinkSchema), async (req: Request, res: Response) => {
   try {
     const businessId = (req as any).user.businessId;
     const { name, originalUrl, campaignId, workflowId, tags, customShortCode } = req.body;

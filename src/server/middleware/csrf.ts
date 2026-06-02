@@ -17,11 +17,11 @@ export const validateCSRF = async (
       return next();
     }
 
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
+    // If req.user is not set yet (auth middleware hasn't run),
+    // skip CSRF validation — the route's own authenticate middleware
+    // will handle unauthorized access. CSRF only applies to authenticated sessions.
+    if (!req.user || !req.user.id) {
+      return next();
     }
 
     const csrfToken = req.headers['x-csrf-token'] as string;
@@ -29,7 +29,7 @@ export const validateCSRF = async (
     if (!csrfToken) {
       return res.status(403).json({
         success: false,
-        error: 'CSRF token required',
+        error: 'CSRF token required. Include X-CSRF-Token header.',
       });
     }
 

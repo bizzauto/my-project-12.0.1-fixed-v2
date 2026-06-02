@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { createAppointmentSchema, updateAppointmentSchema } from '../validations/crm-schemas.js';
 
 const router = Router();
 
@@ -86,7 +88,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
  * Required fields: title, startTime, endTime
  * Optional: description, service, contactId, location, meetingUrl
  */
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, validate(createAppointmentSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { title, startTime, endTime, description, service, contactId, location, meetingUrl } = req.body;
 
@@ -179,7 +181,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
  * Update an existing appointment.
  * Only updates fields that are provided in the request body.
  */
-router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, validate(updateAppointmentSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const updateData: any = {};

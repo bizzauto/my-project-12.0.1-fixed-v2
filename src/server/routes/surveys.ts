@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { createSurveySchema, updateSurveySchema } from '../validations/remaining-schemas.js';
 import rateLimit from 'express-rate-limit';
 
 const router = Router();
@@ -181,7 +183,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
  * POST /api/surveys
  * Create survey
  */
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, validate(createSurveySchema), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, type, settings, thankYouMessage, thankYouRedirect } = req.body;
 

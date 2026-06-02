@@ -461,6 +461,81 @@ router.put('/payment-method', authenticate, requireBusinessOwner, async (req: an
   }
 });
 
+// MRR/ARR Analytics (Super Admin only)
+router.get('/analytics/revenue', authenticate, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const [
+      currentMonthSubs,
+      prevMonthSubs,
+      totalActive,
+      allSubs,
+    ] = await Promise.all([
+      prisma.subscription.findMany({
+        where: { status: 'active', currentPeriodStart: { gte: startOfMonth } },
+        select: { amount: true, plan: true, interval: true },
+      }),
+      prisma.subscription.findMany({
+        where: {
+          status: 'active',
+          currentPeriodStart: { gte: startOfPrevMonth, lt: startOfMonth },
+        },
+        select: { amount: true, plan: true, interval: true },
+      }),
+      prisma.subscription.count({ where: { status: 'active' } }),
+      prisma.subscription.findMany({
+        where: { status: { in: ['active', 'cancelled'] } },
+        select: { amount: true, plan: true, interval: true, status: true, createdAt: true },
+      }),
+    ]);
+
+    // Calculate MRR from all active subscriptions (normalize yearly to monthly)
+    const calculateMRR = (subs: any[]) =>
+      subs.reduce((sum, s) => {
+        if (s.interval === 'year') return sum + (s.amount || 0) / 12;
+        return sum + (s.amount || 0);
+      }, 0);
+
+    const currentMRR = calculateMRR(currentMonthSubs);
+    const prevMRR = calculateMRR(prevMonthSubs);
+    const ARR = currentMRR * 12;
+    const mrrGrowth = prevMRR > 0 ? ((currentMRR - prevMRR) / prevMRR) * 100 : 0;
+
+    // Churn rate
+    const cancelledThisMonth = allSubs.filter(
+      (s) => s.status === 'cancelled' && (s as any).cancelledAt >= startOfMonth
+    ).length;
+    const churnRate = totalActive > 0 ? (cancelledThisMonth / totalActive) * 100 : 0;
+
+    // Revenue by plan
+    const revenueByPlan: Record<string, number> = {};
+    for (const sub of allSubs.filter((s) => s.status === 'active')) {
+      revenueByPlan[sub.plan] = (revenueByPlan[sub.plan] || 0) + (sub.amount || 0);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        mrr: Math.round(currentMRR * 100) / 100,
+        arr: Math.round(ARR * 100) / 100,
+        mrrGrowth: Math.round(mrrGrowth * 100) / 100,
+        activeSubscriptions: totalActive,
+        churnRate: Math.round(churnRate * 100) / 100,
+        revenueByPlan,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 function getPlanAmount(plan: string): number {
   const amounts: Record<string, number> = {
     starter: 499,

@@ -565,8 +565,17 @@ router.get('/p/dashboard', authenticateClientPortal, async (req: AuthRequest, re
     };
 
     if (hasPermission(permissionList, 'view_invoices')) {
+      // Scope invoices to this portal user's contact
+      const portalContactDash = await prisma.contact.findUnique({
+        where: { id: contactId },
+        select: { name: true, email: true, phone: true },
+      });
+      const dashInvoiceWhere: any = { businessId };
+      if (portalContactDash?.email) dashInvoiceWhere.clientEmail = portalContactDash.email;
+      else if (portalContactDash?.phone) dashInvoiceWhere.clientPhone = portalContactDash.phone;
+      else dashInvoiceWhere.clientName = portalContactDash?.name || '__no_match__';
       const invoices = await prisma.invoice.findMany({
-        where: { businessId },
+        where: dashInvoiceWhere,
         orderBy: { createdAt: 'desc' },
       });
 
@@ -676,14 +685,29 @@ router.get('/p/invoices', authenticateClientPortal, async (req: AuthRequest, res
       where.status = asString(status);
     }
 
+    // Scope invoices to this portal user's contact — client should only see their own invoices
+    const portalContactId = req.user.contactId;
+    where.subscriptionId = portalContactId; // Invoice.subscriptionId is not the right field
+    // Since Invoice model doesn't have a direct contactId, we scope by finding the contact's
+    // documents (invoices) via the Contact relation. Invoice is a platform-level model.
+    // For now, filter by the business and match clientEmail/clientPhone from the contact.
+    const portalContact = await prisma.contact.findUnique({
+      where: { id: portalContactId },
+      select: { name: true, email: true, phone: true },
+    });
+    const invoiceWhere: any = { businessId, status: where.status };
+    if (portalContact?.email) invoiceWhere.clientEmail = portalContact.email;
+    else if (portalContact?.phone) invoiceWhere.clientPhone = portalContact.phone;
+    else invoiceWhere.clientName = portalContact?.name || '__no_match__';
+
     const [invoices, total] = await Promise.all([
       prisma.invoice.findMany({
-        where,
+        where: invoiceWhere,
         orderBy: { createdAt: 'desc' },
         skip,
         take: Number(limit),
       }),
-      prisma.invoice.count({ where }),
+      prisma.invoice.count({ where: invoiceWhere }),
     ]);
 
     res.json({

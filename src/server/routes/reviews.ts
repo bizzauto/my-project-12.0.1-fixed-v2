@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { cacheResponse } from '../middleware/cache.js';
 
 const router = Router();
 
 // Get reviews
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, cacheResponse(30), async (req: AuthRequest, res: Response) => {
   try {
     const { page = 1, limit = 50, status } = req.query;
     const where: any = { businessId: req.user.businessId };
@@ -28,7 +29,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // Get review stats (MUST be before /:id)
-router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/stats', authenticate, cacheResponse(30), async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user.businessId;
 

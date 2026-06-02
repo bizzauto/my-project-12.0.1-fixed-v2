@@ -3,10 +3,13 @@ import crypto from 'crypto';
 import { prisma } from '../index.js';
 import { hashPassword, comparePassword, generateToken } from '../utils/auth.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { generateRefreshToken } from '../utils/auth.js';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { encrypt, decrypt } from '../utils/auth.js';
 import rateLimit from 'express-rate-limit';
+import { validate } from '../middleware/validate.js';
+import { registerSchema, loginSchema, changePasswordSchema } from '../validations/schemas.js';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 
@@ -318,6 +321,13 @@ router.post('/google', socialAuthLimiter, async (req: Request, res: Response) =>
         role: user.role,
       });
 
+      const refreshToken = generateRefreshToken({
+        id: user.id,
+        email: user.email,
+        businessId: user.businessId || 'super-admin',
+        role: user.role,
+      });
+
       return res.json({
         success: true,
         data: {
@@ -336,6 +346,7 @@ router.post('/google', socialAuthLimiter, async (req: Request, res: Response) =>
             plan: user.business.plan,
           } : null,
           token,
+          refreshToken,
         },
       });
     }
@@ -403,16 +414,9 @@ router.post('/google', socialAuthLimiter, async (req: Request, res: Response) =>
 });
 
 // Register
-router.post('/register', registerLimiter, async (req: Request, res: Response) => {
+router.post('/register', registerLimiter, validate(registerSchema), async (req: Request, res: Response) => {
   try {
     const { email, password, name, businessName, businessType, phone } = req.body;
-
-    if (!email || !password || !businessName) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email, password, and business name are required',
-      });
-    }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -490,17 +494,10 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
 });
 
 // Login
-router.post('/login', loginLimiter, async (req: Request, res: Response) => {
+router.post('/login', loginLimiter, validate(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password, twoFactorToken } = req.body;
     const { TwoFactorService } = await import('../services/twoFactor.service.js');
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email and password are required',
-      });
-    }
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -554,6 +551,14 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
       role: user.role,
     });
 
+    // Generate refresh token for token rotation
+    const refreshToken = generateRefreshToken({
+      id: user.id,
+      email: user.email,
+      businessId: user.businessId || 'super-admin',
+      role: user.role,
+    });
+
     // Update last login and clear CSRF token
     await prisma.user.update({
       where: { id: user.id },
@@ -578,6 +583,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
           plan: user.business.plan,
         },
         token,
+        refreshToken,
       },
     });
   } catch (error: any) {
@@ -673,16 +679,9 @@ router.put('/profile', authenticate, async (req: AuthRequest, res: Response) => 
 });
 
 // Change password
-router.put('/change-password', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/change-password', authenticate, validate(changePasswordSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Current password and new password are required',
-      });
-    }
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -936,6 +935,79 @@ router.post('/reset-password', resetPasswordLimiter, async (req: Request, res: R
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'Failed to reset password' });
+  }
+});
+
+// Refresh access token using refresh token
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        error: 'Refresh token is required',
+      });
+    }
+
+    // Verify the refresh token
+    let decoded: any;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!) as any;
+    } catch {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid or expired refresh token',
+      });
+    }
+
+    if (decoded.type !== 'refresh') {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token type',
+      });
+    }
+
+    // Verify user still exists and is active
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+    });
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not found or account suspended',
+      });
+    }
+
+    // Issue new token pair (rotation)
+    const newToken = generateToken({
+      id: user.id,
+      email: user.email,
+      businessId: user.businessId || 'super-admin',
+      role: user.role,
+    });
+
+    const newRefreshToken = generateRefreshToken({
+      id: user.id,
+      email: user.email,
+      businessId: user.businessId || 'super-admin',
+      role: user.role,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        token: newToken,
+        refreshToken: newRefreshToken,
+      },
+    });
+  } catch (error: any) {
+    console.error('Token refresh error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to refresh token',
+    });
   }
 });
 

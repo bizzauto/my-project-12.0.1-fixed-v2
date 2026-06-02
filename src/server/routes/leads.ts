@@ -174,14 +174,16 @@ router.post('/instagram/:businessId', leadCaptureLimiter, validateWebhook, async
  * POST /api/leads/manual
  * Create a lead manually
  */
-router.post('/manual', leadCaptureLimiter, async (req: Request, res: Response) => {
+router.post('/manual', authenticate, leadCaptureLimiter, async (req: AuthRequest, res: Response) => {
   try {
-    const { businessId, source, leadData } = req.body;
+    const { source, leadData } = req.body;
+    // SECURITY: Use authenticated user's businessId, not request body
+    const businessId = req.user.businessId;
 
     if (!businessId || !source || !leadData) {
       return res.status(400).json({
         success: false,
-        error: 'businessId, source, and leadData are required',
+        error: 'source and leadData are required',
       });
     }
 
@@ -456,6 +458,7 @@ router.post('/export/excel', authenticate, async (req: AuthRequest, res: Respons
  */
 router.post('/export/sheets', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    // SECURITY: businessId comes from authenticated user, not request body
     const businessId = req.user.businessId;
     const { leadIds } = req.body;
 

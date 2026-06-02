@@ -250,19 +250,16 @@ async function executeNode(
 
     case 'create_deal': {
       try {
-        const deal = await prisma.deal.create({
-          data: {
-            businessId: ctx.businessId,
-            contactId: contactId || undefined,
-            title: interpolateTemplate(data.title || 'New Deal from {{contact.name}}', { contact }),
-            value: parseFloat(data.value) || 0,
-            stage: data.stage || 'qualification',
-            status: 'active',
-            source: 'workflow',
-            metadata: { workflowId: ctx.workflowId, executionId: ctx.executionId },
-          },
+        // Deals are stored as Contact fields (dealValue, dealStage) in this schema
+        if (!contactId) return { created: false, error: 'No contact ID for deal creation' };
+        const dealTitle = interpolateTemplate(data.title || 'New Deal from {{contact.name}}', { contact });
+        const dealValue = parseFloat(data.value) || 0;
+        const dealStage = data.stage || 'qualification';
+        await prisma.contact.update({
+          where: { id: contactId },
+          data: { dealValue, dealStage, stage: dealStage },
         });
-        return { created: true, dealId: deal.id, title: deal.title };
+        return { created: true, contactId, title: dealTitle, value: dealValue, stage: dealStage };
       } catch (err: any) {
         return { created: false, error: err.message };
       }

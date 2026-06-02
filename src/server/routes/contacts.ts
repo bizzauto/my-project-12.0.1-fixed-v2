@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authenticate } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { createContactSchema, updateContactSchema, importContactsSchema } from '../validations/schemas.js';
 
 const router = Router();
 
@@ -116,16 +118,9 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Create contact
-router.post('/', authenticate, async (req: any, res: any) => {
+router.post('/', authenticate, validate(createContactSchema), async (req: any, res: any) => {
   try {
     const { name, phone, email, tags, customFields, pipelineId, stageId } = req.body;
-
-    if (!phone) {
-      return res.status(400).json({
-        success: false,
-        error: 'Phone number is required',
-      });
-    }
 
     // Check if contact already exists
     const existing = await prisma.contact.findFirst({
@@ -143,6 +138,7 @@ router.post('/', authenticate, async (req: any, res: any) => {
       });
     }
 
+    // Note: businessId comes from authenticated user, not request body
     const contact = await prisma.contact.create({
       data: {
         businessId: req.user.businessId,
@@ -190,7 +186,7 @@ router.post('/', authenticate, async (req: any, res: any) => {
 });
 
 // Update contact
-router.put('/:id', authenticate, async (req: any, res: any) => {
+router.put('/:id', authenticate, validate(updateContactSchema), async (req: any, res: any) => {
   try {
     const { name, email, tags, customFields, pipelineId, stageId } = req.body;
 
@@ -276,24 +272,9 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Import contacts from CSV
-router.post('/import', authenticate, async (req: any, res: any) => {
+router.post('/import', authenticate, validate(importContactsSchema), async (req: any, res: any) => {
   try {
-    const { contacts } = req.body; // Array of {name, phone, email, tags}
-
-    if (!Array.isArray(contacts) || contacts.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Valid contacts array is required',
-      });
-    }
-
-    const limit = 1000;
-    if (contacts.length > limit) {
-      return res.status(400).json({
-        success: false,
-        error: `Maximum ${limit} contacts per import`,
-      });
-    }
+    const { contacts } = req.body;
 
     const created: any[] = [];
     const failed: any[] = [];

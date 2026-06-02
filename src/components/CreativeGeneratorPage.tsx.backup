@@ -101,6 +101,13 @@ const LOGO_STYLES: LogoStyle[] = [
 
 const STICKERS = ['⭐', '🔥', '❤️', '✨', '🎉', '💥', '🎯', '✅', '🚀', '💰', '💎', '🏆', '🌟', '🎪', '🎨', '🛍️', '📱', '🎁', '💡', '📢', '🥇', '📣', '💫', '🎊'];
 
+const DEFAULT_POSITIONS: Record<string, { x: number; y: number }> = {
+  productImage: { x: 50, y: 15 },
+  headline: { x: 50, y: 40 },
+  subtitle: { x: 50, y: 55 },
+  businessInfo: { x: 50, y: 88 },
+};
+
 const AI_PROMPTS: Record<string, string[]> = {
   Festival: [
     'Diwali special offers with diya and rangoli theme',
@@ -231,6 +238,9 @@ const CreativeGeneratorPage: React.FC = () => {
   const [showStickers, setShowStickers] = useState(false);
   const nextStickerId = useRef(0);
 
+  // Draggable element positions (percentage-based)
+  const [elementPositions, setElementPositions] = useState<Record<string, { x: number; y: number }>>(DEFAULT_POSITIONS);
+
   // Brand Kit
   const [brandKits, setBrandKits] = useState<BrandKit[]>(() => {
     try { return JSON.parse(localStorage.getItem('brandKits') || '[]'); } catch { return []; }
@@ -248,7 +258,7 @@ const CreativeGeneratorPage: React.FC = () => {
   const [showPrompts, setShowPrompts] = useState(false);
 
   // Active design tab
-  const [activeDesignTab, setActiveDesignTab] = useState<'basic' | 'photo' | 'filters' | 'effects' | 'stickers'>('basic');
+  const [activeDesignTab, setActiveDesignTab] = useState<'basic' | 'photo' | 'filters' | 'effects' | 'stickers' | 'layout'>('basic');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Text alignment
@@ -274,7 +284,7 @@ const CreativeGeneratorPage: React.FC = () => {
 
   // Save state for undo
   const saveState = () => {
-    const state = { headline, subtitle, businessName, phone, selectedPalette, selectedFont, textColor, textSize, textAlign, bgOpacity };
+    const state = { headline, subtitle, businessName, phone, selectedPalette, selectedFont, textColor, textSize, textAlign, bgOpacity, elementPositions };
     setUndoHistory(prev => [...prev.slice(-19), state]);
     undoRef.current = undoHistory.length + 1;
   };
@@ -293,6 +303,7 @@ const CreativeGeneratorPage: React.FC = () => {
     setTextSize(last.textSize);
     setTextAlign(last.textAlign);
     setBgOpacity(last.bgOpacity);
+    if (last.elementPositions) setElementPositions(last.elementPositions);
     setUndoHistory(prev => prev.slice(0, -1));
     showToast('Undone!', 'success');
   };
@@ -359,6 +370,20 @@ const CreativeGeneratorPage: React.FC = () => {
 
   const updateStickerPos = (id: string, x: number, y: number) => {
     setStickers(prev => prev.map(s => s.id === id ? { ...s, x, y } : s));
+  };
+
+  const handleElementDrag = (key: string, e: React.DragEvent) => {
+    const rect = previewRef.current?.getBoundingClientRect();
+    if (rect) {
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      setElementPositions(prev => ({ ...prev, [key]: { x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) } }));
+    }
+  };
+
+  const resetPositions = () => {
+    setElementPositions(DEFAULT_POSITIONS);
+    showToast('Layout reset!', 'success');
   };
 
   const saveBrandKit = () => {
@@ -714,53 +739,82 @@ const CreativeGeneratorPage: React.FC = () => {
                     </div>
                   ))}
 
-                  {/* Content */}
-                  <div className="relative z-10 p-5 md:p-7 flex flex-col items-center justify-center h-full text-center">
-                    {/* Product Image with Filters */}
-                    {productImage ? (
-                      <div className="mb-3 w-20 h-20 md:w-28 md:h-28 rounded-2xl overflow-hidden border-3 border-white/30 shadow-xl">
-                        <img src={productImage} alt={productName} className="w-full h-full object-cover" style={photoFilterStyle} />
-                      </div>
-                    ) : (
-                      <div className="text-3xl sm:text-4xl md:text-6xl mb-3 drop-shadow-lg">{selectedTemplate?.emoji || '🎨'}</div>
-                    )}
+                  {/* Content - All Draggable */}
+                  <div className="absolute inset-0 z-10">
 
-                    {productName && productImage && (
-                      <p className="text-white/80 text-xs font-medium mb-1.5 drop-shadow-md"
-                        style={{ fontFamily: FONT_OPTIONS[selectedFont].family }}>{productName}</p>
-                    )}
-
-                    <h2 className="font-bold leading-tight drop-shadow-md px-2"
-                      style={{
-                        fontSize: `${textSize * 0.26}px`,
-                        color: textColor,
-                        fontFamily: FONT_OPTIONS[selectedFont].family,
-                        textTransform: textEffects.uppercase ? 'uppercase' : 'none',
-                        textAlign: textAlign,
-                        ...getTextEffectStyle(),
-                      }}
+                    {/* Product Image - Draggable */}
+                    <div
+                      className="absolute z-20 cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-white/40 rounded-2xl transition-all"
+                      style={{ left: `${elementPositions.productImage.x}%`, top: `${elementPositions.productImage.y}%`, transform: 'translate(-50%, -50%)' }}
+                      draggable
+                      onDragEnd={(e) => handleElementDrag('productImage', e)}
                     >
-                      {headline || 'Your Headline'}
-                    </h2>
+                      {productImage ? (
+                        <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl overflow-hidden border-3 border-white/30 shadow-xl">
+                          <img src={productImage} alt={productName} className="w-full h-full object-cover" style={photoFilterStyle} />
+                        </div>
+                      ) : (
+                        <div className="text-3xl sm:text-4xl md:text-6xl drop-shadow-lg">{selectedTemplate?.emoji || '🎨'}</div>
+                      )}
+                      {productName && productImage && (
+                        <p className="text-white/80 text-xs font-medium mt-1 text-center drop-shadow-md"
+                          style={{ fontFamily: FONT_OPTIONS[selectedFont].family }}>{productName}</p>
+                      )}
+                    </div>
 
-                    <p className="mt-1.5 opacity-90 drop-shadow-md px-2 max-w-xs"
-                      style={{
-                        fontSize: `${textSize * 0.15}px`,
-                        color: textColor,
-                        fontFamily: FONT_OPTIONS[selectedFont].family,
-                        textTransform: textEffects.uppercase ? 'uppercase' : 'none',
-                        textAlign: textAlign,
-                      }}
+                    {/* Headline - Draggable */}
+                    <div
+                      className="absolute z-20 w-[85%] cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-white/40 rounded-lg px-2 py-1 transition-all"
+                      style={{ left: `${elementPositions.headline.x}%`, top: `${elementPositions.headline.y}%`, transform: 'translate(-50%, -50%)' }}
+                      draggable
+                      onDragEnd={(e) => handleElementDrag('headline', e)}
                     >
-                      {subtitle || 'Your subtitle goes here'}
-                    </p>
+                      <h2 className="font-bold leading-tight drop-shadow-md text-center"
+                        style={{
+                          fontSize: `${textSize * 0.26}px`,
+                          color: textColor,
+                          fontFamily: FONT_OPTIONS[selectedFont].family,
+                          textTransform: textEffects.uppercase ? 'uppercase' : 'none',
+                          textAlign: textAlign,
+                          ...getTextEffectStyle(),
+                        }}
+                      >
+                        {headline || 'Your Headline'}
+                      </h2>
+                    </div>
 
-                    <div className="mt-auto pt-3 w-full px-3">
+                    {/* Subtitle - Draggable */}
+                    <div
+                      className="absolute z-20 w-[80%] cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-white/40 rounded-lg px-2 py-1 transition-all"
+                      style={{ left: `${elementPositions.subtitle.x}%`, top: `${elementPositions.subtitle.y}%`, transform: 'translate(-50%, -50%)' }}
+                      draggable
+                      onDragEnd={(e) => handleElementDrag('subtitle', e)}
+                    >
+                      <p className="opacity-90 drop-shadow-md text-center max-w-xs mx-auto"
+                        style={{
+                          fontSize: `${textSize * 0.15}px`,
+                          color: textColor,
+                          fontFamily: FONT_OPTIONS[selectedFont].family,
+                          textTransform: textEffects.uppercase ? 'uppercase' : 'none',
+                          textAlign: textAlign,
+                        }}
+                      >
+                        {subtitle || 'Your subtitle goes here'}
+                      </p>
+                    </div>
+
+                    {/* Business Info - Draggable */}
+                    <div
+                      className="absolute z-20 w-[90%] cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-white/40 rounded-lg px-2 py-1 transition-all"
+                      style={{ left: `${elementPositions.businessInfo.x}%`, top: `${elementPositions.businessInfo.y}%`, transform: 'translate(-50%, -50%)' }}
+                      draggable
+                      onDragEnd={(e) => handleElementDrag('businessInfo', e)}
+                    >
                       <div className="border-t border-white/20 pt-2.5 flex items-center justify-between">
                         <div className="text-left">
                           <p className="font-semibold text-xs drop-shadow-md"
                             style={{ color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family }}>
-                            {businessName || (language === 'hi' ? 'à¤µà¥à¤¯à¤µà¤¸à¤¾à¤¯' : 'Business Name')}
+                            {businessName || (language === 'hi' ? 'व्यवसाय' : 'Business Name')}
                           </p>
                           <p className="text-[11px] opacity-80 drop-shadow-md" style={{ color: textColor }}>{phone || '+91 XXXXX XXXXX'}</p>
                         </div>
@@ -771,22 +825,60 @@ const CreativeGeneratorPage: React.FC = () => {
                         )}
                       </div>
                     </div>
+
                   </div>
                 </div>
               </div>
 
-              {/* AI Image Gen */}
-              <div className="mt-3 flex justify-end">
-                <button onClick={handleGenerateAIImage} disabled={isGeneratingImage}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiImageUrl ? 'bg-green-500/20 text-green-600 hover:bg-green-500/30' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/25'}`}>
-                  {isGeneratingImage ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
-                  {isGeneratingImage ? 'Generating...' : aiImageUrl ? '✨ Regenerate' : '🚀 Generate AI Poster'}
-                </button>
-              </div>
-            </div>
+              {/* LAYOUT TAB */}
+              {activeDesignTab === 'layout' && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-purple-500 mb-2">📐 Drag elements on poster to reposition</p>
+                  {Object.entries(elementPositions).map(([key, pos]) => (
+                    <div key={key} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 capitalize">
+                          {key === 'productImage' ? '🖼 Product Image' : key === 'headline' ? '📝 Headline' : key === 'subtitle' ? '💬 Subtitle' : '🏪 Business Info'}
+                        </span>
+                        <span className="text-[9px] text-gray-400">{Math.round(pos.x)}%, {Math.round(pos.y)}%</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                          <label className="text-[9px] text-gray-400">X</label>
+                          <input type="range" min="5" max="95" value={pos.x}
+                            onChange={(e) => setElementPositions(prev => ({ ...prev, [key]: { ...prev[key], x: Number(e.target.value) } }))}
+                            className="w-full h-1 accent-purple-500" />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-gray-400">Y</label>
+                          <input type="range" min="5" max="95" value={pos.y}
+                            onChange={(e) => setElementPositions(prev => ({ ...prev, [key]: { ...prev[key], y: Number(e.target.value) } }))}
+                            className="w-full h-1 accent-purple-500" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <button onClick={resetPositions}
+                    className="w-full py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg text-xs font-medium hover:shadow-lg transition-all flex items-center justify-center gap-1.5">
+                    <RefreshCw size={12} /> Reset Layout
+                  </button>
+                  <p className="text-[9px] text-gray-400 text-center">💡 Drag elements directly on poster or use sliders above</p>
+                </div>
+              )}
+</div>
 
-            {/* Content Inputs */}
-            <div className="modern-card rounded-2xl p-5">
+        {/* AI Image Gen */}
+        <div className="mt-3 flex justify-end">
+          <button onClick={handleGenerateAIImage} disabled={isGeneratingImage}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiImageUrl ? 'bg-green-500/20 text-green-600 hover:bg-green-500/30' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/25'}`}>
+            {isGeneratingImage ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
+            {isGeneratingImage ? 'Generating...' : aiImageUrl ? '✨ Regenerate' : '🚀 Generate AI Poster'}
+          </button>
+        </div>
+      </div>
+
+      {/* Content Inputs */}
+      <div className="modern-card rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Type size={18} className="text-indigo-500" />
                 <h3 className="font-semibold text-gray-900 dark:text-white">Content</h3>
@@ -935,7 +1027,7 @@ const CreativeGeneratorPage: React.FC = () => {
               </div>
               {/* Tabs */}
               <div className="flex gap-1 mb-4 overflow-x-auto">
-                {(['basic', 'photo', 'filters', 'effects', 'stickers'] as const).map(tab => (
+                {(['basic', 'photo', 'filters', 'effects', 'stickers', 'layout'] as const).map(tab => (
                   <button key={tab} onClick={() => setActiveDesignTab(tab)}
                     className={`px-3 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all ${activeDesignTab === tab ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
                     {tab === 'basic' && '🎨 Basic'}
@@ -943,6 +1035,7 @@ const CreativeGeneratorPage: React.FC = () => {
                     {tab === 'filters' && '🔄 Filters'}
                     {tab === 'effects' && '✨ Effects'}
                     {tab === 'stickers' && '😊 Stickers'}
+                    {tab === 'layout' && '📐 Layout'}
                   </button>
                 ))}
               </div>
@@ -1409,24 +1502,55 @@ const CreativeGeneratorPage: React.FC = () => {
               {stickers.map(s => (
                 <div key={s.id} className="absolute z-10" style={{ left: `${s.x}%`, top: `${s.y}%`, fontSize: `${s.size}px` }}>{s.emoji}</div>
               ))}
-              <div className="relative z-10 p-5 md:p-7 flex flex-col items-center justify-center h-full text-center">
-                {productImage ? (
-                  <div className="mb-3 w-24 h-24 md:w-32 md:h-32 rounded-2xl overflow-hidden border-3 border-white/30 shadow-xl">
-                    <img src={productImage} alt={productName} className="w-full h-full object-cover" style={photoFilterStyle} />
-                  </div>
-                ) : (
-                  <div className="text-4xl sm:text-5xl md:text-7xl mb-3 drop-shadow-lg">{selectedTemplate?.emoji || '🎨'}</div>
-                )}
-                {productName && productImage && (
-                  <p className="text-white/80 text-sm font-medium mb-1.5 drop-shadow-md" style={{ fontFamily: FONT_OPTIONS[selectedFont].family }}>{productName}</p>
-                )}
-                <h2 className="font-bold leading-tight drop-shadow-md px-2" style={{ fontSize: `${textSize * 0.26}px`, color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family, textTransform: textEffects.uppercase ? 'uppercase' : 'none', textAlign: textAlign, ...getTextEffectStyle() }}>
-                  {headline || 'Your Headline'}
-                </h2>
-                <p className="mt-1.5 opacity-90 drop-shadow-md px-2 max-w-xs" style={{ fontSize: `${textSize * 0.15}px`, color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family, textTransform: textEffects.uppercase ? 'uppercase' : 'none', textAlign: textAlign }}>
-                  {subtitle || 'Your subtitle goes here'}
-                </p>
-                <div className="mt-auto pt-3 w-full px-3">
+              {/* Fullscreen Content - All Draggable */}
+              <div className="absolute inset-0 z-10">
+                {/* Product Image */}
+                <div
+                  className="absolute z-20 cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-white/40 rounded-2xl transition-all"
+                  style={{ left: `${elementPositions.productImage.x}%`, top: `${elementPositions.productImage.y}%`, transform: 'translate(-50%, -50%)' }}
+                  draggable
+                  onDragEnd={(e) => handleElementDrag('productImage', e)}
+                >
+                  {productImage ? (
+                    <div className="w-24 h-24 md:w-32 md:h-32 rounded-2xl overflow-hidden border-3 border-white/30 shadow-xl">
+                      <img src={productImage} alt={productName} className="w-full h-full object-cover" style={photoFilterStyle} />
+                    </div>
+                  ) : (
+                    <div className="text-4xl sm:text-5xl md:text-7xl drop-shadow-lg">{selectedTemplate?.emoji || '🎨'}</div>
+                  )}
+                  {productName && productImage && (
+                    <p className="text-white/80 text-sm font-medium mt-1 text-center drop-shadow-md" style={{ fontFamily: FONT_OPTIONS[selectedFont].family }}>{productName}</p>
+                  )}
+                </div>
+                {/* Headline */}
+                <div
+                  className="absolute z-20 w-[85%] cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-white/40 rounded-lg px-2 py-1 transition-all"
+                  style={{ left: `${elementPositions.headline.x}%`, top: `${elementPositions.headline.y}%`, transform: 'translate(-50%, -50%)' }}
+                  draggable
+                  onDragEnd={(e) => handleElementDrag('headline', e)}
+                >
+                  <h2 className="font-bold leading-tight drop-shadow-md text-center" style={{ fontSize: `${textSize * 0.26}px`, color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family, textTransform: textEffects.uppercase ? 'uppercase' : 'none', textAlign: textAlign, ...getTextEffectStyle() }}>
+                    {headline || 'Your Headline'}
+                  </h2>
+                </div>
+                {/* Subtitle */}
+                <div
+                  className="absolute z-20 w-[80%] cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-white/40 rounded-lg px-2 py-1 transition-all"
+                  style={{ left: `${elementPositions.subtitle.x}%`, top: `${elementPositions.subtitle.y}%`, transform: 'translate(-50%, -50%)' }}
+                  draggable
+                  onDragEnd={(e) => handleElementDrag('subtitle', e)}
+                >
+                  <p className="opacity-90 drop-shadow-md text-center max-w-xs mx-auto" style={{ fontSize: `${textSize * 0.15}px`, color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family, textTransform: textEffects.uppercase ? 'uppercase' : 'none', textAlign: textAlign }}>
+                    {subtitle || 'Your subtitle goes here'}
+                  </p>
+                </div>
+                {/* Business Info */}
+                <div
+                  className="absolute z-20 w-[90%] cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-white/40 rounded-lg px-2 py-1 transition-all"
+                  style={{ left: `${elementPositions.businessInfo.x}%`, top: `${elementPositions.businessInfo.y}%`, transform: 'translate(-50%, -50%)' }}
+                  draggable
+                  onDragEnd={(e) => handleElementDrag('businessInfo', e)}
+                >
                   <div className="border-t border-white/20 pt-2.5 flex items-center justify-between">
                     <div className="text-left">
                       <p className="font-semibold text-xs drop-shadow-md" style={{ color: textColor, fontFamily: FONT_OPTIONS[selectedFont].family }}>{businessName || 'Business Name'}</p>

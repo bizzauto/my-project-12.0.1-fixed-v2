@@ -29,15 +29,95 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor - Handle errors
+// Response interceptor - Handle errors + JWT refresh token rotation
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: any) => void }> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error || !token) prom.reject(error);
+    else prom.resolve(token);
+  });
+  failedQueue = [];
+};
+
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      // Don't use window.location.href - app uses tab-based navigation
-      // The auth store will handle redirect via isAuthenticated state
+  (response) => {
+    // Check if server signals token needs refresh
+    if (response.headers['x-token-needs-refresh'] === 'true') {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken && !isRefreshing) {
+        isRefreshing = true;
+        axios
+          .post(`${API_BASE_URL}/auth/refresh`, { refreshToken })
+          .then((res) => {
+            const { token: newToken, refreshToken: newRefreshToken } = res.data.data;
+            localStorage.setItem('token', newToken);
+            localStorage.setItem('refreshToken', newRefreshToken);
+            processQueue(null, newToken);
+          })
+          .catch((err) => {
+            processQueue(err, null);
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+          })
+          .finally(() => {
+            isRefreshing = false;
+          });
+      }
     }
+    return response;
+  },
+  (error) => {
+    const originalRequest = error.config;
+
+    // If 401 and we have a refresh token, try to refresh
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login') &&
+      !originalRequest.url?.includes('/auth/refresh')
+    ) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          }).then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          });
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        return axios
+          .post(`${API_BASE_URL}/auth/refresh`, { refreshToken })
+          .then((res) => {
+            const { token: newToken, refreshToken: newRefreshToken } = res.data.data;
+            localStorage.setItem('token', newToken);
+            localStorage.setItem('refreshToken', newRefreshToken);
+            processQueue(null, newToken);
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return apiClient(originalRequest);
+          })
+          .catch((refreshError) => {
+            processQueue(refreshError, null);
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            return Promise.reject(refreshError);
+          })
+          .finally(() => {
+            isRefreshing = false;
+          });
+      }
+
+      // No refresh token — clear and let auth store handle redirect
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+    }
+
     return Promise.reject(error);
   }
 );
@@ -550,6 +630,54 @@ export const smsMarketingAPI = {
   sendMessage: (data: any) => apiClient.post('/sms-marketing/send', data),
   listMessages: (params?: any) => apiClient.get('/sms-marketing/messages', { params }),
   getStats: () => apiClient.get('/sms-marketing/stats'),
+};
+
+// Ledger API (CRM Accounting)
+export const ledgerAPI = {
+  list: (params?: any) => apiClient.get('/ledger', { params }),
+  stats: () => apiClient.get('/ledger/stats'),
+  create: (data: any) => apiClient.post('/ledger', data),
+  update: (id: string, data: any) => apiClient.put(`/ledger/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/ledger/${id}`),
+}
+
+// ==================== GOALS ====================
+export const goalsAPI = {
+  list: (params?: Record<string, any>) => apiClient.get('/goals', { params }),
+  create: (data: { title: string; type: string; target: number; current?: number; period?: string; startDate?: string; endDate?: string }) =>
+    apiClient.post('/goals', data),
+  update: (id: string, data: Record<string, any>) => apiClient.put(`/goals/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/goals/${id}`),
+};
+
+// ==================== DEALS & PIPELINES ====================
+export const dealsAPI = {
+  list: (params?: Record<string, any>) => apiClient.get('/deals', { params }),
+  stats: () => apiClient.get('/deals/stats'),
+  updateStage: (id: string, data: { stage?: string; stageId?: string; pipelineId?: string }) =>
+    apiClient.put(`/deals/${id}/stage`, data),
+  update: (id: string, data: Record<string, any>) => apiClient.put(`/deals/${id}`, data),
+};
+
+export const pipelinesAPI = {
+  list: () => apiClient.get('/pipelines'),
+  create: (data: { name: string; description?: string; stages?: any[] }) => apiClient.post('/pipelines', data),
+  addStage: (pipelineId: string, data: { name: string; color?: string }) =>
+    apiClient.post(`/pipelines/${pipelineId}/stages`, data),
+  delete: (id: string) => apiClient.delete(`/pipelines/${id}`),
+};
+
+// ==================== CRM INVOICES ====================
+export const crmInvoicesAPI = {
+  list: (params?: Record<string, any>) => apiClient.get('/crm-invoices', { params }),
+  create: (data: {
+    customerName: string; customerEmail: string; customerPhone: string;
+    items: { description: string; quantity: number; rate: number; amount: number }[];
+    taxRate?: number; notes?: string; dueDate?: string; contactId?: string;
+  }) => apiClient.post('/crm-invoices', data),
+  update: (id: string, data: Record<string, any>) => apiClient.put(`/crm-invoices/${id}`, data),
+  markPaid: (id: string, data?: { paymentMethod?: string }) => apiClient.put(`/crm-invoices/${id}/pay`, data || {}),
+  delete: (id: string) => apiClient.delete(`/crm-invoices/${id}`),
 };
 
 export default apiClient;

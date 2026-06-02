@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authenticate } from '../middleware/auth.js';
+import { cacheResponse } from '../middleware/cache.js';
 
 const router = Router();
 
 // Get dashboard analytics (for frontend dashboard)
-router.get('/dashboard', authenticate, async (req: any, res: any) => {
+router.get('/dashboard', authenticate, cacheResponse(30), async (req: any, res: any) => {
   try {
     const { period = '30' } = req.query;
     const startDate = new Date();
@@ -183,7 +184,7 @@ router.get('/dashboard', authenticate, async (req: any, res: any) => {
 });
 
 // Get business analytics
-router.get('/', authenticate, async (req: any, res: any) => {
+router.get('/', authenticate, cacheResponse(60), async (req: any, res: any) => {
   try {
     const { period = '30' } = req.query;
     const startDate = new Date();
@@ -376,7 +377,7 @@ router.get('/messages', authenticate, async (req: any, res: any) => {
 });
 
 // Get campaigns analytics
-router.get('/campaigns', authenticate, async (req: any, res: any) => {
+router.get('/campaigns', authenticate, cacheResponse(30), async (req: any, res: any) => {
   try {
     const campaigns = await prisma.campaign.findMany({
       where: { businessId: req.user.businessId },
@@ -408,7 +409,7 @@ router.get('/campaigns', authenticate, async (req: any, res: any) => {
 });
 
 // Get social media analytics
-router.get('/social', authenticate, async (req: any, res: any) => {
+router.get('/social', authenticate, cacheResponse(60), async (req: any, res: any) => {
   try {
     const { period = '30' } = req.query;
     const startDate = new Date();
@@ -457,7 +458,7 @@ router.get('/social', authenticate, async (req: any, res: any) => {
 });
 
 // Get contacts analytics
-router.get('/contacts', authenticate, async (req: any, res: any) => {
+router.get('/contacts', authenticate, cacheResponse(60), async (req: any, res: any) => {
   try {
     const { period = '30' } = req.query;
     const startDate = new Date();

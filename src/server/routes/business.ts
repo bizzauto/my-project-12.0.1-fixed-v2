@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, requireBusinessOwner } from '../middleware/auth.js';
+import { encryptBusinessData, decryptBusinessData } from '../services/secrets.service.js';
 
 const router = Router();
 
@@ -15,7 +16,9 @@ router.get('/', authenticate, async (req: any, res: any) => {
       return res.status(404).json({ success: false, error: 'Business not found' });
     }
 
-    res.json({ success: true, data: business });
+    // Decrypt sensitive fields before sending to client
+    const safeData = decryptBusinessData(business as any);
+    res.json({ success: true, data: safeData });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'Failed to fetch business', details: error.message });
   }
@@ -26,17 +29,21 @@ router.put('/', authenticate, async (req: any, res: any) => {
   try {
     const { name, type, city, phone, email, brandColors, timezone } = req.body;
 
+    // Encrypt any sensitive fields in the update data
+    const updateData = {
+      ...(name && { name }),
+      ...(type && { type }),
+      ...(city && { city }),
+      ...(phone && { phone }),
+      ...(email && { email }),
+      ...(brandColors && { brandColors }),
+      ...(timezone && { timezone }),
+    };
+    const encryptedData = encryptBusinessData(updateData);
+
     const business = await prisma.business.update({
       where: { id: req.user.businessId },
-      data: {
-        ...(name && { name }),
-        ...(type && { type }),
-        ...(city && { city }),
-        ...(phone && { phone }),
-        ...(email && { email }),
-        ...(brandColors && { brandColors }),
-        ...(timezone && { timezone }),
-      },
+      data: encryptedData,
     });
 
     res.json({ success: true, data: business });
@@ -65,19 +72,24 @@ router.get('/settings', authenticate, async (req: any, res: any) => {
 // Update business settings (alias for frontend compatibility)
 router.put('/settings', authenticate, async (req: any, res: any) => {
   try {
-    const { name, type, city, phone, email, brandColors, timezone } = req.body;
+    const { name, type, city, phone, email, brandColors, timezone, ...rest } = req.body;
+
+    const updateData = {
+      ...(name && { name }),
+      ...(type && { type }),
+      ...(city && { city }),
+      ...(phone && { phone }),
+      ...(email && { email }),
+      ...(brandColors && { brandColors }),
+      ...(timezone && { timezone }),
+      ...rest,
+    };
+    // Encrypt any sensitive fields that may be in rest (WhatsApp tokens, etc.)
+    const encryptedData = encryptBusinessData(updateData);
 
     const business = await prisma.business.update({
       where: { id: req.user.businessId },
-      data: {
-        ...(name && { name }),
-        ...(type && { type }),
-        ...(city && { city }),
-        ...(phone && { phone }),
-        ...(email && { email }),
-        ...(brandColors && { brandColors }),
-        ...(timezone && { timezone }),
-      },
+      data: encryptedData,
     });
 
     res.json({ success: true, data: business });
@@ -91,15 +103,17 @@ router.put('/whatsapp', authenticate, requireBusinessOwner, async (req: any, res
   try {
     const { wabaId, waPhoneNumberId, waAccessToken, waWebhookSecret, waPhoneNumber } = req.body;
 
+    const encryptedData = encryptBusinessData({
+      wabaId,
+      waPhoneNumberId,
+      waAccessToken,
+      waWebhookSecret,
+      waPhoneNumber,
+    });
+
     const business = await prisma.business.update({
       where: { id: req.user.businessId },
-      data: {
-        wabaId,
-        waPhoneNumberId,
-        waAccessToken,
-        waWebhookSecret,
-        waPhoneNumber,
-      },
+      data: encryptedData,
     });
 
     res.json({ success: true, data: business });
@@ -113,9 +127,11 @@ router.put('/social-media', authenticate, requireBusinessOwner, async (req: any,
   try {
     const { fbPageId, fbAccessToken, igUserId, igAccessToken } = req.body;
 
+    const encryptedData = encryptBusinessData({ fbPageId, fbAccessToken, igUserId, igAccessToken });
+
     const business = await prisma.business.update({
       where: { id: req.user.businessId },
-      data: { fbPageId, fbAccessToken, igUserId, igAccessToken },
+      data: encryptedData,
     });
 
     res.json({ success: true, data: business });

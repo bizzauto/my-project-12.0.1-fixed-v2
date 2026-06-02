@@ -177,27 +177,42 @@ export class EmailService {
   }
 
   /**
-   * Send generic email
+   * Send generic email with automatic retry on failure.
+   * Retries up to 3 times with exponential backoff (1s, 2s, 4s).
    */
   static async sendEmail(
     to: string,
     subject: string,
     html: string,
-    from?: string
+    from?: string,
+    retries: number = 3
   ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const transporter = this.getTransporter();
-      const appName = process.env.APP_NAME || 'BizzAuto';
-      await transporter.sendMail({
-        from: from || `"${appName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-        to,
-        subject,
-        html,
-      });
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    let lastError: string = '';
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const transporter = this.getTransporter();
+        const appName = process.env.APP_NAME || 'BizzAuto';
+        await transporter.sendMail({
+          from: from || `"${appName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+          to,
+          subject,
+          html,
+        });
+        return { success: true };
+      } catch (error: any) {
+        lastError = error.message;
+        console.warn(`[EmailService] Attempt ${attempt}/${retries} failed for ${to}: ${error.message}`);
+        // Reset transporter on connection errors (e.g., ECONNRESET, ETIMEDOUT)
+        if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
+          this.transporter = null;
+        }
+        if (attempt < retries) {
+          // Exponential backoff: 1s, 2s, 4s
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+        }
+      }
     }
+    return { success: false, error: `Failed after ${retries} attempts: ${lastError}` };
   }
 
   // Email Templates

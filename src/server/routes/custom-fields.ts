@@ -455,7 +455,7 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Create custom field
-router.post('/', authenticate, async (req: any, res: any) => {
+router.post('/', authenticate, validate(createCustomFieldSchema), async (req: any, res: any) => {
   try {
     const {
       name, type, entityType, options, validation,

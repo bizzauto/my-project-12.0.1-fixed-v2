@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authenticate } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { createCampaignSchema, updateCampaignSchema, scheduleCampaignSchema } from '../validations/crm-schemas.js';
 
 const router = Router();
 
@@ -92,7 +94,7 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
 });
 
 // Create campaign
-router.post('/', authenticate, async (req: any, res: any) => {
+router.post('/', authenticate, validate(createCampaignSchema), async (req: any, res: any) => {
   try {
     const {
       name,
@@ -144,7 +146,7 @@ router.post('/', authenticate, async (req: any, res: any) => {
 });
 
 // Update campaign
-router.put('/:id', authenticate, async (req: any, res: any) => {
+router.put('/:id', authenticate, validate(updateCampaignSchema), async (req: any, res: any) => {
   try {
     const campaign = await prisma.campaign.findFirst({
       where: {
@@ -432,7 +434,7 @@ router.post('/:id/send', authenticate, async (req: any, res: any) => {
 });
 
 // Schedule campaign
-router.post('/:id/schedule', authenticate, async (req: any, res: any) => {
+router.post('/:id/schedule', authenticate, validate(scheduleCampaignSchema), async (req: any, res: any) => {
   try {
     const { scheduledAt } = req.body;
 

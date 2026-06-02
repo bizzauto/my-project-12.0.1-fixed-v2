@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authenticate } from '../middleware/auth.js';
+import { cacheResponse } from '../middleware/cache.js';
 
 const router = Router();
 router.use(authenticate);
 
 // ==================== REPORTS OVERVIEW ====================
 
-router.get('/overview', async (req: any, res: any) => {
+router.get('/overview', cacheResponse(60), async (req: any, res: any) => {
   try {
     const { days = '30' } = req.query;
     const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);

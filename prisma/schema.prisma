@@ -221,6 +221,7 @@ model Business {
   analyticsIntegration   AnalyticsIntegration?
   discountRules          DiscountRule[]
   orderNotifications     OrderNotification[]
+  goals                  Goal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2970,6 +2971,30 @@ model CallLog {
   @@index([businessId, contactId])
   @@index([businessId, createdAt])
   @@index([dograhRunId])
+}
+
+
+// ==================== CRM GOALS ====================
+model Goal {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+
+  title      String
+  type       String   // revenue, deals, leads, calls, meetings
+  target     Float
+  current    Float    @default(0)
+  period     String   @default("monthly") // daily, weekly, monthly, quarterly, yearly
+  startDate  DateTime
+  endDate    DateTime
+  isActive   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([businessId, type])
+  @@index([businessId, isActive])
 }
 
 // ==================== WALLET & BILLING ====================

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './lib/authStore';
 import { MobileApp } from './lib/capacitor-app';
@@ -54,56 +54,55 @@ const ModeAwareAuthLayout: React.FC<{ children: React.ReactNode }> = ({ children
   return <AuthLayout>{children}</AuthLayout>;
 };
 
-// Authenticated pages
-import Dashboard from './components/DashboardPage';
-import WhatsAppModule from './components/WhatsAppModule';
-import CRMPage from './components/CRMPage';
-import LeadGenerationPage from './components/LeadGenerationPage';
-import AppointmentsPage from './components/AppointmentsPage';
-import ECommercePage from './components/ECommercePage';
-import PublicStorefront from './components/PublicStorefront';
-import CheckoutPage from './components/CheckoutPage';
-import OrderTrackingPage from './components/OrderTrackingPage';
-import StoreSharePage from './components/StoreSharePage';
-import SalesAnalyticsPage from './components/SalesAnalyticsPage';
-import CustomerAccountPage from './components/CustomerAccountPage';
-import BulkImportExport from './components/BulkImportExport';
-import ShippingSettings from './components/ShippingSettings';
-import DocumentsPage from './components/DocumentsPage';
-import SocialMediaPage from './components/SocialMediaPage';
-import GoogleBusinessPage from './components/GoogleBusinessPage';
-import AIChatbotPage from './components/AIChatbotPage';
-import VoiceCallPage from './components/VoiceCallPage';
-import DograhSettings from './components/DograhSettings';
-import CreativeGeneratorPage from './components/CreativeGeneratorPage';
-import AutomationPage from './components/AutomationPage';
-import ReportsPage from './components/ReportsPage';
-import ReviewsPage from './components/ReviewsPage';
-import BillingPage from './components/BillingPage';
-import ApiKeysPage from './components/ApiKeysPage';
-import AuditLogPage from './components/AuditLogPage';
-import TeamManagement from './components/TeamManagement';
-import UserProfile from './components/UserProfile';
-import SettingsPage from './components/SettingsPage';
-import SuperAdminDashboard from './components/SuperAdminDashboard';
-import OnboardingWizard from './components/OnboardingWizard';
-import BulkImportPage from './components/BulkImportPage';
-import EmailLeadImporter from './components/EmailLeadImporter';
-import EmailMarketingPage from './components/EmailMarketingPage';
-import WorkflowBuilder from './components/WorkflowBuilder';
-import FunnelBuilder from './components/FunnelBuilder';
-import SurveyBuilder from './components/SurveyBuilder';
-import CourseBuilder from './components/CourseBuilder';
-import TriggerLinks from './components/TriggerLinks';
-import PaymentLinks from './components/PaymentLinks';
-import ClientPortal from './components/ClientPortal';
-import ConversationsPage from './components/ConversationsPage';
-import CustomFieldsBuilder from './components/CustomFieldsBuilder';
-import BlogManager from './components/BlogManager';
-import ReviewRequests from './components/ReviewRequests';
-import AgencyDashboard from './components/AgencyDashboard';
-import MissedCallSettings from './components/MissedCallSettings';
-import SnapshotManager from './components/SnapshotManager';
+// Authenticated pages — lazy-loaded for code splitting
+const Dashboard = lazy(() => import('./components/DashboardPage'));
+const WhatsAppModule = lazy(() => import('./components/WhatsAppModule'));
+const CRMPage = lazy(() => import('./components/CRMPage'));
+const LeadGenerationPage = lazy(() => import('./components/LeadGenerationPage'));
+const AppointmentsPage = lazy(() => import('./components/AppointmentsPage'));
+const ECommercePage = lazy(() => import('./components/ECommercePage'));
+const PublicStorefront = lazy(() => import('./components/PublicStorefront'));
+const CheckoutPage = lazy(() => import('./components/CheckoutPage'));
+const OrderTrackingPage = lazy(() => import('./components/OrderTrackingPage'));
+const StoreSharePage = lazy(() => import('./components/StoreSharePage'));
+const SalesAnalyticsPage = lazy(() => import('./components/SalesAnalyticsPage'));
+const CustomerAccountPage = lazy(() => import('./components/CustomerAccountPage'));
+const BulkImportExport = lazy(() => import('./components/BulkImportExport'));
+const ShippingSettings = lazy(() => import('./components/ShippingSettings'));
+const DocumentsPage = lazy(() => import('./components/DocumentsPage'));
+const SocialMediaPage = lazy(() => import('./components/SocialMediaPage'));
+const GoogleBusinessPage = lazy(() => import('./components/GoogleBusinessPage'));
+const AIChatbotPage = lazy(() => import('./components/AIChatbotPage'));
+const VoiceCallPage = lazy(() => import('./components/VoiceCallPage'));
+const DograhSettings = lazy(() => import('./components/DograhSettings'));
+const CreativeGeneratorPage = lazy(() => import('./components/CreativeGeneratorPage'));
+const AutomationPage = lazy(() => import('./components/AutomationPage'));
+const ReportsPage = lazy(() => import('./components/ReportsPage'));
+const ReviewsPage = lazy(() => import('./components/ReviewsPage'));
+const BillingPage = lazy(() => import('./components/BillingPage'));
+const ApiKeysPage = lazy(() => import('./components/ApiKeysPage'));
+const AuditLogPage = lazy(() => import('./components/AuditLogPage'));
+const TeamManagement = lazy(() => import('./components/TeamManagement'));
+const UserProfile = lazy(() => import('./components/UserProfile'));
+const SettingsPage = lazy(() => import('./components/SettingsPage'));
+const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard'));
+const OnboardingWizard = lazy(() => import('./components/OnboardingWizard'));
+const EmailLeadImporter = lazy(() => import('./components/EmailLeadImporter'));
+const EmailMarketingPage = lazy(() => import('./components/EmailMarketingPage'));
+const WorkflowBuilder = lazy(() => import('./components/WorkflowBuilder'));
+const FunnelBuilder = lazy(() => import('./components/FunnelBuilder'));
+const SurveyBuilder = lazy(() => import('./components/SurveyBuilder'));
+const CourseBuilder = lazy(() => import('./components/CourseBuilder'));
+const TriggerLinks = lazy(() => import('./components/TriggerLinks'));
+const PaymentLinks = lazy(() => import('./components/PaymentLinks'));
+const ClientPortal = lazy(() => import('./components/ClientPortal'));
+const ConversationsPage = lazy(() => import('./components/ConversationsPage'));
+const CustomFieldsBuilder = lazy(() => import('./components/CustomFieldsBuilder'));
+const BlogManager = lazy(() => import('./components/BlogManager'));
+const ReviewRequests = lazy(() => import('./components/ReviewRequests'));
+const AgencyDashboard = lazy(() => import('./components/AgencyDashboard'));
+const MissedCallSettings = lazy(() => import('./components/MissedCallSettings'));
+const SnapshotManager = lazy(() => import('./components/SnapshotManager'));
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -123,7 +122,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/onboarding" replace />;
   }
 
-  return <>{children}</>;
+  return <ErrorBoundary pageName={location.pathname}>{children}</ErrorBoundary>;
 };
 
 // Super Admin Route
@@ -156,6 +155,7 @@ function AppRoutes() {
 
   return (
     <ToastProvider>
+      <Suspense fallback={<PageSkeleton />}>
       <Routes>
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
@@ -637,6 +637,7 @@ function AppRoutes() {
       <Route path="/404" element={<NotFoundPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+      </Suspense>
     <NetworkStatus />
     <ThemeSelector />
     <UIModeToggle />

@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { createWorkflowSchema, updateWorkflowSchema } from '../validations/crm-schemas.js';
 
 const router = Router();
 
@@ -100,7 +102,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // Create workflow
-router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), validate(createWorkflowSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, triggerType, triggerConfig, nodes, edges } = req.body;
 
@@ -156,7 +158,7 @@ router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRe
 });
 
 // Update workflow
-router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateWorkflowSchema), async (req: AuthRequest, res: Response) => {
   try {
     const workflow = await prisma.workflow.findFirst({
       where: {

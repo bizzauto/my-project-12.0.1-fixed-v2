@@ -70,11 +70,23 @@ import voiceCallsRoutes from './routes/voice-calls.js';
 import dograhWebhookRoutes from './routes/dograh-webhook.js';
 import walletRoutes from './routes/wallet.js';
 import loyaltyRoutes from './routes/loyalty.js';
+import ledgerRoutes from './routes/ledger.js';
+import goalsRoutes from './routes/goals.js';
+import crmInvoicesRoutes from './routes/crm-invoices.js';
+import dealsRoutes from './routes/deals.js';
+import pipelinesRoutes from './routes/pipelines.js';
 import storePublicRoutes from './routes/store-public.js';
 import storeFeaturesRoutes from './routes/store-features.js';
 import storeAdvancedRoutes from './routes/store-advanced.js';
 import storeCustomizeRoutes from './routes/store-customize.js';
 import { securityHeaders, apiSecurityHeaders } from './middleware/security.js';
+import { validateCSRF } from './middleware/csrf.js';
+import { sanitizeInput } from './middleware/sanitize.js';
+import { apiVersioning } from './middleware/api-versioning.js';
+import { cacheResponse, getCacheStats, invalidateCache } from './middleware/cache.js';
+import adminAnalyticsRoutes from './routes/admin-analytics.js';
+import monitoringRoutes from './routes/monitoring.js';
+import dataExportRoutes from './routes/data-export.js';
 
 dotenv.config();
 
@@ -141,8 +153,8 @@ app.use(cors({
   credentials: true,
 }));
 app.use(compression());
-app.use(morgan('combined', {
-  stream: { write: (message) => logger.info(message.trim()) }
+app.use(morgan(':method :url :status :response-time ms :req[host] :user-agent', {
+  stream: { write: (message) => logger.info(message.trim()) },
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
@@ -151,9 +163,31 @@ app.use(cookieParser());
 // Additional security headers
 app.use(securityHeaders);
 
-// Request ID middleware
+// Request ID middleware — also sets X-Request-Id response header
 app.use((req, res, next) => {
   req.id = crypto.randomUUID();
+  res.setHeader('X-Request-Id', req.id);
+  next();
+});
+
+// Global input sanitization — XSS prevention on all request inputs
+app.use(sanitizeInput);
+
+// API versioning — extracts version from path/header/query
+app.use('/api', apiVersioning);
+
+// Auto-invalidate cache on mutations
+app.use('/api', (req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    const originalJson = res.json.bind(res);
+    res.json = (body: any) => {
+      // After successful mutation, invalidate cache for this business
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        invalidateCache((req as any).user?.businessId);
+      }
+      return originalJson(body);
+    };
+  }
   next();
 });
 
@@ -171,7 +205,49 @@ const globalApiLimiter = rateLimit({
 });
 app.use('/api', globalApiLimiter);
 
+// Stricter rate limiter for write/mutation endpoints (100 requests per 15 minutes per IP)
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { success: false, error: 'Too many write requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+// Apply write limiter to high-risk mutation routes
+const mutationRoutes = ['/contacts', '/campaigns', '/posts', '/documents', '/leads', '/workflows', '/email', '/sms-marketing'];
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    const isMutation = mutationRoutes.some(route => req.path.startsWith(route));
+    if (isMutation) {
+      return writeLimiter(req, res, next);
+    }
+  }
+  next();
+});
+
 // API Routes
+
+// CSRF validation for authenticated state-changing routes
+// Applied globally — each route that needs CSRF will check X-CSRF-Token header
+// GET/HEAD/OPTIONS are always allowed (safe methods)
+app.use('/api', (req, res, next) => {
+  // Skip CSRF for safe methods (GET, HEAD, OPTIONS)
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return next();
+  }
+  // Skip CSRF for public endpoints (no auth needed)
+  const publicPaths = ['/api/store', '/api/auth', '/api/health'];
+  if (publicPaths.some(p => req.path.startsWith(p.replace('/api', '')))) {
+    return next();
+  }
+  // Skip CSRF for webhook endpoints (they use webhook-secret validation instead)
+  const webhookPaths = ['/dograh/webhook'];
+  if (webhookPaths.some(p => req.path.startsWith(p))) {
+    return next();
+  }
+  // Apply CSRF validation to all other POST/PUT/PATCH/DELETE requests
+  validateCSRF(req, res, next);
+});
 
 // Public store routes (no auth required)
 app.use('/api/store', storePublicRoutes);
@@ -233,9 +309,23 @@ app.use('/api/voice-calls', voiceCallsRoutes);
 app.use('/api/dograh/webhook', dograhWebhookRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/loyalty', loyaltyRoutes);
+app.use('/api/ledger', ledgerRoutes);
+app.use('/api/goals', goalsRoutes);
+app.use('/api/crm-invoices', crmInvoicesRoutes);
+app.use('/api/deals', dealsRoutes);
+app.use('/api/pipelines', pipelinesRoutes);
 app.use('/api/store-features', storeFeaturesRoutes);
 app.use('/api/store-advanced', storeAdvancedRoutes);
 app.use('/api/store-customize', storeCustomizeRoutes);
+
+// Phase 3: Admin Platform Analytics (SUPER_ADMIN only)
+app.use('/api/admin', adminAnalyticsRoutes);
+
+// Phase 3: Monitoring & Observability (no auth — for LB/monitoring tools)
+app.use('/api', monitoringRoutes);
+
+// Phase 4: Enterprise Data Export/Import
+app.use('/api/data-export', dataExportRoutes);
 
 // Test endpoints (development only)
 if (NODE_ENV !== 'production') {
@@ -251,6 +341,11 @@ if (NODE_ENV !== 'production') {
     res.json({ success: true, body: req.body });
   });
 }
+
+// Cache stats endpoint (for monitoring)
+app.get('/cache-stats', (_req, res) => {
+  res.json({ success: true, data: getCacheStats() });
+});
 
 // Health check - comprehensive
 app.get('/health', async (req, res) => {
@@ -310,6 +405,11 @@ if (NODE_ENV === 'production') {
 // Startup validation for critical secrets
 (async () => {
   try {
+    // Phase 5: Environment hardening — blocks insecure production configs
+    const { validateProductionEnvironment, printEnvironmentReport } = await import('./middleware/env-hardening.js');
+    const hardeningResult = validateProductionEnvironment();
+    printEnvironmentReport(hardeningResult);
+
     const { validateEnvironment, printValidationResult } = await import('./utils/envValidator.js');
     const result = validateEnvironment();
     printValidationResult(result);

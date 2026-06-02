@@ -145,8 +145,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const res = await authAPI.login({ email, password });
-      const { user, business, token } = res.data.data;
+      const { user, business, token, refreshToken } = res.data.data;
       localStorage.setItem('token', token);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       set({ user, business, token, isAuthenticated: true, isLoading: false });
     } catch (error: any) {
       set({ isLoading: false });
@@ -159,8 +160,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const res = await authAPI.googleLogin(credential);
-      const { user, business, token } = res.data.data;
+      const { user, business, token, refreshToken } = res.data.data;
       localStorage.setItem('token', token);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       set({ user, business, token, isAuthenticated: true, isLoading: false, onboardingCompleted: true });
     } catch (error: any) {
       set({ isLoading: false });
@@ -173,8 +175,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const res = await authAPI.appleLogin(credential, name);
-      const { user, business, token } = res.data.data;
+      const { user, business, token, refreshToken } = res.data.data;
       localStorage.setItem('token', token);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       set({ user, business, token, isAuthenticated: true, isLoading: false, onboardingCompleted: true });
     } catch (error: any) {
       set({ isLoading: false });
@@ -187,8 +190,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const res = await authAPI.register(data);
-      const { user, business, token } = res.data.data;
+      const { user, business, token, refreshToken } = res.data.data;
       localStorage.setItem('token', token);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       set({ user, business, token, isAuthenticated: true, isLoading: false, onboardingCompleted: true });
     } catch (error: any) {
       set({ isLoading: false });
@@ -202,6 +206,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('onboardingCompleted');
     localStorage.removeItem('demoMode');
     set({ user: null, business: null, token: null, isAuthenticated: false, onboardingCompleted: false });

@@ -19,6 +19,9 @@ FROM node:22-alpine
 
 RUN apk add --no-cache openssl wget
 
+# Security: run as non-root user
+RUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -30,12 +33,15 @@ COPY --from=builder /app/public ./public
 COPY start.sh ./
 RUN chmod +x start.sh
 
-# Create necessary directories
-RUN mkdir -p uploads logs
+# Create necessary directories with correct ownership
+RUN mkdir -p uploads logs && chown -R appuser:appgroup /app
 
 # Use PORT env var (default 4000)
 ENV PORT=4000
 EXPOSE ${PORT}
+
+# Switch to non-root user
+USER appuser
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:${PORT}/health/live || exit 1
