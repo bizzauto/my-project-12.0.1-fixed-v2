@@ -395,20 +395,18 @@ a:focus-visible {
 
 /* Smooth scrolling (disabled on touch — CSS smooth scroll adds mobile jank) */
 html {
-  overflow: hidden; /* lock body scroll — AuthLayout handles scroll internally */
+  overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
 }
 @media (hover: hover) and (pointer: fine) {
-  html { scroll-behavior: smooth; overflow: auto; }
+  html { scroll-behavior: smooth; }
 }
 
-/* Body: no scroll — AuthLayout page-content div handles it */
+/* Body: just let it flow normally. AuthLayout root handles viewport lock. */
 body {
-  overflow: hidden;
-  height: 100dvh;
+  margin: 0;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  overscroll-behavior-y: contain;
 }
 
 /* Custom scrollbar */
