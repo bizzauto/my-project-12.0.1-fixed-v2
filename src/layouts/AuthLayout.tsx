@@ -163,7 +163,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div
       className="bg-gray-50 dark:bg-gray-900 flex"
-      style={{ height: '100dvh', maxHeight: '100dvh', overflow: 'hidden' }}
+      style={{ height: '100dvh', maxHeight: '100dvh' }}
     >
       {/* ===== TABLET BACKDROP (for slide-out sidebar) ===== */}
       {showSidebarOverlay && (
@@ -474,7 +474,6 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           className="flex-1 overflow-y-auto"
           style={{
             minHeight: 0,
-            WebkitOverflowScrolling: 'touch',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >

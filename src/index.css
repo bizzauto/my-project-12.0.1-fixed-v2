@@ -395,28 +395,20 @@ a:focus-visible {
 
 /* Smooth scrolling (disabled on touch — CSS smooth scroll adds mobile jank) */
 html {
-  overflow-x: hidden; /* only html, never body — body overflow breaks mobile scroll */
+  overflow: hidden; /* lock body scroll — AuthLayout handles scroll internally */
   -webkit-text-size-adjust: 100%;
 }
 @media (hover: hover) and (pointer: fine) {
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; overflow: auto; }
 }
 
-/* Body: just let it scroll. Keep -webkit-overflow-scrolling OFF html/body
-   (deprecated, breaks iOS momentum scroll when set on document root). */
+/* Body: no scroll — AuthLayout page-content div handles it */
 body {
-  overflow-x: hidden;
-  min-height: 100vh;
-  min-height: 100dvh; /* dynamic viewport — fixes iOS address-bar resize */
+  overflow: hidden;
+  height: 100dvh;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  overscroll-behavior-y: contain; /* keep pull-to-refresh off but allow normal scroll */
-  /* Promote body to its own GPU layer; prevents repaints of background-image
-     gradients on Android Chrome from re-compositing the page during scroll. */
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  overscroll-behavior-y: contain;
 }
 
 /* Custom scrollbar */
@@ -626,10 +618,6 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: #0f172a; /* solid on mobile — backdrop-filter kills Android scroll perf */
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  /* Force GPU layer once; helps avoid repaint jank during scroll */
-  transform: translateZ(0);
-  will-change: transform;
-  contain: layout style paint;
 }
 @media (min-width: 768px) {
   .mobile-bottom-nav {
