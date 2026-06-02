@@ -609,6 +609,16 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               </div>
             </div>
 
+            {/* Version Badge */}
+            <div className="px-4 pb-2 pt-2">
+              <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-mono text-green-600 dark:text-green-400">
+                  v12.0.1 • {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+            </div>
+
             {/* Logout */}
             <div className="px-4 pb-6 pt-2 border-t border-gray-200 dark:border-gray-700">
               <button

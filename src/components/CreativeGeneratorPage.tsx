@@ -176,6 +176,7 @@ const TEXT_COLORS = [
 const CreativeGeneratorPage: React.FC = () => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [appliedBackground, setAppliedBackground] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'create' | 'history'>('create');
   const [headline, setHeadline] = useState('');
   const [subtitle, setSubtitle] = useState('');
@@ -437,6 +438,50 @@ const CreativeGeneratorPage: React.FC = () => {
 
   const filteredTemplates = templates.filter(t => t.category === category);
 
+  // ADD button - manually add content to poster
+  const handleAddContent = (type: 'headline' | 'subtitle' | 'business' | 'phone' | 'image' | 'bg') => {
+    switch(type) {
+      case 'headline':
+        if (!headline) setHeadline('Special Offer!');
+        break;
+      case 'subtitle':
+        if (!subtitle) setSubtitle('Limited Time Only');
+        break;
+      case 'business':
+        if (!businessName) setBusinessName('My Business');
+        break;
+      case 'phone':
+        if (!phone) setPhone('+91 98765 43210');
+        break;
+      case 'image':
+        document.getElementById('product-image-input')?.click();
+        break;
+      case 'bg':
+        document.getElementById('bg-image-input')?.click();
+        break;
+    }
+    showToast('Added to poster!', 'success');
+  };
+
+  // Apply template gradient to preview
+  const applyTemplateGradient = (template: Template) => {
+    setSelectedTemplate(template);
+    // Get gradient colors based on template category
+    const gradientMap: Record<string, string[]> = {
+      'Festival': ['#FF6B35', '#F7931E', '#FFD700'],
+      'Offer': ['#2563EB', '#4F46E5', '#7C3AED'],
+      'Product': ['#7C3AED', '#8B5CF6', '#D946EF'],
+      'Seasonal': ['#FACC15', '#FB923C', '#F87171'],
+      'Menu': ['#D97706', '#F97316', '#EF4444'],
+      'Price List': ['#4B5563', '#64748B', '#2563EB'],
+      'Testimonial': ['#7C3AED', '#EC4899', '#F43F5E'],
+      'Wedding': ['#F472B6', '#FB7185', '#F87171'],
+      'Birthday': ['#A855F7', '#C084FC', '#818CF8'],
+    };
+    const colors = gradientMap[template.category] || ['#6366f1', '#8b5cf6', '#ec4899'];
+    setAppliedBackground(`linear-gradient(135deg, ${colors.join(', ')})`);
+  };
+
   const handleAIGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -625,7 +670,7 @@ const CreativeGeneratorPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {filteredTemplates.map(t => (
-                  <button key={t.id} onClick={() => setSelectedTemplate(t)}
+                  <button key={t.id} onClick={() => applyTemplateGradient(t)}
                     className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${selectedTemplate?.id === t.id ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                     <span className="text-2xl">{t.emoji}</span>
                     <span className="text-[10px] text-gray-600 dark:text-gray-400 truncate w-full px-1 leading-tight text-center">{t.name}</span>
@@ -888,6 +933,40 @@ const CreativeGeneratorPage: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Quick Add Buttons */}
+            <div className="modern-card rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Plus size={18} className="text-green-500" />
+                <h3 className="font-semibold text-gray-900 dark:text-white">Quick Add</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => handleAddContent('headline')}
+                  className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all">
+                  <Type size={14} /> Add Headline
+                </button>
+                <button onClick={() => handleAddContent('subtitle')}
+                  className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all">
+                  <Type size={14} /> Add Subtitle
+                </button>
+                <button onClick={() => handleAddContent('business')}
+                  className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all">
+                  <Globe size={14} /> Add Business Name
+                </button>
+                <button onClick={() => handleAddContent('phone')}
+                  className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-amber-500/25 transition-all">
+                  <MessageCircle size={14} /> Add Phone
+                </button>
+                <button onClick={() => handleAddContent('image')}
+                  className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-pink-500/25 transition-all">
+                  <Image size={14} /> Add Product Image
+                </button>
+                <button onClick={() => handleAddContent('bg')}
+                  className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-violet-500/25 transition-all">
+                  <Layers size={14} /> Add Background
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* ============ RIGHT PANEL - PREVIEW ============ */}
@@ -915,7 +994,7 @@ const CreativeGeneratorPage: React.FC = () => {
                     style={{
                       background: backgroundImage
                         ? `url(${backgroundImage}) center/cover no-repeat`
-                        : `linear-gradient(135deg, ${getPaletteColors().join(', ')})`,
+                        : appliedBackground || `linear-gradient(135deg, ${getPaletteColors().join(', ')})`,
                     }}
                   >
                     {/* Overlay */}
@@ -1148,6 +1227,10 @@ const CreativeGeneratorPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Hidden file inputs for Quick Add buttons */}
+      <input type="file" id="product-image-input" className="hidden" accept="image/*" onChange={handleProductImageUpload} />
+      <input type="file" id="bg-image-input" className="hidden" accept="image/*" onChange={handleBackgroundUpload} />
+
       {toast && (
         <div className={`fixed top-4 right-4 z-[100] flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white ${toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
           {toast.message}

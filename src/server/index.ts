@@ -257,6 +257,8 @@ app.get('/health', async (req, res) => {
   try {
     const { getHealthCheck } = await import('./utils/healthCheck.js');
     const health = await getHealthCheck();
+    health.version = '12.0.1';
+    health.buildTime = process.env.BUILD_TIME || new Date().toISOString();
     const statusCode = health.status === 'unhealthy' ? 503 : 200;
     res.status(statusCode).json(health);
   } catch {
@@ -264,14 +266,20 @@ app.get('/health', async (req, res) => {
       status: 'ok',
       timestamp: new Date().toISOString(),
       environment: NODE_ENV,
-      version: '1.0.0',
+      version: '12.0.1',
+      buildTime: process.env.BUILD_TIME || new Date().toISOString(),
     });
   }
 });
 
 // Liveness probe (for Kubernetes/Docker)
 app.get('/health/live', (req, res) => {
-  res.json({ status: 'alive', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'alive',
+    timestamp: new Date().toISOString(),
+    version: '12.0.1',
+    buildTime: process.env.BUILD_TIME || new Date().toISOString(),
+  });
 });
 
 // Readiness probe (for Kubernetes/Docker)
