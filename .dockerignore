@@ -20,7 +20,6 @@ thumbs.db
 *.tar.gz
 __pycache__
 *.pyc
-scripts
 tests
 __tests__
 *.test.*
