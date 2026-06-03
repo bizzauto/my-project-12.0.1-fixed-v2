@@ -186,6 +186,51 @@ class JimiVoiceAgent {
     }
   }
 
+  private findBestVoiceForLang(lang: string): SpeechSynthesisVoice | null {
+    const langCode = lang.split('-')[0];
+    
+    // Female voice names to prefer (sweet sounding)
+    const femaleKeywords = ['female', 'woman', 'girl', 'priya', 'neha', 'ria', 'kanya', 'mahila', 'zira', 'susan', 'sarah', 'emma', 'samantha', 'karen', 'google'];
+    
+    // Find female voices for the language
+    const femaleVoice = this.availableVoices.find(v => 
+      v.lang.startsWith(langCode) && 
+      femaleKeywords.some(k => v.name.toLowerCase().includes(k))
+    );
+    if (femaleVoice) return femaleVoice;
+
+    // Find any voice for the language
+    const langVoice = this.availableVoices.find(v => v.lang.startsWith(langCode));
+    if (langVoice) return langVoice;
+
+    // Fallback to Hindi female then English female
+    const hindiFemale = this.availableVoices.find(v => 
+      v.lang.startsWith('hi') && 
+      femaleKeywords.some(k => v.name.toLowerCase().includes(k))
+    );
+    if (hindiFemale) return hindiFemale;
+
+    const hindiVoice = this.availableVoices.find(v => v.lang.startsWith('hi'));
+    if (hindiVoice) return hindiVoice;
+
+    const englishFemale = this.availableVoices.find(v => 
+      v.lang.startsWith('en') && 
+      femaleKeywords.some(k => v.name.toLowerCase().includes(k))
+    );
+    if (englishFemale) return englishFemale;
+
+    const englishVoice = this.availableVoices.find(v => v.lang.startsWith('en'));
+    if (englishVoice) return englishVoice;
+
+    return this.availableVoices[0] || null;
+  }
+
+  private loadVoices() {
+    if (this.synthesis) {
+      this.availableVoices = this.synthesis.getVoices();
+    }
+  }
+
   setMessageCallback(callback: JimiCallback) {
     this.onMessage = callback;
   }
@@ -255,8 +300,11 @@ class JimiVoiceAgent {
     const utterance = new SpeechSynthesisUtterance(text);
     const detectedLang = this.detectLanguage(text);
     utterance.lang = detectedLang;
-    utterance.rate = this.config.rate || 1.0;
-    utterance.pitch = this.config.pitch || 1.0;
+    
+    // Sweet voice settings - slightly higher pitch, softer pace
+    utterance.rate = this.config.rate || 0.95; // Slightly slower for sweetness
+    utterance.pitch = this.config.pitch || 1.2; // Higher pitch for female sweet voice
+    utterance.volume = 1.0;
 
     const voice = this.findBestVoiceForLang(detectedLang);
     if (voice) {

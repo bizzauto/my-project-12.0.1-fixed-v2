@@ -139,6 +139,24 @@ const JimiAssistant: React.FC = () => {
     addMessage(`Ab hum ${LANGUAGES.find(l => l.code === lang)?.nativeName || lang} mein baat karenge! ✨`, false);
   };
 
+  const previewVoice = () => {
+    const previewTexts: Record<string, string> = {
+      'hi-IN': 'Namaste! Main Jimi hun. Kaise ho aap? 😊',
+      'en-US': 'Hello! I am Jimi. How are you? 😊',
+      'mr-IN': 'नमस्कार! मी जिमी आहे. कसे आहात? 😊',
+      'ta-IN': 'வணக்கம்! நான் ஜிமி. எப்படி இருக்கிறீர்கள்? 😊',
+      'te-IN': 'నమస్కారం! నేను జిమ్మీ. ఎలా ఉన్నారు? 😊',
+      'bn-IN': 'নমস্কার! আমি জিমি. কেমন আছেন? 😊',
+      'gu-IN': 'નમસ્તે! હું જિમી છું. કેમ છો? 😊',
+      'kn-IN': 'ನಮಸ್ಕಾರ! ನಾನು ಜಿಮ್ಮಿ. ಹವಾಗಿದ್ದೀರಾ? 😊',
+      'ml-IN': 'നമസ്കാരം! ഞാൻ ജിമ്മി ആണ്. എങ്ങനെ ഇരിക്കുന്നു? 😊',
+      'pa-IN': 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਜਿਮੀ ਹਾਂ. ਕਿਵੇਂ ਹੋ? 😊',
+    };
+    const text = previewTexts[selectedLang] || previewTexts['hi-IN'];
+    jimi.speak(text);
+    addMessage(`🎤 Voice preview: "${text}"`, false);
+  };
+
   return (
     <>
       {/* Floating Button */}
@@ -201,13 +219,21 @@ const JimiAssistant: React.FC = () => {
                   </span>
                 </button>
                 {showLangMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 max-h-64 overflow-y-auto">
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 max-h-72 overflow-y-auto">
+                    <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-600">
+                      <button
+                        onClick={previewVoice}
+                        className="w-full px-3 py-1.5 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-lg text-xs font-medium hover:bg-pink-200 dark:hover:bg-pink-900/50 flex items-center justify-center gap-1"
+                      >
+                        🔊 Preview Voice
+                      </button>
+                    </div>
                     {LANGUAGES.map(lang => (
                       <button
                         key={lang.code}
                         onClick={() => handleLanguageChange(lang.code)}
                         className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                          selectedLang === lang.code ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'
+                          selectedLang === lang.code ? 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' : 'text-gray-700 dark:text-gray-300'
                         }`}
                       >
                         <span>{lang.nativeName}</span>
