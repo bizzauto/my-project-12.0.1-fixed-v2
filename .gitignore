@@ -56,6 +56,11 @@ tmp/
 # Deployment agent (local tool, not part of project)
 deploy-agent/
 
+# Extra files / mobile app (huge, not needed in Docker build)
+EXTRA/
+mobile-app/
+*.zip
+
 # Platform-specific generated files (auto-created by deploy agent)
 render.yaml
 vercel.json
