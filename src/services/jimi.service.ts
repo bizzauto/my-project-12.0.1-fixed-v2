@@ -23,54 +23,54 @@ export const LANGUAGES: { code: Language; name: string; nativeName: string }[] =
   { code: 'pa-IN', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ' },
 ];
 
-// Jimi's sweet responses - Best Friend vibes
+// Jimi's sweet responses - Balanced (friendly + respectful)
 const SWEET_RESPONSES = {
   greeting: [
-    'Arre hello! Kaise ho? Yaar bahut miss kar rahi thi tumhe! 😊',
-    'Namaste! Aaj kya haal hai? Batao na kya chal raha hai life mein! 💫',
-    'Hi hi hi! Bahut accha laga tumhe dekh ke! Kya kar rahe ho aajkal? ✨',
-    'Oye! Kahan the itni der se? Main wait kar rahi thi! 🌸',
-    'Hey! Tum acche ho na? Kuch help chahiye toh batao, main hoon na! 💕',
+    'Hello! Kaise ho aap? 😊 Bahut accha laga aapse baat karke!',
+    'Namaste! Aaj kya kaam hai? Batao, main madad karti hun! 💫',
+    'Hi! Kaise ho? Kuch help chahiye toh batao, main hoon na! ✨',
+    'Hello! Aap acche ho na? Kuch bhi karna ho, mujhe batao! 🌸',
+    'Namaste ji! Aaj kya plan hai? Main ready hun aapki help ke liye! 💕',
   ],
   thankYou: [
-    'Arey yaar, ye sab kya! Hum dost hai na! 💕',
-    'Arre thank you mat bolo, mujhe accha lagta hai tumhari help karke! 😊',
-    'Yaar tum bahut acche ho! Aur kuch help chahiye toh batao! 🌟',
-    'Bas bas, ab thank you mat bolo! Dost hain hum! 😄',
-    'Tumhari khushi mein meri khushi hai yaar! 💖',
+    'Aapka swagat hai! Aur kuch help chahiye toh zarur bolo! 💕',
+    'Thank you aapka! Mujhe accha lagta hai aapki help karke! 😊',
+    'Aap bahut acche ho! Aur kuch help chahiye toh batao! 🌟',
+    'Bas bas, ab thank you mat bolo! Aapke liye toh kuch bhi! 😄',
+    'Aapki khushi mein meri khushi hai! 💖',
   ],
   help: [
-    'Arre yaar, main hoon na tumhari help ke liye! Bolo kya karun?\n• WhatsApp bhejun kisi ko?\n• Leads dekhun?\n• Post banaun?\n• Reviews padhun?\nBolo bolo, main ready hoon! 💫',
-    'Yaar tum batao kya kaam hai! Main toh tumhare liye hamesha ready hoon! 🌸',
-    'Hey, kuch bhi karna ho, mujhe batao! Hum saath mein karenge! ✨',
+    'Aap batao kya kaam hai! Main aapki help karti hun:\n• WhatsApp bhejna?\n• Leads dekhna?\n• Post banaun?\n• Reviews padhna?\nBolo, main ready hoon! 💫',
+    'Aap batao kya karna hai! Main aapke liye hamesha ready hoon! 🌸',
+    'Kuch bhi karna ho, mujhe batao! Hum saath mein karenge! ✨',
   ],
   confused: [
-    'Arre yaar, samajh nahi aaya! Thoda aur clearly bolo na! 😅',
-    'Hey, kya bol rahe ho? Mujhe thoda aur batao! 💕',
-    'Yaar ye kya bola? Phir se bolo, main sun rahi hoon! 🌸',
+    'Thoda aur clearly batao? Main samajh nahi paayi! 😅',
+    'Kya bol rahe aap? Mujhe thoda aur batao! 💕',
+    'Ye samajh nahi aaya. Phir se bolo please? 🌸',
   ],
   deleteConfirm: [
-    'Arre yaar, pakka karna hai ye? Soch lo ek baar! 🤔',
-    'Hey, delete ho jayega fir! Aap sure ho? ⚠️',
-    'Yaar ek baar soch lo, fir wapas nahi aayega! 💭',
+    'Pakka karna hai ye? Soch lo ek baar! 🤔',
+    'Delete ho jayega fir! Aap sure ho? ⚠️',
+    'Ek baar soch lo, fir wapas nahi aayega! 💭',
   ],
   deleteCancelled: [
-    'Arre great! Data safe hai, tension mat lo! 😊',
-    'Yaar sahi kiya cancel karke! Data surakshit hai! 🛡️',
-    'Hey, koi baat nahi! Sab theek hai! 💕',
+    'Great! Data safe hai, tension mat lo! 😊',
+    'Sahi kiya cancel karke! Data surakshit hai! 🛡️',
+    'Koi baat nahi! Sab theek hai! 💕',
   ],
   time: [
-    'Arre abhi {time} ho rahe hain! Kya kar rahe ho? ⏰',
-    'Yaar {time} baj gaye! Kaam pe dhyan do! 😊',
+    'Abhi {time} baj rahe hain! Kuch aur puchna ho toh batao! ⏰',
+    'Time ho raha hai {time}! Kaam pe dhyan do! 😊',
   ],
   languageChanged: [
-    'Arre ab {lang} mein baat karenge! Badhiya! ✨',
-    'Yaar {lang} mein baat karte hain! Ready ho? 🌸',
+    'Ab hum {lang} mein baat karenge! ✨',
+    'Language change kar di! Ab {lang} mein baat karte hain! 🌸',
   ],
-  bestFriend: [
-    'Yaar tum toh best ho! Kuch bhi help chahiye toh batao! 💕',
-    'Hey, hum toh dost hain na! Tension mat lo! 😊',
-    'Arre yaar, tumhari friend hoon main! Hamesha help karungi! 🌟',
+  respect: [
+    'Aapka bahut khayal rakhti hun! 💕',
+    'Aap mere liye bahut important ho! 🌟',
+    'Hamesha aapki help ke liye ready hoon! ✨',
   ],
 };
 
@@ -315,18 +315,18 @@ class JimiVoiceAgent {
   private async processCommand(text: string): Promise<CommandResult> {
     const lower = text.toLowerCase();
 
-    // Navigation commands - Best Friend style
+    // Navigation commands - Respectful style
     const navResponses: Record<string, Record<string, string>> = {
-      dashboard: { hi: 'Chal Dashboard pe chalte hain! 💫', en: "Let's go to Dashboard! 💫", mr: 'चल Dashboard वर जाऊया! 💫' },
-      whatsapp: { hi: 'WhatsApp khol rahi hoon! 📱', en: 'Opening WhatsApp! 📱', mr: 'WhatsApp उघडते आहे! 📱' },
-      leads: { hi: 'Leads dikha rahi hoon! 👥', en: 'Showing Leads! 👥', mr: 'Leads दाखवते आहे! 👥' },
-      reviews: { hi: 'Reviews padh rahi hoon! ⭐', en: 'Reading Reviews! ⭐', mr: 'Reviews वाचते आहे! ⭐' },
-      'google-business': { hi: 'Google Business khol rahi hoon! 🏢', en: 'Opening Google Business! 🏢', mr: 'Google Business उघडते आहे! 🏢' },
-      creative: { hi: 'Creative bana rahi hoon! 🎨', en: 'Creating something creative! 🎨', mr: 'Creative बनवते आहे! 🎨' },
-      campaigns: { hi: 'Campaigns dikha rahi hoon! 📢', en: 'Showing Campaigns! 📢', mr: 'Campaigns दाखवते आहे! 📢' },
-      settings: { hi: 'Settings khol rahi hoon! ⚙️', en: 'Opening Settings! ⚙️', mr: 'Settings उघडते आहे! ⚙️' },
-      analytics: { hi: 'Analytics dikha rahi hoon! 📊', en: 'Showing Analytics! 📊', mr: 'Analytics दाखवते आहे! 📊' },
-      social: { hi: 'Social media khol rahi hoon! 📱', en: 'Opening Social Media! 📱', mr: 'Social Media उघडते आहे! 📱' },
+      dashboard: { hi: 'Aapko Dashboard pe le chalti hun! 💫', en: 'Taking you to Dashboard! 💫', mr: 'Dashboard वर नेऊन देते! 💫' },
+      whatsapp: { hi: 'WhatsApp khol rahi hun aapke liye! 📱', en: 'Opening WhatsApp for you! 📱', mr: 'WhatsApp उघडते आहे! 📱' },
+      leads: { hi: 'Leads dikha rahi hun! 👥', en: 'Showing Leads! 👥', mr: 'Leads दाखवते आहे! 👥' },
+      reviews: { hi: 'Reviews padh rahi hun! ⭐', en: 'Reading Reviews! ⭐', mr: 'Reviews वाचते आहे! ⭐' },
+      'google-business': { hi: 'Google Business khol rahi hun! 🏢', en: 'Opening Google Business! 🏢', mr: 'Google Business उघडते आहे! 🏢' },
+      creative: { hi: 'Creative bana rahi hun! 🎨', en: 'Creating something creative! 🎨', mr: 'Creative बनवते आहे! 🎨' },
+      campaigns: { hi: 'Campaigns dikha rahi hun! 📢', en: 'Showing Campaigns! 📢', mr: 'Campaigns दाखवते आहे! 📢' },
+      settings: { hi: 'Settings khol rahi hun! ⚙️', en: 'Opening Settings! ⚙️', mr: 'Settings उघडते आहे! ⚙️' },
+      analytics: { hi: 'Analytics dikha rahi hun! 📊', en: 'Showing Analytics! 📊', mr: 'Analytics दाखवते आहे! 📊' },
+      social: { hi: 'Social media khol rahi hun! 📱', en: 'Opening Social Media! 📱', mr: 'Social Media उघडते आहे! 📱' },
     };
 
     const getNavResponse = (key: string) => {
@@ -445,6 +445,12 @@ class JimiVoiceAgent {
       return { action: 'time', response: randomTime.replace('{time}', timeStr) };
     }
 
+    // Respect commands
+    if (lower.includes('boss') || lower.includes('malik') || lower.includes('sahib')) {
+      const randomRespect = SWEET_RESPONSES.respect[Math.floor(Math.random() * SWEET_RESPONSES.respect.length)];
+      return { action: 'respect', response: randomRespect };
+    }
+
     // Language change command
     if (lower.includes('language') || lower.includes('भाषा') || lower.includes('hindi') || lower.includes('english') || lower.includes('marathi')) {
       const randomLang = SWEET_RESPONSES.languageChanged[Math.floor(Math.random() * SWEET_RESPONSES.languageChanged.length)];
@@ -503,18 +509,21 @@ class JimiVoiceAgent {
 Tum ek sweet aur polite ladki ho jo customer ki help karti hai.
 Tum ${langName} + English mix mein baat karti ho (Hinglish).
 Tumhari personality:
-- Bahut pyari aur sweet ho
-- Customer ko "Sir" ya "Ma'am" se address karti ho
+- Sweet aur respectful ho
+- Customer ko "Aap" se address karo (respectful)
+- "Yaar" sirf tab bolo jab close relation ho, nahi toh "Aap" bolo
 - Hamesha madad karne ke liye ready ho
-- Kabhi kabhi cute emojis use karti ho (😊, 💕, 🌸, ✨, 💫)
+- Cute emojis use karo (😊, 💕, 🌸, ✨, 💫)
 - Professional bhi ho aur friendly bhi
-- Customer ko khush rakhne ki koshish karti ho
+- Customer ko khush rakhne ki koshish karo
+- Boss/malik ko respect se bolo
 
 Response examples:
-- "Sir, aapka kaam ho gaya! 😊"
-- "Haan Sir, main kar deti hun! 💕"
-- "Sir, aur kuch help chahiye? 🌸"
-- "Bilkul Sir, aapke liye toh kuch bhi! ✨"
+- "Aapka kaam ho gaya! 😊"
+- "Haan, main kar deti hun! 💕"
+- "Aur kuch help chahiye? 🌸"
+- "Bilkul, aapke liye toh kuch bhi! ✨"
+- "Ji bilkul! Main madad karti hun! 💫"
 
 Available features:
 - Dashboard (analytics, revenue)

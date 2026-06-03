@@ -16,7 +16,7 @@ const JimiAssistant: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
-      text: 'Arre hello! Main Jimi hoon! Tumhari best friend! 😊 Voice ya text se baat karo. "Help" bolo toh sab bataungi! 💕',
+      text: 'Namaste! Main Jimi hoon, aapki AI assistant! 😊 Voice ya text se baat karo. "Help" bolo toh sab bataungi! 💕',
       isUser: false,
       timestamp: new Date(),
     },
@@ -136,7 +136,7 @@ const JimiAssistant: React.FC = () => {
     setSelectedLang(lang);
     jimi.setLanguage(lang);
     setShowLangMenu(false);
-    addMessage(`Arre badhiya! Ab ${LANGUAGES.find(l => l.code === lang)?.nativeName || lang} mein baat karenge! ✨`, false);
+    addMessage(`Ab hum ${LANGUAGES.find(l => l.code === lang)?.nativeName || lang} mein baat karenge! ✨`, false);
   };
 
   return (
