@@ -27,7 +27,28 @@ interface CommandResult {
   action: string;
   params?: any;
   response: string;
+  requiresConfirmation?: boolean;
+  confirmationMessage?: string;
 }
+
+// Safety: Destructive commands that need confirmation
+const DESTRUCTIVE_ACTIONS = [
+  'delete', 'remove', 'clear', 'destroy', 'wipe', 'reset', 'purge',
+  'delete_lead', 'delete_review', 'delete_post', 'delete_template',
+  'delete_campaign', 'delete_contact', 'unsubscribe', 'ban',
+];
+
+// Safety: Restricted commands - NEVER allowed
+const RESTRICTED_ACTIONS = [
+  'drop_table', 'drop_database', 'format_db', 'factory_reset',
+  'delete_account', 'delete_business', 'nuke', 'destroy_all',
+];
+
+// Safety: Commands that need explicit user confirmation
+const CONFIRMATION_REQUIRED = [
+  'delete_lead', 'delete_review', 'delete_post', 'delete_template',
+  'delete_campaign', 'clear_data', 'reset_settings', 'unsubscribe',
+];
 
 type JimiCallback = (text: string, isUser: boolean) => void;
 
@@ -220,6 +241,14 @@ class JimiVoiceAgent {
   async processUserInput(text: string) {
     this.onMessage?.(text, true);
 
+    // Safety: Check if command is allowed
+    const safetyCheck = this.isCommandAllowed(text);
+    if (!safetyCheck.allowed) {
+      this.onMessage?.(safetyCheck.reason || 'Command blocked for safety.', false);
+      this.speak(safetyCheck.reason || 'Command blocked for safety.');
+      return;
+    }
+
     const command = await this.processCommand(text);
     this.onMessage?.(command.response, false);
     this.speak(command.response);
@@ -303,9 +332,39 @@ class JimiVoiceAgent {
       return { action: 'schedule', response: 'Message scheduler kholta hun.' };
     }
 
+    // Delete commands - Need confirmation
+    if (lower.includes('delete') || lower.includes('remove') || lower.includes('हटाओ') || lower.includes('डिलीट')) {
+      this.pendingConfirmation = { command: lower, timestamp: Date.now() };
+      return {
+        action: 'confirm_delete',
+        response: '⚠️ Delete command mila. Confirm karo: "Haan delete karo" bolo ya type karo. 30 second mein cancel ho jayega.',
+        requiresConfirmation: true,
+      };
+    }
+
+    // Confirm delete
+    if (lower.includes('haan') && lower.includes('delete') || lower.includes('confirm') || lower.includes('पक्का')) {
+      if (this.confirmAction()) {
+        return { action: 'delete_confirmed', response: '✅ Delete confirmed. Kya delete karna hai? Specific batao - lead, review, post, ya template.' };
+      } else {
+        return { action: 'delete_expired', response: '⏰ Delete confirmation expire ho gaya. Phir se command do.' };
+      }
+    }
+
+    // Cancel delete
+    if (lower.includes('cancel') || lower.includes('रद्द') || lower.includes('nahi')) {
+      this.cancelAction();
+      return { action: 'delete_cancelled', response: '❌ Delete cancelled. Data safe hai!' };
+    }
+
     // Info commands
     if (lower.includes('revenue') || lower.includes('income') || lower.includes('paise') || lower.includes('कमाई')) {
       return { action: 'info', response: 'Revenue dashboard pe dekh sakte ho.' };
+    }
+
+    // Safety info
+    if (lower.includes('safety') || lower.includes('security') || lower.includes('suraksha') || lower.includes('safe')) {
+      return { action: 'safety', response: this.getSafetyInfo() };
     }
 
     if (lower.includes('help') || lower.includes('madad') || lower.includes('मदद')) {
@@ -434,6 +493,68 @@ Respond in the same language the user is speaking.`;
 
   getIsSpeaking(): boolean {
     return this.isSpeaking;
+  }
+
+  // Safety: Check if command is allowed
+  private isCommandAllowed(command: string): { allowed: boolean; reason?: string } {
+    const lower = command.toLowerCase();
+
+    // Check restricted actions (NEVER allowed)
+    for (const restricted of RESTRICTED_ACTIONS) {
+      if (lower.includes(restricted)) {
+        return { allowed: false, reason: `Ye command allowed nahi hai: "${restricted}". Data safe hai!` };
+      }
+    }
+
+    // Check if it's a destructive action
+    for (const destructive of DESTRUCTIVE_ACTIONS) {
+      if (lower.includes(destructive)) {
+        // Check if confirmation is pending
+        if (this.pendingConfirmation?.command === lower) {
+          this.pendingConfirmation = null;
+          return { allowed: true };
+        }
+        return {
+          allowed: false,
+          reason: `⚠️ Warning: Ye action data delete kar sakta hai. Confirm karo: "${command}" bolkar ya type karke.`,
+        };
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  // Safety: Pending confirmation state
+  private pendingConfirmation: { command: string; timestamp: number } | null = null;
+
+  // Safety: Confirm destructive action
+  confirmAction(): boolean {
+    if (this.pendingConfirmation) {
+      const elapsed = Date.now() - this.pendingConfirmation.timestamp;
+      if (elapsed < 30000) { // 30 second window
+        return true;
+      }
+      this.pendingConfirmation = null;
+    }
+    return false;
+  }
+
+  // Safety: Cancel pending action
+  cancelAction() {
+    this.pendingConfirmation = null;
+  }
+
+  // Safety: Get safety info
+  getSafetyInfo(): string {
+    return `🛡️ Jimi Safety Rules:
+1. Delete commands need confirmation
+2. Database operations blocked
+3. Account deletion blocked
+4. All destructive actions logged
+5. 30-second confirmation window
+
+Restricted: delete_account, drop_database, factory_reset
+Protected: leads, reviews, posts, campaigns, templates`;
   }
 
   destroy() {

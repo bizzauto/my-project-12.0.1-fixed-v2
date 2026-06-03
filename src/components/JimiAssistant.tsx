@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, MessageCircle, X, Send, Volume2, VolumeX, Bot, User, Globe } from 'lucide-react';
+import { Mic, MicOff, MessageCircle, X, Send, Volume2, VolumeX, Bot, User, Globe, Shield } from 'lucide-react';
 import { jimi, LANGUAGES, Language } from '../services/jimi.service';
 import { useNavigate } from 'react-router-dom';
 
@@ -178,9 +178,12 @@ const JimiAssistant: React.FC = () => {
                 <Bot size={24} className="text-white" />
               </div>
               <div>
-                <h3 className="text-white font-semibold">Jimi</h3>
+                <h3 className="text-white font-semibold flex items-center gap-2">
+                  Jimi
+                  <Shield size={14} className="text-green-300" title="Protected Mode" />
+                </h3>
                 <p className="text-white/80 text-xs">
-                  {isListening ? '🎤 Listening...' : isTyping ? '🧠 Thinking...' : 'Online • Ready'}
+                  {isListening ? '🎤 Listening...' : isTyping ? '🧠 Thinking...' : '🛡️ Protected • Ready'}
                 </p>
               </div>
             </div>
@@ -298,8 +301,8 @@ const JimiAssistant: React.FC = () => {
               </button>
             </div>
             <div className="mt-2 flex items-center justify-center gap-1 text-xs text-gray-400">
-              <Mic size={12} />
-              <span>Click mic to speak voice commands</span>
+              <Shield size={10} className="text-green-500" />
+              <span>Protected Mode • Delete requires confirmation</span>
             </div>
           </div>
         </div>
