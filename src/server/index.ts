@@ -83,11 +83,14 @@ import { securityHeaders, apiSecurityHeaders } from './middleware/security.js';
 import { validateCSRF } from './middleware/csrf.js';
 import { sanitizeInput } from './middleware/sanitize.js';
 import { apiVersioning } from './middleware/api-versioning.js';
+import { requestCounting } from './middleware/request-counting.js';
 import { cacheResponse, getCacheStats, invalidateCache } from './middleware/cache.js';
 import adminAnalyticsRoutes from './routes/admin-analytics.js';
-import monitoringRoutes, { incrementCounter, setGauge, getGauge } from './routes/monitoring.js';
+import monitoringRoutes from './routes/monitoring.js';
 import dataExportRoutes from './routes/data-export.js';
 import v2Routes from './routes/v2/index.js';
+import { auditMiddleware } from './services/audit.service.js';
+import dbPoolRoutes from './routes/db-pool.js';
 
 dotenv.config();
 
@@ -99,11 +102,17 @@ const HOST = process.env.HOST || '0.0.0.0';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Initialize Prisma with optimized connection pool
+// connection_limit defaults to num_cpus * 2 + 1; pool_timeout controls wait time
+const POOL_SIZE = parseInt(process.env.DB_POOL_SIZE || '0');
+const poolUrl = POOL_SIZE > 0
+  ? `${process.env.DATABASE_URL}${process.env.DATABASE_URL?.includes('?') ? '&' : '?'}connection_limit=${POOL_SIZE}&pool_timeout=10`
+  : process.env.DATABASE_URL;
+
 export const prisma = new PrismaClient({
   log: NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   datasources: {
     db: {
-      url: process.env.DATABASE_URL,
+      url: poolUrl,
     },
   },
 });
@@ -193,46 +202,10 @@ app.use('/api', (req, res, next) => {
 });
 
 // Request counting middleware — feeds /api/metrics with real traffic data
-app.use('/api', (req, res, next) => {
-  // Skip health checks and metrics themselves
-  if (req.path.startsWith('/health') || req.path === '/metrics') {
-    return next();
-  }
+app.use('/api', requestCounting);
 
-  // Normalize route: strip query params and IDs for grouping
-  // e.g., /contacts/abc123 → /contacts, /deals/stats → /deals/stats
-  const basePath = '/' + (req.path.split('/').filter(Boolean)[0] || 'unknown');
-  const method = req.method;
-
-  // Increment request counter: method + route
-  incrementCounter(`${method}:${basePath}`);
-
-  // Track response time
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    const status = res.statusCode;
-
-    // Count by status class (2xx, 4xx, 5xx)
-    const statusClass = `${Math.floor(status / 100)}xx`;
-    incrementCounter(`status:${statusClass}`);
-
-    // Count errors specifically
-    if (status >= 400) {
-      incrementCounter(`errors:${basePath}`);
-    }
-
-    // Update response time gauge (rolling average)
-    const currentAvg = getGauge(`${basePath}_avg_ms`);
-    const currentCount = getGauge(`${basePath}_count`);
-    const newCount = currentCount + 1;
-    const newAvg = currentAvg + (duration - currentAvg) / newCount;
-    setGauge(`${basePath}_avg_ms`, Math.round(newAvg));
-    setGauge(`${basePath}_count`, newCount);
-  });
-
-  next();
-});
+// Audit log middleware — automatically logs state-changing API requests
+app.use('/api', auditMiddleware);
 
 // API Security Headers
 app.use('/api', apiSecurityHeaders);
@@ -372,6 +345,9 @@ app.use('/api/data-export', dataExportRoutes);
 
 // Phase 4: v2 API Routes (breaking changes with versioning)
 app.use('/api/v2', v2Routes);
+
+// Database connection pool monitoring
+app.use('/api/db-pool', dbPoolRoutes);
 
 // Test endpoints (development only)
 if (NODE_ENV !== 'production') {

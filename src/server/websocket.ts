@@ -2,6 +2,7 @@ import { Server as SocketServer, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { default as redisClient } from './services/redis.service.js';
+import { checkConnectionLimit, checkMessageLimit, cleanupSocketLimits, startRateLimitCleanup } from './middleware/websocket-rate-limit.js';
 
 export function setupWebSocket(httpServer: HttpServer) {
   const io = new SocketServer(httpServer, {
@@ -12,6 +13,19 @@ export function setupWebSocket(httpServer: HttpServer) {
     },
     pingTimeout: 60000,
     pingInterval: 25000,
+  });
+
+  // Start periodic rate limit cleanup
+  startRateLimitCleanup();
+
+  // Connection rate limiting — prevent IP-based flooding
+  io.use(async (socket: Socket, next) => {
+    const ip = socket.handshake.address;
+    const connCheck = checkConnectionLimit(ip);
+    if (!connCheck.allowed) {
+      return next(new Error(`Rate limit exceeded. Retry after ${Math.ceil(connCheck.retryAfterMs / 1000)}s.`));
+    }
+    next();
   });
 
   // Authentication middleware
@@ -56,6 +70,11 @@ export function setupWebSocket(httpServer: HttpServer) {
 
     // Handle real-time messaging
     socket.on('send:message', async (data) => {
+      const rateCheck = checkMessageLimit(socket.id, socket.userId);
+      if (!rateCheck.allowed) {
+        socket.emit('rate_limited', { retryAfterMs: rateCheck.retryAfterMs, event: 'send:message' });
+        return;
+      }
       const { contactId, message, type } = data;
 
       // Emit to relevant room
@@ -70,6 +89,8 @@ export function setupWebSocket(httpServer: HttpServer) {
 
     // Handle typing indicator
     socket.on('typing:start', (data) => {
+      const rateCheck = checkMessageLimit(socket.id, socket.userId);
+      if (!rateCheck.allowed) return;
       socket.to(`business:${socket.businessId}`).emit('user:typing', {
         userId: socket.userId,
         contactId: data.contactId,
@@ -77,6 +98,8 @@ export function setupWebSocket(httpServer: HttpServer) {
     });
 
     socket.on('typing:stop', (data) => {
+      const rateCheck = checkMessageLimit(socket.id, socket.userId);
+      if (!rateCheck.allowed) return;
       socket.to(`business:${socket.businessId}`).emit('user:stopped', {
         userId: socket.userId,
         contactId: data.contactId,
@@ -85,6 +108,8 @@ export function setupWebSocket(httpServer: HttpServer) {
 
     // Handle order status updates
     socket.on('order:update', async (data) => {
+      const rateCheck = checkMessageLimit(socket.id, socket.userId);
+      if (!rateCheck.allowed) return;
       const { orderId, status } = data;
       io.to(`business:${socket.businessId}`).emit('order:changed', {
         orderId,
@@ -96,6 +121,8 @@ export function setupWebSocket(httpServer: HttpServer) {
 
     // Handle CRM lead updates
     socket.on('lead:update', async (data) => {
+      const rateCheck = checkMessageLimit(socket.id, socket.userId);
+      if (!rateCheck.allowed) return;
       const { contactId, stage, dealValue } = data;
       io.to(`business:${socket.businessId}`).emit('lead:changed', {
         contactId,
@@ -107,6 +134,8 @@ export function setupWebSocket(httpServer: HttpServer) {
 
     // Handle appointment notifications
     socket.on('appointment:reminder', (data) => {
+      const rateCheck = checkMessageLimit(socket.id, socket.userId);
+      if (!rateCheck.allowed) return;
       io.to(`business:${socket.businessId}`).emit('appointment:alert', {
         ...data,
         notifyAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min before
@@ -116,6 +145,7 @@ export function setupWebSocket(httpServer: HttpServer) {
     // Handle disconnect
     socket.on('disconnect', async () => {
       console.log(`🔌 User disconnected: ${socket.userId}`);
+      cleanupSocketLimits(socket.id);
       if (redisClient) {
         await redisClient?.hDel(`socket:${socket.userId}`, 'socketId');
       }
