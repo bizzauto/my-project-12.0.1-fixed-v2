@@ -494,11 +494,190 @@ const VoiceCallPage: React.FC = () => {
                 <PhoneOff size={20} />
               </button>
             </div>
-          </div>
+</div>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Jimi Voice Assistant for Calls */}
+      <JimiCallAssistant 
+        onCallRequest={(number, name) => {
+          setDialNumber(number);
+          setShowDialer(true);
+        }}
+        contacts={calls}
+      />
     </div>
   );
 };
 
 export default VoiceCallPage;
+
+// Jimi Call Assistant Component
+interface JimiCallAssistantProps {
+  onCallRequest: (number: string, name?: string) => void;
+  contacts: CallRecord[];
+}
+
+const JimiCallAssistant: React.FC<JimiCallAssistantProps> = ({ onCallRequest, contacts }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [message, setMessage] = useState('');
+  const [chat, setChat] = useState<{ text: string; isUser: boolean }[]>([
+    { text: 'Namaste! Main Jimi hun, aapki voice call assistant! 🎧\n\nBolo kya karna hai:\n• "Call karo Rahul ko"\n• "Contact list dikhao"\n• "Save karo Amit 9876543210"', isUser: false }
+  ]);
+  const recognitionRef = useRef<any>(null);
+
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      addMessage('Speech recognition not supported. Use Chrome!', false);
+      return;
+    }
+
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = 'hi-IN';
+
+    recognitionRef.current.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      addMessage(transcript, true);
+      processCommand(transcript);
+    };
+
+    recognitionRef.current.onend = () => setIsListening(false);
+    recognitionRef.current.onerror = () => setIsListening(false);
+
+    recognitionRef.current.start();
+    setIsListening(true);
+  };
+
+  const addMessage = (text: string, isUser: boolean) => {
+    setChat(prev => [...prev, { text, isUser }]);
+  };
+
+  const processCommand = (text: string) => {
+    const lower = text.toLowerCase();
+
+    // Call command
+    if (lower.includes('call') || lower.includes('phone') || lower.includes('dial')) {
+      // Find contact by name
+      const nameMatch = text.match(/(?:call|phone|dial|karo)\s+(?:kar)?\s*(.+)/i);
+      if (nameMatch) {
+        const searchName = nameMatch[1].trim().toLowerCase();
+        const contact = contacts.find(c => 
+          c.name.toLowerCase().includes(searchName) || 
+          searchName.includes(c.name.toLowerCase())
+        );
+        if (contact) {
+          addMessage(`📞 ${contact.name} ko call kar rahi hun!\nNumber: ${contact.phone}`, false);
+          onCallRequest(contact.phone, contact.name);
+        } else {
+          addMessage(`🤔 "${searchName}" ka number nahi mila.\nSave karo: "Save karo ${searchName} [number]"`, false);
+        }
+      } else {
+        addMessage('📞 Bolo kaunsa contact call karna hai?\nExample: "Call karo Rahul ko"', false);
+      }
+    }
+    // Save number
+    else if ((lower.includes('save') || lower.includes('add')) && lower.includes('number')) {
+      const match = text.match(/(?:save|add|store)\s+(?:kar)?\s*([A-Za-z\s]+?)\s+(\d{10,})/i);
+      if (match) {
+        const name = match[1].trim();
+        const number = match[2];
+        addMessage(`✅ Save ho gaya!\n${name}: ${number}\nAb "Call karo ${name} ko" bolo!`, false);
+      } else {
+        addMessage('📝 Number save karne ke liye:\n"Save karo Rahul 9876543210"', false);
+      }
+    }
+    // Contact list
+    else if (lower.includes('contact') || lower.includes('list') || lower.includes('contacts')) {
+      if (contacts.length > 0) {
+        const list = contacts.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} - ${c.phone}`).join('\n');
+        addMessage(`📋 Recent Contacts:\n${list}\n\nCall karne ke liye bolo: "Call karo [name] ko"`, false);
+      } else {
+        addMessage('📋 Abhi koi contacts nahi hain!', false);
+      }
+    }
+    // Help
+    else if (lower.includes('help')) {
+      addMessage('🎧 Jimi Call Assistant Commands:\n\n• "Call karo Rahul ko" - Contact ko call karo\n• "Save karo Amit 9876543210" - Number save karo\n• "Contact list dikhao" - Contacts dekho\n• "Call history dikhao" - Recent calls', false);
+    }
+    // Unknown
+    else {
+      addMessage('🤔 Samajh nahi aaya. "Help" bolo commands sunne ke liye!', false);
+    }
+  };
+
+  const handleSend = () => {
+    if (message.trim()) {
+      addMessage(message, true);
+      processCommand(message);
+      setMessage('');
+    }
+  };
+
+  return (
+    <>
+      {/* Floating Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all ${
+          isOpen ? 'bg-gray-600 hover:bg-gray-700' : isListening ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
+        }`}
+      >
+        {isOpen ? <X size={24} className="text-white" /> : isListening ? <MicOff size={24} className="text-white" /> : <Phone size={24} className="text-white" />}
+      </button>
+
+      {/* Chat Panel */}
+      {isOpen && (
+        <div className="fixed bottom-36 right-6 z-50 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-pink-500 to-purple-600 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">👩</span>
+              <div>
+                <p className="text-white font-semibold text-sm">Jimi - Call Assistant</p>
+                <p className="text-white/70 text-xs">{isListening ? '🎤 Listening...' : 'Ready to help'}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="h-64 overflow-y-auto p-3 space-y-2 bg-gray-50 dark:bg-gray-900">
+            {chat.map((c, i) => (
+              <div key={i} className={`flex ${c.isUser ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${
+                  c.isUser ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-sm'
+                }`}>
+                  {c.text}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div className="flex gap-2">
+              <button
+                onClick={startListening}
+                className={`p-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse text-white' : 'bg-pink-100 text-pink-600'}`}
+              >
+                {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+              <input
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSend()}
+                placeholder="Type or speak..."
+                className="flex-1 px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white"
+              />
+              <button onClick={handleSend} className="p-2 bg-blue-600 text-white rounded-lg">
+                <Send size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
