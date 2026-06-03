@@ -494,9 +494,7 @@ const VoiceCallPage: React.FC = () => {
                 <PhoneOff size={20} />
               </button>
             </div>
-</div>
-            </div>
-          )}
+          </div>
         </div>
       )}
 

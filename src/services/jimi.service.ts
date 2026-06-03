@@ -151,7 +151,7 @@ const SWEET_RESPONSES = {
   let callHistory: { name: string; number: string; timestamp: Date; type: 'outgoing' | 'incoming' }[] = [];
 
   // Dograh API base URL
-  private dograhApiUrl = 'http://localhost:8000';
+  const dograhApiUrl = 'http://localhost:8000';
 
 interface CommandResult {
   action: string;

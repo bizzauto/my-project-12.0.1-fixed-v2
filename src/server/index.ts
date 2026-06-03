@@ -12,6 +12,25 @@ import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import winston from 'winston';
 import path from 'path';
+
+// Security imports
+import { 
+  globalRateLimiter, 
+  authRateLimiter, 
+  loginRateLimiter,
+  uploadRateLimiter,
+  speedLimiter,
+  aiApiRateLimiter 
+} from './middleware/rateLimiters.js';
+import { 
+  securityHeaders, 
+  additionalSecurityHeaders,
+  inputSanitizer 
+} from './middleware/security.js';
+import { 
+  ipBlockMiddleware,
+  ipWhitelist 
+} from './middleware/ipSecurity.js';
 import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
 import analyticsRoutes from './routes/analytics.js';
@@ -217,8 +236,18 @@ app.use('/api', (req, res, next) => {
 // Request timeout — prevent slow-client DoS
 app.use(requestTimeout());
 
+// NEW: IP Blocking & Rate Limiting Middlewares
+app.use(ipBlockMiddleware);
+app.use(speedLimiter);
+
 // Request counting middleware — feeds /api/metrics with real traffic data
 app.use('/api', requestCounting);
+
+// NEW: AI API Rate Limiter (stricter for expensive calls)
+app.use('/api/ai', aiApiRateLimiter);
+
+// NEW: Upload Rate Limiter
+app.use('/upload', uploadRateLimiter);
 
 // Audit log middleware — automatically logs state-changing API requests
 app.use('/api', auditMiddleware);
@@ -283,6 +312,8 @@ app.use('/api', (req, res, next) => {
 
 // Public store routes (no auth required)
 app.use('/api/store', storePublicRoutes);
+app.use('/api/auth', authRateLimiter);
+app.use('/api/auth/login', loginRateLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/analytics', analyticsRoutes);
