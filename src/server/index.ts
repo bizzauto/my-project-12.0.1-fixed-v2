@@ -93,6 +93,7 @@ import { auditMiddleware } from './services/audit.service.js';
 import dbPoolRoutes from './routes/db-pool.js';
 import auditRetentionRoutes from './routes/audit-retention.js';
 import { startSlowQueryLogger } from './middleware/slow-query-logger.js';
+import { requestTimeout } from './middleware/request-timeout.js';
 
 dotenv.config();
 
@@ -207,6 +208,9 @@ app.use('/api', (req, res, next) => {
   }
   next();
 });
+
+// Request timeout — prevent slow-client DoS
+app.use(requestTimeout());
 
 // Request counting middleware — feeds /api/metrics with real traffic data
 app.use('/api', requestCounting);
@@ -538,5 +542,6 @@ app.listen(Number(PORT), () => {
 // Export authenticate middleware for use in routes
 export { authenticate } from './middleware/auth.js';
 export { authenticateApiKey, hashApiKey, generateApiKey } from './middleware/api-key-auth.js';
+export { parsePagination, paginatedResponse } from './utils/pagination.js';
 
 export default app;

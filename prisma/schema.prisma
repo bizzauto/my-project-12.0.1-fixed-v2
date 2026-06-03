@@ -487,6 +487,7 @@ model Message {
   @@index([businessId])
   @@index([businessId, contactId])
   @@index([businessId, status])
+  @@index([businessId, createdAt])
   @@index([status])
   @@index([createdAt])
 }
@@ -575,6 +576,7 @@ model Campaign {
   @@index([businessId])
   @@index([status])
   @@index([scheduledAt])
+  @@index([businessId, status])
 }
 
 // ==================== APPOINTMENTS ====================
@@ -610,6 +612,8 @@ model Appointment {
   @@index([businessId])
   @@index([contactId])
   @@index([startTime])
+  @@index([businessId, status])
+  @@index([contactId, startTime])
 }
 
 // ==================== E-COMMERCE ====================
@@ -723,6 +727,10 @@ model Order {
 
   @@index([businessId])
   @@index([contactId])
+  @@index([businessId, status])
+  @@index([businessId, createdAt])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -1734,6 +1742,9 @@ model AuditLog {
   @@index([businessId])
   @@index([action])
   @@index([createdAt])
+  @@index([businessId, createdAt])
+  @@index([businessId, action])
+  @@index([businessId, entity])
 }
 
 // ==================== NOTIFICATIONS ====================
