@@ -16,7 +16,7 @@
  */
 
 import { Queue, Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
+
 import axios from 'axios';
 import crypto from 'crypto';
 import { prisma } from '../index.js';
@@ -68,12 +68,8 @@ const CONCURRENCY = 5;
 
 // ==================== REDIS CONNECTION ====================
 
-const redisConnection = new IORedis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || undefined,
-  maxRetriesPerRequest: null,
-});
+import { createRedisConnection } from '../utils/redis-connection.js';
+const redisConnection = createRedisConnection();
 
 // ==================== QUEUE ====================
 

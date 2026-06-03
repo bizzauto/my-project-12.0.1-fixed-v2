@@ -1,15 +1,10 @@
 import { Queue, Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
 import { prisma } from '../index.js';
 import { GBPAutoPostService } from '../services/gbp-auto-post.service.js';
+import { createRedisConnection } from '../utils/redis-connection.js';
 
 // Redis connection
-const redisConnection = new IORedis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || undefined,
-  maxRetriesPerRequest: null,
-});
+const redisConnection = createRedisConnection();
 
 // Queue for GBP auto-posts
 export const gbpAutoPostQueue = new Queue('gbp-auto-post', {

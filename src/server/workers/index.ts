@@ -1,5 +1,4 @@
 import { Queue, Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
 import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EmailService } from '../services/email.service.js';
 import { GoogleSheetsService } from '../services/google-sheets.service.js';
@@ -7,14 +6,10 @@ import { LeadCaptureService } from '../services/lead-capture.service.js';
 import { GBPAutoPostService } from '../services/gbp-auto-post.service.js';
 import { webhookDeliveryQueue, shutdownWebhookWorker } from '../services/webhook-retry.service.js';
 import { prisma } from '../index.js';
+import { createRedisConnection } from '../utils/redis-connection.js';
 
 // Redis connection
-const redisConnection = new IORedis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || undefined,
-  maxRetriesPerRequest: null,
-});
+const redisConnection = createRedisConnection();
 
 // Queues
 export const queues = {
