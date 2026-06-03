@@ -94,6 +94,10 @@ import dbPoolRoutes from './routes/db-pool.js';
 import auditRetentionRoutes from './routes/audit-retention.js';
 import { startSlowQueryLogger } from './middleware/slow-query-logger.js';
 import { requestTimeout } from './middleware/request-timeout.js';
+import { circuitBreaker } from './services/circuit-breaker.service.js';
+import { shutdownWebhookWorker } from './services/webhook-retry.service.js';
+import { startAuditPruneCron, stopAuditPruneCron } from './services/audit-prune.service.js';
+import adminInfrastructureRoutes from './routes/admin-infrastructure.js';
 
 dotenv.config();
 
@@ -351,6 +355,9 @@ app.use('/api/admin', adminAnalyticsRoutes);
 // Audit log retention management (SUPER_ADMIN only)
 app.use('/api/admin/audit-retention', auditRetentionRoutes);
 
+// Enterprise infrastructure management (SUPER_ADMIN only)
+app.use('/api/admin/infrastructure', adminInfrastructureRoutes);
+
 // Phase 3: Monitoring & Observability (no auth — for LB/monitoring tools)
 app.use('/api', monitoringRoutes);
 
@@ -500,6 +507,9 @@ process.on('unhandledRejection', (error: any) => {
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
   try {
+    stopAuditPruneCron();
+    circuitBreaker.destroy();
+    await shutdownWebhookWorker();
     await prisma.$disconnect();
   } catch (e) {
     // ignore disconnect errors during shutdown
@@ -512,6 +522,9 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
   try {
+    stopAuditPruneCron();
+    circuitBreaker.destroy();
+    await shutdownWebhookWorker();
     await prisma.$disconnect();
   } catch (e) {
     // ignore
@@ -531,6 +544,9 @@ process.on('uncaughtException', async (error) => {
 
 // Start slow query logger
 startSlowQueryLogger();
+
+// Start audit log auto-prune cron
+startAuditPruneCron();
 
 // Start server
 console.log(`Starting server on ${HOST}:${PORT} in ${NODE_ENV} mode`);

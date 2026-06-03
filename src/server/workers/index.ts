@@ -5,6 +5,7 @@ import { EmailService } from '../services/email.service.js';
 import { GoogleSheetsService } from '../services/google-sheets.service.js';
 import { LeadCaptureService } from '../services/lead-capture.service.js';
 import { GBPAutoPostService } from '../services/gbp-auto-post.service.js';
+import { webhookDeliveryQueue, shutdownWebhookWorker } from '../services/webhook-retry.service.js';
 import { prisma } from '../index.js';
 
 // Redis connection
@@ -24,6 +25,7 @@ export const queues = {
   leadProcessing: new Queue('lead-processing', { connection: redisConnection }),
   campaignScheduler: new Queue('campaign-scheduler', { connection: redisConnection }),
   gbpAutoPost: new Queue('gbp-auto-post', { connection: redisConnection }),
+  webhookRetry: webhookDeliveryQueue,
 };
 
 /**
@@ -737,6 +739,7 @@ export async function shutdownWorkers() {
     leadProcessingWorker.close(),
     campaignSchedulerWorker.close(),
     gbpAutoPostWorker.close(),
+    shutdownWebhookWorker(),
   ]);
 
   await redisConnection.quit();
