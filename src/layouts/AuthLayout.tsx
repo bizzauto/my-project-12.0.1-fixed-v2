@@ -14,6 +14,7 @@ import { useThemeStore } from '../lib/themeStore';
 import { MobileApp } from '../lib/capacitor-app';
 import { useViewport } from '../hooks/useViewport';
 import NotificationCenter from '../components/NotificationCenter';
+import JimiAssistant from '../components/JimiAssistant';
 
 interface MenuItem {
   id: string;
@@ -483,6 +484,9 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           </div>
         </div>
       </div>
+
+      {/* ===== JIMI AI ASSISTANT ===== */}
+      <JimiAssistant />
 
       {/* ===== MOBILE BOTTOM NAVIGATION (visible only on mobile) ===== */}
       <div className="md:hidden mobile-bottom-nav">
