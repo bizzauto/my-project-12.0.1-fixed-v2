@@ -383,6 +383,13 @@ router.post('/google', socialAuthLimiter, async (req: Request, res: Response) =>
       role: user.role,
     });
 
+    const refreshToken = generateRefreshToken({
+      id: user.id,
+      email: user.email,
+      businessId: user.businessId,
+      role: user.role,
+    });
+
     res.status(201).json({
       success: true,
       data: {
@@ -401,6 +408,7 @@ router.post('/google', socialAuthLimiter, async (req: Request, res: Response) =>
           plan: business.plan,
         },
         token,
+        refreshToken,
       },
     });
   } catch (error: any) {
