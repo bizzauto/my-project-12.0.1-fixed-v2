@@ -24,9 +24,8 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY prisma ./prisma/
-RUN npm install --omit=dev --no-audit --no-fund --no-fund && npx prisma generate && \
-    find /app/node_modules -type d -name "test" -o -name "tests" -o -name "__tests__" -o -name "docs" -o -name "example" -o -name "examples" | xargs rm -rf 2>/dev/null; \
-    find /app/node_modules -name "*.md" -o -name "*.txt" -o -name "LICENSE*" -o -name "CHANGELOG*" -o -name ".eslintrc*" -o -name ".prettierrc*" -o -name "tsconfig*.json" | xargs rm -f 2>/dev/null; \
+RUN npm install --omit=dev --no-audit --no-fund && npx prisma generate && \
+    find /app/node_modules -type d -name "test" -o -name "tests" -o -name "__tests__" | xargs rm -rf 2>/dev/null; \
     npm cache clean --force && rm -rf /root/.npm
 
 COPY --from=builder /app/dist ./dist
