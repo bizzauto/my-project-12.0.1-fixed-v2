@@ -1208,7 +1208,7 @@ class JimiVoiceAgent {
     }
 
     // ==================== HELP ====================
-    if (lower.includes('help') || lower.includes('madad') || lower.includes('मदद') || lower.includes('kya kar sakti') || lower.includes('features')) {
+    if (lower.includes('help') || lower.includes('madad') || lower.includes('मदद') || lower.includes('kya kar sakti') || lower.includes('features') || lower === 'jimi' || lower === 'jimmy' || lower === 'जिमी') {
       const randomHelp = this.currentResponses.help[Math.floor(Math.random() * this.currentResponses.help.length)];
       return { action: 'help', response: randomHelp };
     }
