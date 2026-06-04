@@ -40,6 +40,7 @@ import businessRoutes from './routes/business.js';
 import campaignsRoutes from './routes/campaigns.js';
 import chatbotRoutes from './routes/chatbot.js';
 import contactsRoutes from './routes/contacts.js';
+import customerDataSecurityRoutes from './routes/customer-data-security.routes.js';
 import documentsRoutes from './routes/documents.js';
 import ecommerceRoutes from './routes/ecommerce.js';
 import emailRoutes from './routes/email.js';
@@ -109,6 +110,7 @@ import adminAnalyticsRoutes from './routes/admin-analytics.js';
 import monitoringRoutes from './routes/monitoring.js';
 import dataExportRoutes from './routes/data-export.js';
 import v2Routes from './routes/v2/index.js';
+import { piiMaskingMiddleware, sanitizeRequestBody } from './middleware/pii-masking.js';
 import { auditMiddleware } from './services/audit.service.js';
 import dbPoolRoutes from './routes/db-pool.js';
 import auditRetentionRoutes from './routes/audit-retention.js';
@@ -214,6 +216,12 @@ app.use((req, res, next) => {
 
 // Global input sanitization — XSS prevention on all request inputs
 app.use(sanitizeInput);
+
+// PII masking middleware — masks sensitive customer data in logs
+app.use(piiMaskingMiddleware);
+
+// Sanitize request body — removes XSS from request data
+app.use(sanitizeRequestBody);
 
 // API versioning — extracts version from path/header/query
 app.use('/api', apiVersioning);
@@ -323,6 +331,7 @@ app.use('/api/business', businessRoutes);
 app.use('/api/campaigns', campaignsRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/contacts', contactsRoutes);
+app.use('/api/customer-security', customerDataSecurityRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/ecommerce', ecommerceRoutes);
 app.use('/api/email', emailRoutes);
