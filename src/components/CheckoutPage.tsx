@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Truck, Check, ArrowLeft, Tag, MapPin, Package, Loader2 } from 'lucide-react';
+import { CreditCard, Truck, Check, ArrowLeft, Tag, MapPin, Package, Loader2, Smartphone, Building2, Wallet, Banknote } from 'lucide-react';
 import apiClient from '../lib/api';
 import { useToast } from './Toast';
 import { useAuthStore } from '../lib/authStore';
@@ -32,7 +32,7 @@ const CheckoutPage: React.FC = () => {
     state: '',
     pincode: '',
   });
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod'>('razorpay');
+  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking' | 'wallet' | 'cod'>('upi');
 
   const fetchCart = useCallback(async () => {
     try {
@@ -113,13 +113,21 @@ const CheckoutPage: React.FC = () => {
 
       const order = res.data?.data;
 
-      if (paymentMethod === 'razorpay' && order?.razorpayOrder) {
+      if (paymentMethod !== 'cod' && order?.razorpayOrder) {
         const loaded = await loadRazorpay();
         if (!loaded) {
           showError('Failed to load payment gateway. Please try again.');
           setProcessing(false);
           return;
         }
+
+        // Map our payment methods to Razorpay methods
+        const razorpayMethodMap: Record<string, string> = {
+          upi: 'upi',
+          card: 'card',
+          netbanking: 'netbanking',
+          wallet: 'wallet',
+        };
 
         const options = {
           key: order.razorpayOrder.key_id || import.meta.env.VITE_RAZORPAY_KEY_ID,
@@ -128,6 +136,7 @@ const CheckoutPage: React.FC = () => {
           name: 'Store Purchase',
           description: `Order ${order.orderNumber}`,
           order_id: order.razorpayOrder.id,
+          method: razorpayMethodMap[paymentMethod] || 'upi',
           handler: async (response: any) => {
             try {
               await apiClient.post(`/ecommerce/orders/${order.id}/verify-payment`, {
@@ -266,23 +275,82 @@ const CheckoutPage: React.FC = () => {
                   <CreditCard size={20} /> Payment Method
                 </h2>
                 <div className="space-y-3">
-                  <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'razorpay' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
-                    <input type="radio" name="payment" value="razorpay" checked={paymentMethod === 'razorpay'} onChange={() => setPaymentMethod('razorpay')} className="text-blue-600" />
-                    <CreditCard size={20} className="text-blue-600" />
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Online Payment (Razorpay)</p>
-                      <p className="text-sm text-gray-500">UPI, Cards, Net Banking, Wallets</p>
+                  {/* UPI */}
+                  <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'upi' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
+                    <input type="radio" name="payment" value="upi" checked={paymentMethod === 'upi'} onChange={() => setPaymentMethod('upi')} className="text-blue-600" />
+                    <Smartphone size={20} className="text-purple-600" />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white">UPI</p>
+                      <p className="text-sm text-gray-500">Google Pay, PhonePe, Paytm & more</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">GPay</span>
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">PhonePe</span>
+                      <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-medium">Paytm</span>
                     </div>
                   </label>
+
+                  {/* Credit/Debit Card */}
+                  <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'card' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
+                    <input type="radio" name="payment" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} className="text-blue-600" />
+                    <CreditCard size={20} className="text-blue-600" />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white">Credit / Debit Card</p>
+                      <p className="text-sm text-gray-500">Visa, Mastercard, Rupay & more</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">VISA</span>
+                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">MC</span>
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">RuPay</span>
+                    </div>
+                  </label>
+
+                  {/* Net Banking */}
+                  <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'netbanking' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
+                    <input type="radio" name="payment" value="netbanking" checked={paymentMethod === 'netbanking'} onChange={() => setPaymentMethod('netbanking')} className="text-blue-600" />
+                    <Building2 size={20} className="text-orange-600" />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white">Net Banking</p>
+                      <p className="text-sm text-gray-500">SBI, HDFC, ICICI & 50+ banks</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">SBI</span>
+                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">HDFC</span>
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">ICICI</span>
+                    </div>
+                  </label>
+
+                  {/* Wallets */}
+                  <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'wallet' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
+                    <input type="radio" name="payment" value="wallet" checked={paymentMethod === 'wallet'} onChange={() => setPaymentMethod('wallet')} className="text-blue-600" />
+                    <Wallet size={20} className="text-yellow-600" />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white">Wallets</p>
+                      <p className="text-sm text-gray-500">Paytm, PhonePe, Amazon Pay & more</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">Paytm</span>
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">Mobikwik</span>
+                    </div>
+                  </label>
+
+                  {/* COD */}
                   <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'cod' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
                     <input type="radio" name="payment" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} className="text-blue-600" />
-                    <Truck size={20} className="text-green-600" />
+                    <Banknote size={20} className="text-green-600" />
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white">Cash on Delivery</p>
                       <p className="text-sm text-gray-500">Pay when you receive</p>
                     </div>
                   </label>
                 </div>
+
+                {/* Secure payment badge */}
+                <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+                  <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                  <span>Secured by <span className="font-semibold text-gray-700 dark:text-gray-300">Razorpay</span> | 256-bit SSL Encrypted</span>
+                </div>
+
                 <div className="flex gap-3 mt-6">
                   <button onClick={() => setStep('address')} className="flex-1 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                     Back
