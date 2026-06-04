@@ -314,10 +314,9 @@ function tryEdgeTTS(text: string, lang: string, voiceStyle: string = 'sweet'): s
     // Edge TTS with MYRA-like tuning
     const rateArg = `--rate="${style.rate}"`;
     const pitchArg = `--pitch="${style.pitch}"`;
-    const volumeArg = `--volume="${style.volume}"`;
     
     execSync(
-      `edge-tts --voice "${voice}" ${rateArg} ${pitchArg} ${volumeArg} --file "${textFile}" --write-media "${tmpMp3}"`,
+      `edge-tts --voice "${voice}" ${rateArg} ${pitchArg} --file "${textFile}" --write-media "${tmpMp3}"`,
       { timeout: 10000, stdio: 'pipe' }
     );
 
