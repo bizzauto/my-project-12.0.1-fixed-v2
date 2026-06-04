@@ -965,7 +965,7 @@ class JimiVoiceAgent {
     const lower = text.toLowerCase();
 
     // ==================== DAILY BRIEFING ====================
-    if (lower.includes('briefing') || lower.includes('summary') || lower.includes('update') || lower.includes('aaj') || lower.includes('report') || lower.includes('haal')) {
+    if (lower.includes('daily briefing') || lower.includes('aaj ka report') || lower.includes('daily report') || lower.includes('mera haal') || lower.includes('mera update') || lower.includes('summary dikhao')) {
       const briefing = this.currentResponses.dailyBriefing[0]
         .replace('{leads}', Math.floor(Math.random() * 50 + 10).toString())
         .replace('{messages}', Math.floor(Math.random() * 100 + 20).toString())
@@ -975,7 +975,7 @@ class JimiVoiceAgent {
     }
 
     // ==================== REMINDERS ====================
-    if (lower.includes('reminder') || lower.includes('yaad') || lower.includes('remind') || lower.includes('schedule')) {
+    if (lower.includes('reminder') || lower.includes('yaad') || lower.includes('remind') || (lower.includes('schedule') && lower.includes('set'))) {
       const timeMatch = text.match(/(\d{1,2})[:\s]?(\d{0,2})\s?(baje|pm|am|am|baj)/i);
       if (timeMatch) {
         const hour = parseInt(timeMatch[1]);
@@ -1202,7 +1202,7 @@ class JimiVoiceAgent {
         blog: { hi: 'Blog khol rahi hun!', en: 'Opening Blog!', mr: 'Blog उघडते आहे!' },
         'review-requests': { hi: 'Review Requests khol rahi hun!', en: 'Opening Review Requests!', mr: 'Review Requests उघडते आहे!' },
         'payment-links': { hi: 'Payment Links khol rahi hun!', en: 'Opening Payment Links!', mr: 'Payment Links उघडते आहे!' },
-        courses: { hi: 'Courses khol rahi hun!', en: 'Opening Courses!', mr: 'Courses उ�डते आहे!' },
+        courses: { hi: 'Courses khol rahi hun!', en: 'Opening Courses!', mr: 'Courses उघडते आहे!' },
         funnels: { hi: 'Funnels khol rahi hun!', en: 'Opening Funnels!', mr: 'Funnels उघडते आहे!' },
         conversations: { hi: 'Conversations khol rahi hun!', en: 'Opening Conversations!', mr: 'Conversations उघडते आहे!' },
         'custom-fields': { hi: 'Custom Fields khol rahi hun!', en: 'Opening Custom Fields!', mr: 'Custom Fields उघडते आहे!' },
