@@ -11,10 +11,9 @@ export async function initRedis(): Promise<RedisClientType | null> {
   try {
     const host = process.env.REDIS_HOST || 'coolify-redis';
     const port = process.env.REDIS_PORT || '6379';
-    const username = process.env.REDIS_USERNAME || 'default';
     const password = process.env.REDIS_PASSWORD || undefined;
     const redisUrl = process.env.REDIS_URL || (password
-      ? `redis://${username}:${password}@${host}:${port}`
+      ? `redis://:${password}@${host}:${port}`
       : `redis://${host}:${port}`);
 
     redisClient = createClient({

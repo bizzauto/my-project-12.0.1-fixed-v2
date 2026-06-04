@@ -12,16 +12,18 @@ export function createRedisConnection() {
     });
     client.on('error', (err: any) => {
       if (err?.message?.includes('NOAUTH') || err?.message?.includes('WRONGPASS')) {
-        console.warn('Redis auth failed — running without Redis cache/queue. Set REDIS_PASSWORD env var to fix.');
+        console.warn('Redis auth failed — running without Redis cache/queue.');
       }
     });
     return client;
   }
+  
+  // If password is set, use it; otherwise connect without auth
+  const password = process.env.REDIS_PASSWORD || undefined;
   const client = new IORedis({
     host: process.env.REDIS_HOST || 'coolify-redis',
     port: parseInt(process.env.REDIS_PORT || '6379'),
-    username: process.env.REDIS_USERNAME || 'default',
-    password: process.env.REDIS_PASSWORD || undefined,
+    ...(password ? { password } : {}),
     maxRetriesPerRequest: null,
     retryStrategy(times: number) {
       if (times > 3) return null;
@@ -31,7 +33,7 @@ export function createRedisConnection() {
   });
   client.on('error', (err: any) => {
     if (err?.message?.includes('NOAUTH') || err?.message?.includes('WRONGPASS')) {
-      console.warn('Redis auth failed — running without Redis cache/queue. Set REDIS_PASSWORD env var to fix.');
+      console.warn('Redis auth failed — running without Redis cache/queue.');
     }
   });
   return client;
