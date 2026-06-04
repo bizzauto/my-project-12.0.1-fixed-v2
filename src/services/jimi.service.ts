@@ -833,33 +833,7 @@ class JimiVoiceAgent {
 
     const detectedLang = this.detectLanguage(text);
 
-    // 1. Try Kyutai TTS (English - free, CPU, never stops mid-speech)
-    // MYRA: Aoede-style sweet voice with natural Hinglish flow
-    if (detectedLang.startsWith('en')) {
-      try {
-        const response = await fetch('/api/jimi/tts/kyutai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            text: cleanText, 
-            voiceStyle: this.voiceSettings.voiceStyle || 'sweet', // MYRA default
-            speed: this.voiceSettings.rate || 0.92,
-            pitch: this.voiceSettings.pitch || 1.4
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
-        const data = await response.json();
-        if (data.audio) {
-          this.playBase64Audio(data.audio);
-          return;
-        }
-      } catch (err) {
-        console.log('Jimi: Kyutai TTS unavailable');
-      }
-    }
-
-    // 2. Try Edge TTS (Hindi/Marathi/Indian languages - free, neural voice)
-    // MYRA: SwaraNeural for Hindi, NeerjaNeural for Indian English
+    // 1. Try Edge TTS first (Hindi/Hinglish/Indian languages - works reliably)
     try {
       const response = await fetch('/api/jimi/tts/edge', {
         method: 'POST',
@@ -867,9 +841,7 @@ class JimiVoiceAgent {
         body: JSON.stringify({ 
           text: cleanText, 
           lang: detectedLang, 
-          voiceStyle: this.voiceSettings.voiceStyle || 'sweet', // MYRA default
-          speed: this.voiceSettings.rate || 0.92,
-          pitch: this.voiceSettings.pitch || 1.4
+          voiceStyle: this.voiceSettings.voiceStyle || 'sweet',
         }),
         signal: AbortSignal.timeout(12000),
       });
@@ -880,6 +852,25 @@ class JimiVoiceAgent {
       }
     } catch (err) {
       console.log('Jimi: Edge TTS unavailable');
+    }
+
+    // 2. Try Kyutai TTS (English only, when Kyutai container is deployed)
+    if (detectedLang.startsWith('en')) {
+      try {
+        const response = await fetch('/api/jimi/tts/kyutai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: cleanText, voiceStyle: this.voiceSettings.voiceStyle || 'sweet' }),
+          signal: AbortSignal.timeout(5000),
+        });
+        const data = await response.json();
+        if (data.audio) {
+          this.playBase64Audio(data.audio);
+          return;
+        }
+      } catch (err) {
+        console.log('Jimi: Kyutai TTS unavailable');
+      }
     }
 
     // 3. Browser TTS fallback
