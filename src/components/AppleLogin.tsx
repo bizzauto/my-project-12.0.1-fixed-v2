@@ -35,10 +35,14 @@ const AppleLogin: React.FC<AppleLoginProps> = ({ onError, className }) => {
     document.head.appendChild(script);
 
     return () => {
-      if (scriptRef.current) {
-        document.head.removeChild(scriptRef.current);
-        scriptRef.current = null;
+      try {
+        if (scriptRef.current && scriptRef.current.parentNode === document.head) {
+          document.head.removeChild(scriptRef.current);
+        }
+      } catch (e) {
+        // Ignore cleanup errors
       }
+      scriptRef.current = null;
     };
   }, [clientId]);
 
