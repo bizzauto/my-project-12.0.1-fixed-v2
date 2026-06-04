@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, MessageCircle, X, Send, Volume2, VolumeX, Bot, User, Globe, Shield, Phone, PhoneCall } from 'lucide-react';
-import { jimi, LANGUAGES, Language } from '../services/jimi.service';
+import { Mic, MicOff, MessageCircle, X, Send, Volume2, VolumeX, Bot, User, Globe, Shield, Phone, PhoneCall, Heart, Users, Briefcase } from 'lucide-react';
+import { jimi, LANGUAGES, Language, PERSONALITY_MODES, PersonalityMode } from '../services/jimi.service';
 import { useNavigate } from 'react-router-dom';
 
 interface Message {
@@ -26,6 +26,8 @@ const JimiAssistant: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [selectedLang, setSelectedLang] = useState<Language>(jimi.getLanguage());
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<PersonalityMode>(jimi.getPersonalityMode());
+  const [showModeMenu, setShowModeMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -154,6 +156,15 @@ const JimiAssistant: React.FC = () => {
     addMessage(`Ab hum ${LANGUAGES.find(l => l.code === lang)?.nativeName || lang} mein baat karenge! ✨`, false);
   };
 
+  const handleModeChange = (mode: PersonalityMode) => {
+    setSelectedMode(mode);
+    jimi.setPersonalityMode(mode);
+    setShowModeMenu(false);
+    const modeName = PERSONALITY_MODES.find(m => m.code === mode)?.name;
+    const modeEmoji = PERSONALITY_MODES.find(m => m.code === mode)?.emoji;
+    addMessage(`Mode changed to ${modeEmoji} ${modeName}! Ab main ${modeName} ki tarah baat karungi! ✨`, false);
+  };
+
   const previewVoice = () => {
     const previewTexts: Record<string, string> = {
       'hi-IN': 'Namaste! Main Jimi hun. Kaise ho aap? 😊',
@@ -212,15 +223,53 @@ const JimiAssistant: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-white font-semibold flex items-center gap-2">
-                  Jimi 💕
+                  Jimi {PERSONALITY_MODES.find(m => m.code === selectedMode)?.emoji}
                   <Shield size={14} className="text-green-300" title="Protected Mode" />
                 </h3>
                 <p className="text-white/80 text-xs">
-                  {isListening ? '🎤 Sun rahi hoon...' : isTyping ? '🧠 Soch rahi hoon...' : '💕 Tumhari friend • Ready'}
+                  {isListening ? '🎤 Sun rahi hoon...' : isTyping ? '🧠 Soch rahi hoon...' : `${PERSONALITY_MODES.find(m => m.code === selectedMode)?.name} • Ready`}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Personality Mode Selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowModeMenu(!showModeMenu)}
+                  className="p-2 rounded-full hover:bg-white/20 transition-colors flex items-center gap-1"
+                  title="Change Personality Mode"
+                >
+                  {selectedMode === 'gf' ? (
+                    <Heart size={18} className="text-white" />
+                  ) : selectedMode === 'bestfriend' ? (
+                    <Users size={18} className="text-white" />
+                  ) : (
+                    <Briefcase size={18} className="text-white" />
+                  )}
+                  <span className="text-white text-xs hidden sm:inline">
+                    {PERSONALITY_MODES.find(m => m.code === selectedMode)?.emoji}
+                  </span>
+                </button>
+                {showModeMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50">
+                    {PERSONALITY_MODES.map(mode => (
+                      <button
+                        key={mode.code}
+                        onClick={() => handleModeChange(mode.code)}
+                        className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                          selectedMode === mode.code ? 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        <span className="text-lg">{mode.emoji}</span>
+                        <div>
+                          <div className="font-medium">{mode.name}</div>
+                          <div className="text-xs text-gray-400">{mode.description}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {/* Language Selector */}
               <div className="relative">
                 <button

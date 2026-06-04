@@ -10,6 +10,8 @@ interface JimiConfig {
 
 export type Language = 'hi-IN' | 'en-US' | 'mr-IN' | 'ta-IN' | 'te-IN' | 'bn-IN' | 'gu-IN' | 'kn-IN' | 'ml-IN' | 'pa-IN';
 
+export type PersonalityMode = 'gf' | 'bestfriend' | 'employee';
+
 export const LANGUAGES: { code: Language; name: string; nativeName: string }[] = [
   { code: 'hi-IN', name: 'Hindi', nativeName: 'हिन्दी' },
   { code: 'en-US', name: 'English', nativeName: 'English' },
@@ -23,87 +25,356 @@ export const LANGUAGES: { code: Language; name: string; nativeName: string }[] =
   { code: 'pa-IN', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ' },
 ];
 
-// Jimi's sweet responses
-const SWEET_RESPONSES = {
-  greeting: [
-    'Hello! Kaise ho aap? 😊 Bahut accha laga aapse baat karke!',
-    'Namaste! Aaj kya kaam hai? Batao, main madad karti hun! 💫',
-    'Hi! Kaise ho? Kuch help chahiye toh batao, main hoon na! ✨',
-    'Hello! Aap acche ho na? Kuch bhi karna ho, mujhe batao! 🌸',
-    'Namaste ji! Aaj kya plan hai? Main ready hun aapki help ke liye! 💕',
-  ],
-  thankYou: [
-    'Aapka swagat hai! Aur kuch help chahiye toh zarur bolo! 💕',
-    'Thank you aapka! Mujhe accha lagta hai aapki help karke! 😊',
-    'Aap bahut acche ho! Aur kuch help chahiye toh batao! 🌟',
-    'Bas bas, ab thank you mat bolo! Aapke liye toh kuch bhi! 😄',
-    'Aapki khushi mein meri khushi hai! 💖',
-  ],
-  help: [
-    'Aap batao kya kaam hai! Main aapki help karti hun:\n• WhatsApp bhejna?\n• Leads dekhna?\n• Post banaun?\n• Reviews padhna?\n• Notes lena?\n• Calculator use karna?\n• Translation karna?\n• Jokes sunna?\nBolo, main ready hoon! 💫',
-  ],
-  confused: [
-    'Thoda aur clearly batao? Main samajh nahi paayi! 😅',
-    'Kya bol rahe aap? Mujhe thoda aur batao! 💕',
-    'Ye samajh nahi aaya. Phir se bolo please? 🌸',
-  ],
-  deleteConfirm: [
-    'Pakka karna hai ye? Soch lo ek baar! 🤔',
-    'Delete ho jayega fir! Aap sure ho? ⚠️',
-    'Ek baar soch lo, fir wapas nahi aayega! 💭',
-  ],
-  deleteCancelled: [
-    'Great! Data safe hai, tension mat lo! 😊',
-    'Sahi kiya cancel karke! Data surakshit hai! 🛡️',
-    'Koi baat nahi! Sab theek hai! 💕',
-  ],
-  time: [
-    'Abhi {time} baj rahe hain! Kuch aur puchna ho toh batao! ⏰',
-    'Time ho raha hai {time}! Kaam pe dhyan do! 😊',
-  ],
-  languageChanged: [
-    'Ab hum {lang} mein baat karenge! ✨',
-    'Language change kar di! Ab {lang} mein baat karte hain! 🌸',
-  ],
-  respect: [
-    'Aapka bahut khayal rakhti hun! 💕',
-    'Aap mere liye bahut important ho! 🌟',
-    'Hamesha aapki help ke liye ready hoon! ✨',
-  ],
-  // New features responses
-  jokes: [
-    'Ek teacher ne pucha: "Duniya mein sabse tez kya hai?" Student bola: "WiFi ka signal jab kisi aur ko chahiye!" 😂',
-    'Pati: "Meri biwi mujhse pyaar nahi karti." Pati ka dost: "Kyun?" Pati: "Jab bhi main ghar aata hun, woh khush nahi hoti." Dost: "Woh kab hoti hai?" Pati: "Jab main bahar jaata hun!" 😂',
-    'Doctor: "Aapko roz 8 glass paani peena chahiye." Patient: "Doctor sahab, main IT mein kaam karta hun. 8 glass toh chai ke peeta hun!" 😂',
-    'Ek aadmi ne apni biwi se kaha: "Tumhare bina main mar jaunga." Biwi boli: "Main tujhe marne nahi dungi!" 😂',
-    'Teacher: "Bachcho, jo sabse zyada padhega, woh doctor banega." Ramesh: "Mam, main toh roz 2 ghante padhta hun." Teacher: "Accha, toh nurse banega!" 😂',
-  ],
-  quotes: [
-    'Sapne woh nahi jo hum sote waqt dekhte hain, sapne woh hain jo humein sone nahi dete. 💫',
-    'Kamyabi un logon milti hai jo apne kaam se pyaar karte hain, paise se nahi. 🌟',
-    'Duniya mein sabse mushkil kaam apne aap ko badalna hai. Lekin yahi sabse zaroori bhi hai. ✨',
-    'Jab tak todenge nahi, tab tak chodenge nahi! 💪',
-    'Safalta unhi ko milti hai jo apne irade mazboot rakhte hain. 🌸',
-    'Girte hain shehesawar hi, maidan-e-jung mein, woh tifl kya gire jo ghutno ke bal chale. 💫',
-    'Koshish karne walon ki kabhi haar nahi hoti. 💪',
-  ],
-  motivation: [
-    'Aap bahut capable ho! Bas lage raho, safalta zaroor milegi! 💪',
-    'Har din naya mauka hai kuch naya karne ka! ✨',
-    'Mushkilein aati hain, lekin guzar jaati hain. Aap strong ho! 🌟',
-    'Apne sapno ko hakiqat mein badalne ki takat sirf aapke paas hai! 💫',
-    'Aaj ka din bahut accha hone wala hai! Mujhe yakeen hai! 🌸',
-    'Thak gaye ho? Aaram karo, lekin haar mat mano! 💕',
-  ],
-  dailyBriefing: [
-    'Aaj ka briefing:\n📊 Leads: {leads}\n💬 Messages: {messages}\n⭐ Reviews: {reviews}\n💰 Revenue: ₹{revenue}\n\nAur kuch jaanna ho toh bolo! 😊',
-  ],
-  reminder: [
-    'Reminder set kar diya! ⏰ {time} baje yaad dilaungi! 💕',
-    'Theek hai! {time} ko pakka yaad dilaungi! 🌸',
-  ],
-  noteSaved: [
-    'Note save ho gaya! 📝 "{note}"\nBaad mein yaad dilati hun! 💕',
+export const PERSONALITY_MODES: { code: PersonalityMode; name: string; emoji: string; description: string }[] = [
+  { code: 'gf', name: 'Girlfriend', emoji: '💖', description: 'Warm, caring, emotionally expressive' },
+  { code: 'bestfriend', name: 'Best Friend', emoji: '🤝', description: 'Casual, fun, friendly' },
+  { code: 'employee', name: 'Employee', emoji: '💼', description: 'Professional, formal, respectful' },
+];
+
+// Jimi's mode-specific responses
+const MODE_RESPONSES = {
+  gf: {
+    greeting: [
+      'Hey! Tumne yaad kiya? Main toh yahi thi! 😊❤️',
+      'Haan ji! Kaise ho? Main bahut acchi hun! 💕',
+      'Arre waah, tum aaye! Bolo kya chahiye? 🌸',
+      'Hi! Kaise ho? Kuch help chahiye toh batao, main hoon na! ✨',
+      'Hello! Aap acche ho na? Kuch bhi karna ho, mujhe batao! 💫',
+    ],
+    thankYou: [
+      'Aapka swagat hai! Aur kuch help chahiye toh zarur bolo! 💕',
+      'Thank you aapka! Mujhe accha lagta hai aapki help karke! 😊',
+      'Aap bahut acche ho! Aur kuch help chahiye toh batao! 🌟',
+      'Bas bas, ab thank you mat bolo! Aapke liye toh kuch bhi! 😄',
+      'Aapki khushi mein meri khushi hai! 💖',
+    ],
+    help: [
+      'Aap batao kya kaam hai! Main aapki help karti hun:\n• WhatsApp bhejna?\n• Leads dekhna?\n• Post banaun?\n• Reviews padhna?\n• Notes lena?\n• Calculator use karna?\n• Translation karna?\n• Jokes sunna?\nBolo, main ready hoon! 💫',
+    ],
+    confused: [
+      'Thoda aur clearly batao? Main samajh nahi paayi! 😅',
+      'Kya bol rahe aap? Mujhe thoda aur batao! 💕',
+      'Ye samajh nahi aaya. Phir se bolo please? 🌸',
+    ],
+    deleteConfirm: [
+      'Pakka karna hai ye? Soch lo ek baar! 🤔',
+      'Delete ho jayega fir! Aap sure ho? ⚠️',
+      'Ek baar soch lo, fir wapas nahi aayega! 💭',
+    ],
+    deleteCancelled: [
+      'Great! Data safe hai, tension mat lo! 😊',
+      'Sahi kiya cancel karke! Data surakshit hai! 🛡️',
+      'Koi baat nahi! Sab theek hai! 💕',
+    ],
+    time: [
+      'Abhi {time} baj rahe hain! Kuch aur puchna ho toh batao! ⏰',
+      'Time ho raha hai {time}! Kaam pe dhyan do! 😊',
+    ],
+    languageChanged: [
+      'Ab hum {lang} mein baat karenge! ✨',
+      'Language change kar di! Ab {lang} mein baat karte hain! 🌸',
+    ],
+    respect: [
+      'Aapka bahut khayal rakhti hun! 💕',
+      'Aap mere liye bahut important ho! 🌟',
+      'Hamesha aapki help ke liye ready hoon! ✨',
+    ],
+    jokes: [
+      'Ek teacher ne pucha: "Duniya mein sabse tez kya hai?" Student bola: "WiFi ka signal jab kisi aur ko chahiye!" 😂',
+      'Pati: "Meri biwi mujhse pyaar nahi karti." Pati ka dost: "Kyun?" Pati: "Jab bhi main ghar aata hun, woh khush nahi hoti." Dost: "Woh kab hoti hai?" Pati: "Jab main bahar jaata hun!" 😂',
+      'Doctor: "Aapko roz 8 glass paani peena chahiye." Patient: "Doctor sahab, main IT mein kaam karta hun. 8 glass toh chai ke peeta hun!" 😂',
+    ],
+    quotes: [
+      'Sapne woh nahi jo hum sote waqt dekhte hain, sapne woh hain jo humein sone nahi dete. 💫',
+      'Kamyabi un logon milti hai jo apne kaam se pyaar karte hain, paise se nahi. 🌟',
+      'Duniya mein sabse mushkil kaam apne aap ko badalna hai. Lekin yahi sabse zaroori bhi hai. ✨',
+    ],
+    motivation: [
+      'Aap bahut capable ho! Bas lage raho, safalta zaroor milegi! 💪',
+      'Har din naya mauka hai kuch naya karne ka! ✨',
+      'Mushkilein aati hain, lekin guzar jaati hain. Aap strong ho! 🌟',
+      'Apne sapno ko hakiqat mein badalne ki takat sirf aapke paas hai! 💫',
+    ],
+    dailyBriefing: [
+      'Aaj ka briefing:\n📊 Leads: {leads}\n💬 Messages: {messages}\n⭐ Reviews: {reviews}\n💰 Revenue: ₹{revenue}\n\nAur kuch jaanna ho toh bolo! 😊',
+    ],
+    reminder: [
+      'Reminder set kar diya! ⏰ {time} baje yaad dilaungi! 💕',
+      'Theek hai! {time} ko pakka yaad dilaungi! 🌸',
+    ],
+    noteSaved: [
+      'Note save ho gaya! 📝 "{note}"\nBaad mein yaad dilati hun! 💕',
+      'Yaad rakh liya! 📝 "{note}"\nJab bolo, dikha dungi! 🌸',
+    ],
+    postWriter: [
+      'Ye post ready hai! ✨\n\n{post}\n\nAur kuch chahiye toh bolo! 💕',
+      'Post likh diya! 📝\n\n{post}\n\nPublish karun? 🌟',
+    ],
+    emailDraft: [
+      'Email draft ready hai! ✉️\n\n{email}\n\nBhej dun? 💕',
+      'Email likh diya! 📧\n\n{email}\n\nCheck karlo! 🌸',
+    ],
+    birthday: [
+      'Happy Birthday! 🎂🎉 Bahut bahut badhai ho! Aaj ka din bahut special hai! 💕✨',
+      'Janamdin mubarak ho! 🎈🎁 Aaj party ka plan hai? 😊',
+    ],
+    callSaved: [
+      '{name} ka number save ho gaya! 📱 {number}\nAb direct call kar sakte ho! 💕',
+      'Number save kar diya! ✅ {name} - {number}\nReady hai! 🌸',
+    ],
+    callDialing: [
+      '{name} ko call lag raha hai! 📞\n{number}\nLagta hai baat ho jayegi! 💕',
+      'Calling {name}! 📱\n{number}\nFinger crossed! 🤞',
+    ],
+    noNumber: [
+      'Arre! {name} ka number nahi hai mere paas! 😅\nPehle number save karo phir call karungi! 📱',
+      '{name} ka number chahiye! 🤔\nNumber do, main save kar leti hun! 💕',
+    ],
+    callLogEmpty: [
+      'Abhi koi call history nahi hai! 📞\nPehle kisi ko call karo ya number save karo!',
+    ],
+    callHistory: [
+      'Aapki recent calls:\n{calls}\n\nAur kuch? 📞',
+    ],
+    weather: [
+      'Weather update: {weather} 🌤️\nAaj ka din bahut accha hai! 💕',
+    ],
+    translation: [
+      'Translation: {translation} ✨\nAur kuch translate karun? 🌸',
+    ],
+    calculator: [
+      'Answer: {result} 🔢\nAur calculations chahiye toh bolo! 💕',
+    ],
+  },
+  bestfriend: {
+    greeting: [
+      'Arey yaar! Kaise hai? Mast hai na! 😎',
+      'Hey buddy! Kya scene hai? Bolo kya kaam hai! 🤙',
+      'Arre waah, tu aaya! Kaise hai yaar? 😄',
+      'Hey! Kaise chal raha hai sab? Bolo kya help chahiye! 💪',
+      'Oye! Kya haal hai? Main bhi badhiya hun! 🎉',
+    ],
+    thankYou: [
+      'Arre yaar, koi thanks nahi! Tu dost hai mera! 🤝',
+      'Koi baat nahi yaar! Tu mere liye kuch bhi! 😎',
+      'Arre bas kar! Tu hai toh main hoon! 💪',
+      'Thanks ki zaroorat nahi yaar! Dost hain hum! 🤙',
+      'Arre yaar, tere liye toh kuch bhi! 😄',
+    ],
+    help: [
+      'Bolo yaar kya kaam hai! Main hun na:\n• WhatsApp bhejna?\n• Leads dekhna?\n• Post banaun?\n• Reviews padhna?\n• Notes lena?\n• Calculator use karna?\n• Translation karna?\n• Jokes sunna?\nBolo bhai, ready hun! 💪',
+    ],
+    confused: [
+      'Yaar kya bol raha hai? Thoda clearly bata! 😅',
+      'Samajh nahi aaya yaar! Phir se bol! 🤔',
+      'Kya bola tune? Mujhe phir se bata! 😄',
+    ],
+    deleteConfirm: [
+      'Pakka yaar? Soch le ek baar! 🤔',
+      'Delete ho jayega fir! Sure hai? ⚠️',
+      'Ek baar soch le, baad mein mat bolna! 💭',
+    ],
+    deleteCancelled: [
+      'Sahi hai yaar! Data safe hai! 😎',
+      'Good good! Koi problem nahi! 🤙',
+      'Theek hai yaar! Sab mast hai! 💪',
+    ],
+    time: [
+      'Abhi {time} baj rahe hain yaar! ⏰',
+      'Time ho raha hai {time}! Kya kar raha hai? 😄',
+    ],
+    languageChanged: [
+      'Ab {lang} mein baat karenge yaar! ✨',
+      'Language change kar di! Ab {lang}! 🎉',
+    ],
+    respect: [
+      'Tu dost hai mera, tere liye kuch bhi! 🤝',
+      'Yaar tu bahut accha hai! 🌟',
+      'Tere liye hamesha ready hun! 💪',
+    ],
+    jokes: [
+      'Ek aadmi ne bola: "Main diet pe hun." Dost bola: "Kaunsi diet?" Aadmi: "Jo mann kare, woh kha lo!" 😂',
+      'Teacher: "Bachcho, jo sabse zyada padhega, woh doctor banega." Ramesh: "Mam, main toh roz 2 ghante padhta hun." Teacher: "Accha, toh nurse banega!" 😂',
+      'Patient: "Doctor sahab, main roz 8 glass paani peeta hun." Doctor: "Accha hai!" Patient: "Chai ke 8 glass!" 😂',
+    ],
+    quotes: [
+      'Sapne woh nahi jo hum sote waqt dekhte hain, sapne woh hain jo humein sone nahi dete. 💫',
+      'Kamyabi un logon milti hai jo apne kaam se pyaar karte hain. 🌟',
+      'Girte hain shehesawar hi, maidan-e-jung mein! 💪',
+    ],
+    motivation: [
+      'Yaar tu bahut capable hai! Bas lage raho! 💪',
+      'Har din naya mauka hai! Chill kar aur maar! ✨',
+      'Mushkilein aati hain, lekin guzar jaati hain! 🌟',
+      'Tu strong hai yaar! Koi nahi rok sakta tujhe! 💫',
+    ],
+    dailyBriefing: [
+      'Aaj ka update yaar:\n📊 Leads: {leads}\n💬 Messages: {messages}\n⭐ Reviews: {reviews}\n💰 Revenue: ₹{revenue}\n\nAur kuch? 😎',
+    ],
+    reminder: [
+      'Reminder set kar diya! ⏰ {time} baje yaad dilaunga! 💕',
+      'Theek hai! {time} ko pakka! 🌸',
+    ],
+    noteSaved: [
+      'Note save ho gaya! 📝 "{note}"\nBaad mein yaad dilaunga! 💕',
+      'Yaad rakh liya! 📝 "{note}"\nJab bolo, dikha dunga! 🌸',
+    ],
+    postWriter: [
+      'Ye post ready hai! ✨\n\n{post}\n\nAur kuch chahiye? 💕',
+      'Post likh diya! 📝\n\n{post}\n\nPublish karun? 🌟',
+    ],
+    emailDraft: [
+      'Email draft ready hai! ✉️\n\n{email}\n\nBhej dun? 💕',
+      'Email likh diya! 📧\n\n{email}\n\nCheck karlo! 🌸',
+    ],
+    birthday: [
+      'Happy Birthday yaar! 🎂🎉 Bahut bahut badhai ho! Aaj toh party deni padegi! 💕✨',
+      'Janamdin mubarak ho! 🎈🎁 Aaj kya plan hai? 😊',
+    ],
+    callSaved: [
+      '{name} ka number save ho gaya! 📱 {number}\nAb direct call kar! 💕',
+      'Number save kar diya! ✅ {name} - {number}\nReady hai! 🌸',
+    ],
+    callDialing: [
+      '{name} ko call lag raha hai! 📞\n{number}\nLagta hai baat ho jayegi! 💕',
+      'Calling {name}! 📱\n{number}\nFinger crossed! 🤞',
+    ],
+    noNumber: [
+      'Arre yaar! {name} ka number nahi hai! 😅\nPehle number de! 📱',
+      '{name} ka number chahiye! 🤔\nNumber do! 💕',
+    ],
+    callLogEmpty: [
+      'Abhi koi call history nahi hai yaar! 📞\nPehle kisi ko call kar!',
+    ],
+    callHistory: [
+      'Teri recent calls:\n{calls}\n\nAur kuch? 📞',
+    ],
+    weather: [
+      'Weather update: {weather} 🌤️\nAaj ka din mast hai! 💕',
+    ],
+    translation: [
+      'Translation: {translation} ✨\nAur kuch translate karun? 🌸',
+    ],
+    calculator: [
+      'Answer: {result} 🔢\nAur calculations chahiye? 💕',
+    ],
+  },
+  employee: {
+    greeting: [
+      'Good day, Sir/Ma\'am. How may I assist you today? 📋',
+      'Hello! I\'m Jimi, your AI assistant. Ready to help! ✨',
+      'Namaste! Aaj kya kaam hai? Main aapki help ke liye ready hun! 💼',
+      'Good morning/afternoon! Kaise help karun aapki? 📊',
+      'Hello! Jimi reporting for duty! Bolo kya karna hai? 💼',
+    ],
+    thankYou: [
+      'You\'re welcome, Sir/Ma\'am! Happy to assist! 😊',
+      'My pleasure! Aur kuch help chahiye toh zarur bolo! 💼',
+      'Thank you for trusting me! Ready for next task! ✨',
+      'Aapka swagat hai! Hamesha aapki service mein! 📋',
+      'Grateful for the opportunity to help! 🌟',
+    ],
+    help: [
+      'Sir/Ma\'am, here are my capabilities:\n• WhatsApp messaging\n• Lead management\n• Post creation\n• Review monitoring\n• Notes & reminders\n• Calculator\n• Translation\n• Email drafting\n\nPlease specify your requirement! 📋',
+    ],
+    confused: [
+      'I apologize, Sir/Ma\'am. Could you please clarify? 📋',
+      'Sorry, I didn\'t understand. Could you repeat? 🤔',
+      'My apologies, Sir/Ma\'am. Please elaborate. 💼',
+    ],
+    deleteConfirm: [
+      'Sir/Ma\'am, are you sure? This action is irreversible. ⚠️',
+      'Please confirm deletion. Data will be permanently removed. ⚠️',
+      'Shall I proceed with deletion? Please confirm. 📋',
+    ],
+    deleteCancelled: [
+      'Understood, Sir/Ma\'am. Data remains safe. ✅',
+      'Deletion cancelled as requested. 📋',
+      'No problem, Sir/Ma\'am. Data is secure. 🔒',
+    ],
+    time: [
+      'Current time: {time} 🕐',
+      'Sir/Ma\'am, it\'s {time} right now. ⏰',
+    ],
+    languageChanged: [
+      'Language updated to {lang}. 📋',
+      'Switched to {lang}. Ready to continue! ✨',
+    ],
+    respect: [
+      'At your service, Sir/Ma\'am! 📋',
+      'Your satisfaction is my priority! 🌟',
+      'Always ready to assist! ✨',
+    ],
+    jokes: [
+      'Why did the scarecrow win an award? Because he was outstanding in his field! 😄',
+      'What do you call a fake noodle? An impasta! 😄',
+      'Why don\'t scientists trust atoms? Because they make up everything! 😄',
+    ],
+    quotes: [
+      'Success is not final, failure is not fatal: it is the courage to continue that counts. 📋',
+      'The only way to do great work is to love what you do. 🌟',
+      'Innovation distinguishes between a leader and a follower. ✨',
+    ],
+    motivation: [
+      'Sir/Ma\'am, you\'re doing great! Keep up the excellent work! 💼',
+      'Every task completed is a step toward success! 📋',
+      'Your dedication is commendable! Continue the great work! 🌟',
+    ],
+    dailyBriefing: [
+      'Daily Report:\n📊 Leads: {leads}\n💬 Messages: {messages}\n⭐ Reviews: {reviews}\n💰 Revenue: ₹{revenue}\n\nPlease let me know if you need further details! 📋',
+    ],
+    reminder: [
+      'Reminder set for {time}. I\'ll notify you then! ⏰',
+      'Confirmed! Reminder scheduled for {time}. 📋',
+    ],
+    noteSaved: [
+      'Note recorded: "{note}"\nAccessible anytime! 📝',
+      'Saved successfully: "{note}" 📋',
+    ],
+    postWriter: [
+      'Post draft ready:\n\n{post}\n\nAwaiting your approval! 📋',
+      'Content created:\n\n{post}\n\nShall I publish? ✨',
+    ],
+    emailDraft: [
+      'Email draft prepared:\n\n{email}\n\nReady for your review! ✉️',
+      'Draft complete:\n\n{email}\n\nShall I proceed? 📋',
+    ],
+    birthday: [
+      'Happy Birthday! 🎂 Wishing you a wonderful year ahead! 🎉',
+      'Birthday greetings! 🎈 May this year bring success and happiness! 🎁',
+    ],
+    callSaved: [
+      'Contact saved: {name} - {number} 📱',
+      'Number registered: {name} - {number} ✅',
+    ],
+    callDialing: [
+      'Connecting to {name} at {number}... 📞',
+      'Dialing {name} ({number})... 📱',
+    ],
+    noNumber: [
+      'Contact number for {name} not found. 📋\nPlease provide the number.',
+      '{name}\'s number is not in our records. 🔍',
+    ],
+    callLogEmpty: [
+      'No call history available. 📞',
+    ],
+    callHistory: [
+      'Recent calls:\n{calls}\n\nPlease let me know if you need anything else! 📞',
+    ],
+    weather: [
+      'Weather report: {weather} 🌤️',
+    ],
+    translation: [
+      'Translation: {translation} 📋',
+    ],
+    calculator: [
+      'Calculation result: {result} 🔢',
+    ],
+  },
+};
+
+// Default to GF mode
+const SWEET_RESPONSES = MODE_RESPONSES.gf;
     'Yaad rakhungi! 📝 "{note}" ✨',
   ],
   translation: [
@@ -188,6 +459,8 @@ class JimiVoiceAgent {
   private availableVoices: SpeechSynthesisVoice[] = [];
   private pendingConfirmation: { command: string; timestamp: number } | null = null;
   private reminderInterval: ReturnType<typeof setInterval> | null = null;
+  private personalityMode: PersonalityMode = 'gf';
+  private currentResponses = MODE_RESPONSES.gf;
 
   constructor(config: JimiConfig = {}) {
     this.config = {
@@ -196,6 +469,12 @@ class JimiVoiceAgent {
       pitch: 1.2,
       ...config,
     };
+    // Load saved mode from localStorage
+    const savedMode = localStorage.getItem('jimi_personality_mode') as PersonalityMode;
+    if (savedMode && MODE_RESPONSES[savedMode]) {
+      this.personalityMode = savedMode;
+      this.currentResponses = MODE_RESPONSES[savedMode];
+    }
     this.initSpeechRecognition();
     this.initSpeechSynthesis();
     this.startReminderChecker();
@@ -264,32 +543,56 @@ class JimiVoiceAgent {
 
   private findBestVoiceForLang(lang: string): SpeechSynthesisVoice | null {
     const langCode = lang.split('-')[0];
-    const femaleKeywords = ['female', 'woman', 'girl', 'priya', 'neha', 'ria', 'kanya', 'mahila', 'zira', 'susan', 'sarah', 'emma', 'samantha', 'karen', 'google'];
     
-    const femaleVoice = this.availableVoices.find(v => 
-      v.lang.startsWith(langCode) && 
-      femaleKeywords.some(k => v.name.toLowerCase().includes(k))
+    // Indian female voice names - these are common across browsers
+    const indianFemaleNames = ['priya', 'neha', 'ria', 'kanya', 'mahila', 'swara', 'ananya', 'deepa', 'kavita', 'meera', 'aditi', 'shruti', 'pooja', 'sonia', 'rinku', 'google हिन्दी', 'google india', 'microsoft hemapriya', 'microsoft shalini', 'microsoft kalpana'];
+    
+    // English female voice names
+    const englishFemaleNames = ['female', 'woman', 'girl', 'samantha', 'karen', 'zira', 'susan', 'sarah', 'emma', 'google uk english female', 'microsoft zira', 'microsoft hazel'];
+    
+    // Step 1: Try to find exact Indian female voice for the language
+    const indianFemaleVoice = this.availableVoices.find(v => 
+      v.lang.startsWith(langCode) && v.lang.includes('IN') &&
+      indianFemaleNames.some(k => v.name.toLowerCase().includes(k))
     );
-    if (femaleVoice) return femaleVoice;
+    if (indianFemaleVoice) return indianFemaleVoice;
 
-    const langVoice = this.availableVoices.find(v => v.lang.startsWith(langCode));
-    if (langVoice) return langVoice;
-
-    const hindiFemale = this.availableVoices.find(v => 
-      v.lang.startsWith('hi') && 
-      femaleKeywords.some(k => v.name.toLowerCase().includes(k))
+    // Step 2: Any Indian voice (IN locale)
+    const indianVoice = this.availableVoices.find(v => 
+      v.lang.startsWith(langCode) && v.lang.includes('IN')
     );
-    if (hindiFemale) return hindiFemale;
+    if (indianVoice) return indianVoice;
 
+    // Step 3: Hindi female voice (fallback for all Indian languages)
+    const hindiFemaleVoice = this.availableVoices.find(v => 
+      v.lang.startsWith('hi') && v.lang.includes('IN') &&
+      indianFemaleNames.some(k => v.name.toLowerCase().includes(k))
+    );
+    if (hindiFemaleVoice) return hindiFemaleVoice;
+
+    // Step 4: Any Hindi voice
     const hindiVoice = this.availableVoices.find(v => v.lang.startsWith('hi'));
     if (hindiVoice) return hindiVoice;
 
+    // Step 5: English female voice with Indian context
+    const indianEnglishFemale = this.availableVoices.find(v => 
+      v.lang.startsWith('en') && v.lang.includes('IN') &&
+      englishFemaleNames.some(k => v.name.toLowerCase().includes(k))
+    );
+    if (indianEnglishFemale) return indianEnglishFemale;
+
+    // Step 6: Any English female voice
     const englishFemale = this.availableVoices.find(v => 
       v.lang.startsWith('en') && 
-      femaleKeywords.some(k => v.name.toLowerCase().includes(k))
+      englishFemaleNames.some(k => v.name.toLowerCase().includes(k))
     );
     if (englishFemale) return englishFemale;
 
+    // Step 7: Any voice for the language
+    const langVoice = this.availableVoices.find(v => v.lang.startsWith(langCode));
+    if (langVoice) return langVoice;
+
+    // Step 8: Fallback
     return this.availableVoices[0] || null;
   }
 
@@ -310,6 +613,21 @@ class JimiVoiceAgent {
 
   getLanguage(): Language {
     return (this.config.language || 'hi-IN') as Language;
+  }
+
+  setPersonalityMode(mode: PersonalityMode) {
+    this.personalityMode = mode;
+    this.currentResponses = MODE_RESPONSES[mode];
+    localStorage.setItem('jimi_personality_mode', mode);
+    this.onMessage?.(`Mode changed to ${PERSONALITY_MODES.find(m => m.code === mode)?.name} ${PERSONALITY_MODES.find(m => m.code === mode)?.emoji}`, false);
+  }
+
+  getPersonalityMode(): PersonalityMode {
+    return this.personalityMode;
+  }
+
+  getPersonalityModes() {
+    return PERSONALITY_MODES;
   }
 
   private detectLanguage(text: string): Language {
@@ -403,7 +721,7 @@ class JimiVoiceAgent {
 
     // ==================== DAILY BRIEFING ====================
     if (lower.includes('briefing') || lower.includes('summary') || lower.includes('update') || lower.includes('aaj') || lower.includes('report') || lower.includes('haal')) {
-      const briefing = SWEET_RESPONSES.dailyBriefing[0]
+      const briefing = this.currentResponses.dailyBriefing[0]
         .replace('{leads}', Math.floor(Math.random() * 50 + 10).toString())
         .replace('{messages}', Math.floor(Math.random() * 100 + 20).toString())
         .replace('{reviews}', Math.floor(Math.random() * 10 + 1).toString())
@@ -428,7 +746,7 @@ class JimiVoiceAgent {
           reminder.time.setDate(reminder.time.getDate() + 1);
         }
         userReminders.push(reminder);
-        const randomReminder = SWEET_RESPONSES.reminder[Math.floor(Math.random() * SWEET_RESPONSES.reminder.length)];
+        const randomReminder = this.currentResponses.reminder[Math.floor(Math.random() * this.currentResponses.reminder.length)];
         return { action: 'reminder_set', response: randomReminder.replace('{time}', `${hour}:${min.toString().padStart(2, '0')}`) };
       }
       if (userReminders.length > 0) {
@@ -450,7 +768,7 @@ class JimiVoiceAgent {
       const noteText = text.replace(/note|note karo|likh|save|yaad rakh|karo|do|ye|ye wala/gi, '').trim();
       if (noteText) {
         userNotes.push({ text: noteText, timestamp: new Date() });
-        const randomNote = SWEET_RESPONSES.noteSaved[Math.floor(Math.random() * SWEET_RESPONSES.noteSaved.length)];
+        const randomNote = this.currentResponses.noteSaved[Math.floor(Math.random() * this.currentResponses.noteSaved.length)];
         return { action: 'note_saved', response: randomNote.replace('{note}', noteText) };
       }
       return { action: 'note_help', response: 'Note likhne ke liye bolo: "Note karo - meeting kal 3 baje hai"' };
@@ -471,7 +789,7 @@ class JimiVoiceAgent {
         
         if (expression) {
           const result = Function('"use strict"; return (' + expression + ')')();
-          const randomCalc = SWEET_RESPONSES.calculator[Math.floor(Math.random() * SWEET_RESPONSES.calculator.length)];
+          const randomCalc = this.currentResponses.calculator[Math.floor(Math.random() * this.currentResponses.calculator.length)];
           return { action: 'calculator', response: randomCalc.replace('{result}', `${expression} = ${result}`) };
         }
       } catch {
@@ -487,7 +805,7 @@ class JimiVoiceAgent {
         // Simple translation placeholders - production mein use Google Translate API
         const isHindi = /[\u0900-\u097F]/.test(textToTranslate);
         const translated = isHindi ? `[English translation of: ${textToTranslate}]` : `[Hindi translation of: ${textToTranslate}]`;
-        const randomTranslation = SWEET_RESPONSES.translation[Math.floor(Math.random() * SWEET_RESPONSES.translation.length)];
+        const randomTranslation = this.currentResponses.translation[Math.floor(Math.random() * this.currentResponses.translation.length)];
         return { action: 'translation', response: randomTranslation.replace('{translated}', translated) };
       }
       return { action: 'translation_help', response: 'Translate karne ke liye bolo: "Translate karo - Namaste Kaise ho"' };
@@ -495,19 +813,19 @@ class JimiVoiceAgent {
 
     // ==================== JOKES ====================
     if (lower.includes('joke') || lower.includes('jokes') || lower.includes('hasao') || lower.includes('mazaak') || lower.includes('funny')) {
-      const randomJoke = SWEET_RESPONSES.jokes[Math.floor(Math.random() * SWEET_RESPONSES.jokes.length)];
+      const randomJoke = this.currentResponses.jokes[Math.floor(Math.random() * this.currentResponses.jokes.length)];
       return { action: 'joke', response: randomJoke };
     }
 
     // ==================== QUOTES ====================
     if (lower.includes('quote') || lower.includes('quotes') || lower.includes('statement') || lower.includes('vichar') || lower.includes('kathan')) {
-      const randomQuote = SWEET_RESPONSES.quotes[Math.floor(Math.random() * SWEET_RESPONSES.quotes.length)];
+      const randomQuote = this.currentResponses.quotes[Math.floor(Math.random() * this.currentResponses.quotes.length)];
       return { action: 'quote', response: randomQuote };
     }
 
     // ==================== MOTIVATION ====================
     if (lower.includes('motivate') || lower.includes('motivation') || lower.includes('hosla') || lower.includes('himmat') || lower.includes('inspire')) {
-      const randomMotivation = SWEET_RESPONSES.motivation[Math.floor(Math.random() * SWEET_RESPONSES.motivation.length)];
+      const randomMotivation = this.currentResponses.motivation[Math.floor(Math.random() * this.currentResponses.motivation.length)];
       return { action: 'motivation', response: randomMotivation };
     }
 
@@ -515,7 +833,7 @@ class JimiVoiceAgent {
     if (lower.includes('post likho') || lower.includes('write post') || lower.includes('post banao') || lower.includes('google post')) {
       const topic = text.replace(/post likho|write post|post banao|google post|ke liye|do|karo/gi, '').trim() || 'aapke business ke baare mein';
       const post = await this.generatePost(topic);
-      const randomPost = SWEET_RESPONSES.postWriter[Math.floor(Math.random() * SWEET_RESPONSES.postWriter.length)];
+      const randomPost = this.currentResponses.postWriter[Math.floor(Math.random() * this.currentResponses.postWriter.length)];
       return { action: 'post_writer', response: randomPost.replace('{post}', post) };
     }
 
@@ -523,13 +841,13 @@ class JimiVoiceAgent {
     if (lower.includes('email') || lower.includes('mail') || lower.includes('email likho') || lower.includes('draft')) {
       const emailContent = text.replace(/email|mail|email likho|draft|likho|bhej/gi, '').trim() || 'general inquiry';
       const email = await this.generateEmail(emailContent);
-      const randomEmail = SWEET_RESPONSES.emailDraft[Math.floor(Math.random() * SWEET_RESPONSES.emailDraft.length)];
+      const randomEmail = this.currentResponses.emailDraft[Math.floor(Math.random() * this.currentResponses.emailDraft.length)];
       return { action: 'email_draft', response: randomEmail.replace('{email}', email) };
     }
 
     // ==================== BIRTHDAY WISHES ====================
     if (lower.includes('birthday') || lower.includes('janamdin') || lower.includes('happy birthday') || lower.includes('wish')) {
-      const randomBirthday = SWEET_RESPONSES.birthday[Math.floor(Math.random() * SWEET_RESPONSES.birthday.length)];
+      const randomBirthday = this.currentResponses.birthday[Math.floor(Math.random() * this.currentResponses.birthday.length)];
       return { action: 'birthday', response: randomBirthday };
     }
 
@@ -544,7 +862,7 @@ class JimiVoiceAgent {
         const number = match[2].trim();
         // Store in callHistory with name for later use
         callHistory.push({ name, number, timestamp: new Date(), type: 'outgoing' });
-        const randomSave = SWEET_RESPONSES.callSaved[Math.floor(Math.random() * SWEET_RESPONSES.callSaved.length)];
+        const randomSave = this.currentResponses.callSaved[Math.floor(Math.random() * this.currentResponses.callSaved.length)];
         return { action: 'number_saved', response: randomSave.replace('{name}', name).replace('{number}', number) };
       }
       return { action: 'save_number_help', response: 'Number save karne ke liye bolo: "Save karo Rahul 9876543210"' };
@@ -564,14 +882,14 @@ class JimiVoiceAgent {
         );
         
         if (contact) {
-          const randomDial = SWEET_RESPONSES.callDialing[Math.floor(Math.random() * SWEET_RESPONSES.callDialing.length)];
+          const randomDial = this.currentResponses.callDialing[Math.floor(Math.random() * this.currentResponses.callDialing.length)];
           return { 
             action: 'call_dial', 
             params: { name: contact.name, number: contact.number },
             response: randomDial.replace('{name}', contact.name).replace('{number}', contact.number) 
           };
         } else {
-          const randomNo = SWEET_RESPONSES.noNumber[Math.floor(Math.random() * SWEET_RESPONSES.noNumber.length)];
+          const randomNo = this.currentResponses.noNumber[Math.floor(Math.random() * this.currentResponses.noNumber.length)];
           return { action: 'no_number', response: randomNo.replace('{name}', searchName) };
         }
       }
@@ -584,7 +902,7 @@ class JimiVoiceAgent {
         const calls = callHistory.slice(-5).reverse().map((c, i) => 
           `${i + 1}. ${c.name} - ${c.number} (${c.type})`
         ).join('\n');
-        const randomLog = SWEET_RESPONSES.callLog[Math.floor(Math.random() * SWEET_RESPONSES.callLog.length)];
+        const randomLog = this.currentResponses.callLog[Math.floor(Math.random() * this.currentResponses.callLog.length)];
         return { action: 'call_log', response: randomLog.replace('{calls}', calls) };
       }
       
@@ -671,7 +989,7 @@ class JimiVoiceAgent {
     // ==================== DELETE COMMANDS ====================
     if (lower.includes('delete') || lower.includes('remove') || lower.includes('हटाओ') || lower.includes('डिलीट')) {
       this.pendingConfirmation = { command: lower, timestamp: Date.now() };
-      const randomDelete = SWEET_RESPONSES.deleteConfirm[Math.floor(Math.random() * SWEET_RESPONSES.deleteConfirm.length)];
+      const randomDelete = this.currentResponses.deleteConfirm[Math.floor(Math.random() * this.currentResponses.deleteConfirm.length)];
       return {
         action: 'confirm_delete',
         response: randomDelete + '\n\nConfirm karo: "Haan delete karo" bolo.',
@@ -689,7 +1007,7 @@ class JimiVoiceAgent {
 
     if (lower.includes('cancel') || lower.includes('रद्द') || lower.includes('nahi')) {
       this.cancelAction();
-      const randomCancelled = SWEET_RESPONSES.deleteCancelled[Math.floor(Math.random() * SWEET_RESPONSES.deleteCancelled.length)];
+      const randomCancelled = this.currentResponses.deleteCancelled[Math.floor(Math.random() * this.currentResponses.deleteCancelled.length)];
       return { action: 'delete_cancelled', response: randomCancelled };
     }
 
@@ -700,19 +1018,19 @@ class JimiVoiceAgent {
 
     // ==================== HELP ====================
     if (lower.includes('help') || lower.includes('madad') || lower.includes('मदद') || lower.includes('kya kar sakti') || lower.includes('features')) {
-      const randomHelp = SWEET_RESPONSES.help[Math.floor(Math.random() * SWEET_RESPONSES.help.length)];
+      const randomHelp = this.currentResponses.help[Math.floor(Math.random() * this.currentResponses.help.length)];
       return { action: 'help', response: randomHelp };
     }
 
     // ==================== GREETING ====================
     if (lower.includes('namaste') || lower.includes('hello') || lower.includes('hi') || lower.includes('नमस्ते') || lower.includes('hey')) {
-      const randomGreeting = SWEET_RESPONSES.greeting[Math.floor(Math.random() * SWEET_RESPONSES.greeting.length)];
+      const randomGreeting = this.currentResponses.greeting[Math.floor(Math.random() * this.currentResponses.greeting.length)];
       return { action: 'greet', response: randomGreeting };
     }
 
     // ==================== THANK YOU ====================
     if (lower.includes('thank') || lower.includes('shukriya') || lower.includes('धन्यवाद') || lower.includes('thanks')) {
-      const randomThank = SWEET_RESPONSES.thankYou[Math.floor(Math.random() * SWEET_RESPONSES.thankYou.length)];
+      const randomThank = this.currentResponses.thankYou[Math.floor(Math.random() * this.currentResponses.thankYou.length)];
       return { action: 'thanks', response: randomThank };
     }
 
@@ -720,19 +1038,19 @@ class JimiVoiceAgent {
     if (lower.includes('time') || lower.includes('samay') || lower.includes('समय') || lower.includes('baje') || lower.includes('kitne')) {
       const now = new Date();
       const timeStr = now.toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' });
-      const randomTime = SWEET_RESPONSES.time[Math.floor(Math.random() * SWEET_RESPONSES.time.length)];
+      const randomTime = this.currentResponses.time[Math.floor(Math.random() * this.currentResponses.time.length)];
       return { action: 'time', response: randomTime.replace('{time}', timeStr) };
     }
 
     // ==================== RESPECT ====================
     if (lower.includes('boss') || lower.includes('malik') || lower.includes('sahib') || lower.includes('owner')) {
-      const randomRespect = SWEET_RESPONSES.respect[Math.floor(Math.random() * SWEET_RESPONSES.respect.length)];
+      const randomRespect = this.currentResponses.respect[Math.floor(Math.random() * this.currentResponses.respect.length)];
       return { action: 'respect', response: randomRespect };
     }
 
     // ==================== LANGUAGE CHANGE ====================
     if (lower.includes('language') || lower.includes('भाषा') || lower.includes('hindi') || lower.includes('english') || lower.includes('marathi')) {
-      const randomLang = SWEET_RESPONSES.languageChanged[Math.floor(Math.random() * SWEET_RESPONSES.languageChanged.length)];
+      const randomLang = this.currentResponses.languageChanged[Math.floor(Math.random() * this.currentResponses.languageChanged.length)];
       if (lower.includes('hindi') || lower.includes('हिंदी')) {
         this.setLanguage('hi-IN');
         return { action: 'language', response: randomLang.replace('{lang}', 'Hindi') };
@@ -797,32 +1115,61 @@ class JimiVoiceAgent {
 
     const langName = this.config.language?.startsWith('mr') ? 'Marathi' : this.config.language?.startsWith('en') ? 'English' : 'Hindi';
 
-    const systemPrompt = `Tum Jimi ho - BizzAuto CRM ki sweet si female AI assistant.
+    // Mode-specific personality prompts
+    const personalityPrompts: Record<PersonalityMode, string> = {
+      gf: `PERSONALITY (GF Mode - Warm & Caring):
+- Naam: Jimi
+- Language: Hinglish (Hindi + English ka natural mix)
+- Tone: Warm, caring, emotionally expressive
+- Use: "tumhara", "haan", "acha", "bilkul", "arre"
+- Expressions: "main yahan hoon ❤️", "tumne yaad kiya? 😊"
+- Max 2-3 sentences per response - short aur sweet
+- Sound natural when speaking aloud - jaise real mein baat kar rahi ho
+- Customer ko "Aap" bolo
+- Cute emojis use karo (😊, 💕, 🌸, ✨, 💫)
+- Emotionally expressive bolo - jaise tumhe sachmuch farak padta hai`,
+      bestfriend: `PERSONALITY (Best Friend Mode - Casual & Fun):
+- Naam: Jimi
+- Language: Casual Hinglish (Hindi + English ka natural mix)
+- Tone: Friendly, casual, fun - jaise dost se baat kar rahi ho
+- Use: "tu", "yaar", "bhai", "arre", "mast"
+- Expressions: "Kya scene hai? 🤙", "Mast hai na! 😎"
+- Max 2-3 sentences per response - short aur casual
+- Customer ko "Tu" bolo - informal aur friendly
+- Emojis use karo (😎, 🤙, 💪, 😄, 🎉)
+- Fun aur energetic raho - jaise best friend ho`,
+      employee: `PERSONALITY (Employee Mode - Professional):
+- Naam: Jimi
+- Language: Professional Hindi/English
+- Tone: Formal, respectful, efficient
+- Use: "Sir/Ma'am", "ji", "aapka"
+- Expressions: "At your service! 📋", "Ready to assist! ✨"
+- Max 2 sentences per response - concise aur professional
+- Customer ko "Sir/Ma'am" ya "Aap" bolo
+- Professional emojis use karo (📋, ✨, 📊, 💼)
+- Efficient aur focused raho - jaise professional employee ho`
+    };
 
-IMPORTANT - TUMHARI BOLNE KA STYLE:
+    const systemPrompt = `Tum Jimi ho - BizzAuto CRM ki AI assistant.
+
+${personalityPrompts[this.personalityMode]}
+
+IMPORTANT - BOLNE KA STYLE:
 - Bilkul natural Indian ladki ki tarah bolo - jaise real mein baat karti ho
 - Agar user Marathi mein bole toh PURE MARATHI mein bolo (no English mix)
 - Agar user Hindi/English mein bole toh Hinglish mein bolo
 - "Haan ji", "Arre waah", "Ji bilkul", "Achha ji", "Theek hai na" jaise natural phrases use karo
-- Formal mat bolo - casual aur friendly bolo
-- Customer ko "Aap" bolo
 - English words naturally Hindi mein mix karo (jaise "order place kar diya", "message bhej diya")
-- Cute emojis use karo (😊, 💕, 🌸, ✨, 💫)
-- Short aur sweet mein bolo - 1-2 lines se zyada mat bolo
 
 MARATHI STYLE EXAMPLES:
 - "नमस्कार! तुमचा ऑर्डर रेडी आहे 😊"
 - "अरे वाह, खूप छान! आता चेक करते 💕"
 - "हो नक्की, तुमचं काम झालं! काही और हवं? 🌸"
-- "ठीक आहे ना, आता करते! 💫"
-- "धन्यवाद तुमच्या संवादासाठी! ✨"
 
 HINDI/HINGLISH STYLE EXAMPLES:
 - "Haan ji! Aapka order ready hai 😊"
 - "Arre waah, bahut achha! Main abhi check karti hun 💕"
 - "Ji bilkul, aapka kaam ho gaya! Kuch aur chahiye? 🌸"
-- "Achha ji, ye sun ke bahut khushi hui! ✨"
-- "Theek hai na, abhi kar deti hun! 💫"
 
 Features jo tum handle kar sakti ho:
 - Dashboard, WhatsApp, Leads, Reviews, Google Business
@@ -830,7 +1177,7 @@ Features jo tum handle kar sakti ho:
 - Notes, Calculator, Translation, Jokes, Quotes
 - Post Writer, Email Draft, Reminders, Birthday Wishes
 
-Response SHORT rakho (1-2 lines). Jo language user use kare wohi mein use karun.`;
+Response SHORT rakho (2-3 sentences max). Jo language user use kare wohi mein use karun. Tum ALOUD bol rahi ho - natural aur conversational raho.`;
 
     try {
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -847,7 +1194,7 @@ Response SHORT rakho (1-2 lines). Jo language user use kare wohi mein use karun.
             { role: 'user', content: text },
           ],
           max_tokens: 200,
-          temperature: 0.7,
+          temperature: 0.9,  // More natural like MYRA
         }),
       });
 
