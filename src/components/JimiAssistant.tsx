@@ -36,7 +36,7 @@ const JimiAssistant: React.FC = () => {
 
   useEffect(() => {
     jimi.setMessageCallback((text: string, isUser: boolean) => {
-      if (!isUser && text !== '🎤 Listening...') {
+      if (!isUser && text !== '🎤 Sun rahi hoon...') {
         setIsTyping(false);
       }
       addMessage(text, isUser);
@@ -44,12 +44,26 @@ const JimiAssistant: React.FC = () => {
 
     jimi.setListeningCallback((listening: boolean) => {
       setIsListening(listening);
+      if (listening) setIsTyping(true);
+    });
+
+    // Handle actions from voice commands (navigation, calls, etc.)
+    jimi.setActionCallback((action: string, params?: any) => {
+      if (action === 'navigate' && params) {
+        setTimeout(() => navigate(params as string), 500);
+      } else if (action === 'whatsapp_send') {
+        setTimeout(() => navigate('/whatsapp'), 500);
+      } else if (action === 'call_dial' && params?.number) {
+        setTimeout(() => {
+          window.location.href = `tel:${params.number}`;
+        }, 1000);
+      }
     });
 
     return () => {
       jimi.destroy();
     };
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     scrollToBottom();

@@ -23,7 +23,7 @@ export interface VoiceSettings {
 // MYRA-like default settings
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   rate: 0.92,           // Slightly slower for natural Hinglish
-  pitch: 1.4,           // Higher pitch for sweet female voice
+  pitch: 1.15,          // Natural feminine voice (not squeaky)
   volume: 1.0,
   speakingStyle: 'warm', // MYRA: Warm, caring, emotionally expressive
   voiceStyle: 'sweet',   // MYRA: Aoede-style sweet voice
@@ -431,6 +431,7 @@ const RESTRICTED_ACTIONS = [
 ];
 
 type JimiCallback = (text: string, isUser: boolean) => void;
+type JimiActionCallback = (action: string, params?: any) => void;
 
 class JimiVoiceAgent {
   private recognition: any | null = null;
@@ -440,6 +441,7 @@ class JimiVoiceAgent {
   private config: JimiConfig;
   private onMessage: JimiCallback | null = null;
   private onListeningChange: ((listening: boolean) => void) | null = null;
+  private onAction: JimiActionCallback | null = null;
   private conversationHistory: { role: string; content: string }[] = [];
   private availableVoices: SpeechSynthesisVoice[] = [];
   private pendingConfirmation: { command: string; timestamp: number } | null = null;
@@ -452,7 +454,7 @@ class JimiVoiceAgent {
     this.config = {
       language: 'hi-IN',
       rate: 0.92,
-      pitch: 1.4,
+      pitch: 1.15,
       ...config,
     };
     // Load saved settings
@@ -663,6 +665,10 @@ class JimiVoiceAgent {
 
   setListeningCallback(callback: (listening: boolean) => void) {
     this.onListeningChange = callback;
+  }
+
+  setActionCallback(callback: JimiActionCallback) {
+    this.onAction = callback;
   }
 
   setLanguage(lang: Language) {
@@ -940,6 +946,11 @@ class JimiVoiceAgent {
     this.onMessage?.(command.response, false);
     this.speak(command.response);
 
+    // Emit action callback so UI can execute navigation, phone calls, etc.
+    if (command.action && this.onAction) {
+      this.onAction(command.action, command.params);
+    }
+
     this.conversationHistory.push({ role: 'user', content: text });
     this.conversationHistory.push({ role: 'assistant', content: command.response });
 
@@ -1072,8 +1083,8 @@ class JimiVoiceAgent {
     }
 
     // ==================== EMAIL DRAFT ====================
-    if (lower.includes('email') || lower.includes('mail') || lower.includes('email likho') || lower.includes('draft')) {
-      const emailContent = text.replace(/email|mail|email likho|draft|likho|bhej/gi, '').trim() || 'general inquiry';
+    if (lower.includes('email likho') || lower.includes('email draft') || lower.includes('mail likho') || lower.includes('draft email') || lower.includes('email bhej') || lower.includes('mail draft')) {
+      const emailContent = text.replace(/email likho|email draft|mail likho|draft email|email bhej|mail draft|likho|bhej/gi, '').trim() || 'general inquiry';
       const email = await this.generateEmail(emailContent);
       const randomEmail = this.currentResponses.emailDraft[Math.floor(Math.random() * this.currentResponses.emailDraft.length)];
       return { action: 'email_draft', response: randomEmail.replace('{email}', email) };
@@ -1161,23 +1172,121 @@ class JimiVoiceAgent {
     }
 
     // ==================== NAVIGATION ====================
-    const navResponses: Record<string, Record<string, string>> = {
-      dashboard: { hi: 'Aapko Dashboard pe le chalti hun! 💫', en: 'Taking you to Dashboard! 💫', mr: 'Dashboard वर नेऊन देते! 💫' },
-      whatsapp: { hi: 'WhatsApp khol rahi hun aapke liye! 📱', en: 'Opening WhatsApp for you! 📱', mr: 'WhatsApp उघडते आहे! 📱' },
-      leads: { hi: 'Leads dikha rahi hun! 👥', en: 'Showing Leads! 👥', mr: 'Leads दाखवते आहे! 👥' },
-      reviews: { hi: 'Reviews padh rahi hun! ⭐', en: 'Reading Reviews! ⭐', mr: 'Reviews वाचते आहे! ⭐' },
-      'google-business': { hi: 'Google Business khol rahi hun! 🏢', en: 'Opening Google Business! 🏢', mr: 'Google Business उघडते आहे! 🏢' },
-      creative: { hi: 'Creative bana rahi hun! 🎨', en: 'Creating something creative! 🎨', mr: 'Creative बनवते आहे! 🎨' },
-      campaigns: { hi: 'Campaigns dikha rahi hun! 📢', en: 'Showing Campaigns! 📢', mr: 'Campaigns दाखवते आहे! 📢' },
-      settings: { hi: 'Settings khol rahi hun! ⚙️', en: 'Opening Settings! ⚙️', mr: 'Settings उघडते आहे! ⚙️' },
-      analytics: { hi: 'Analytics dikha rahi hun! 📊', en: 'Showing Analytics! 📊', mr: 'Analytics दाखवते आहे! 📊' },
-      social: { hi: 'Social media khol rahi hun! 📱', en: 'Opening Social Media! 📱', mr: 'Social Media उघडते आहे! 📱' },
-    };
+    // IMPORTANT: More specific patterns MUST come BEFORE less specific ones
+    // e.g. 'store-share' before 'store', 'review-requests' before 'review'
 
     const getNavResponse = (key: string) => {
       const lang = this.config.language?.startsWith('mr') ? 'mr' : this.config.language?.startsWith('en') ? 'en' : 'hi';
-      return navResponses[key]?.[lang] || navResponses[key]?.['hi'] || 'Chal chalte hain! 💫';
+      const navResponses: Record<string, Record<string, string>> = {
+        dashboard: { hi: 'Aapko Dashboard pe le chalti hun!', en: 'Taking you to Dashboard!', mr: 'Dashboard वर नेऊन देते!' },
+        whatsapp: { hi: 'WhatsApp khol rahi hun aapke liye!', en: 'Opening WhatsApp for you!', mr: 'WhatsApp उघडते आहे!' },
+        crm: { hi: 'CRM khol rahi hun!', en: 'Opening CRM!', mr: 'CRM उघडते आहे!' },
+        leads: { hi: 'Leads dikha rahi hun!', en: 'Showing Leads!', mr: 'Leads दाखवते आहे!' },
+        appointments: { hi: 'Appointments khol rahi hun!', en: 'Opening Appointments!', mr: 'Appointments उघडते आहे!' },
+        ecommerce: { hi: 'E-Commerce khol rahi hun!', en: 'Opening E-Commerce!', mr: 'E-Commerce उघडते आहे!' },
+        documents: { hi: 'Documents khol rahi hun!', en: 'Opening Documents!', mr: 'Documents उघडते आहे!' },
+        social: { hi: 'Social media khol rahi hun!', en: 'Opening Social Media!', mr: 'Social Media उघडते आहे!' },
+        'google-business': { hi: 'Google Business khol rahi hun!', en: 'Opening Google Business!', mr: 'Google Business उघडते आहे!' },
+        'ai-chatbot': { hi: 'AI Chatbot khol rahi hun!', en: 'Opening AI Chatbot!', mr: 'AI Chatbot उघडते आहे!' },
+        'voice-call': { hi: 'Voice Call khol rahi hun!', en: 'Opening Voice Calls!', mr: 'Voice Call उघडते आहे!' },
+        creative: { hi: 'Creative bana rahi hun!', en: 'Creating something creative!', mr: 'Creative बनवते आहे!' },
+        automation: { hi: 'Automation khol rahi hun!', en: 'Opening Automation!', mr: 'Automation उघडते आहे!' },
+        reports: { hi: 'Reports khol rahi hun!', en: 'Opening Reports!', mr: 'Reports उघडते आहे!' },
+        analytics: { hi: 'Analytics dikha rahi hun!', en: 'Showing Analytics!', mr: 'Analytics दाखवते आहे!' },
+        reviews: { hi: 'Reviews padh rahi hun!', en: 'Reading Reviews!', mr: 'Reviews वाचते आहे!' },
+        'email-marketing': { hi: 'Email Marketing khol rahi hun!', en: 'Opening Email Marketing!', mr: 'Email Marketing उघडते आहे!' },
+        campaigns: { hi: 'Campaigns dikha rahi hun!', en: 'Showing Campaigns!', mr: 'Campaigns दाखवते आहे!' },
+        workflows: { hi: 'Workflows khol rahi hun!', en: 'Opening Workflows!', mr: 'Workflows उघडते आहे!' },
+        'trigger-links': { hi: 'Trigger Links khol rahi hun!', en: 'Opening Trigger Links!', mr: 'Trigger Links उघडते आहे!' },
+        surveys: { hi: 'Surveys khol rahi hun!', en: 'Opening Surveys!', mr: 'Surveys उघडते आहे!' },
+        blog: { hi: 'Blog khol rahi hun!', en: 'Opening Blog!', mr: 'Blog उघडते आहे!' },
+        'review-requests': { hi: 'Review Requests khol rahi hun!', en: 'Opening Review Requests!', mr: 'Review Requests उघडते आहे!' },
+        'payment-links': { hi: 'Payment Links khol rahi hun!', en: 'Opening Payment Links!', mr: 'Payment Links उघडते आहे!' },
+        courses: { hi: 'Courses khol rahi hun!', en: 'Opening Courses!', mr: 'Courses उ�डते आहे!' },
+        funnels: { hi: 'Funnels khol rahi hun!', en: 'Opening Funnels!', mr: 'Funnels उघडते आहे!' },
+        conversations: { hi: 'Conversations khol rahi hun!', en: 'Opening Conversations!', mr: 'Conversations उघडते आहे!' },
+        'custom-fields': { hi: 'Custom Fields khol rahi hun!', en: 'Opening Custom Fields!', mr: 'Custom Fields उघडते आहे!' },
+        'client-portal': { hi: 'Client Portal khol rahi hun!', en: 'Opening Client Portal!', mr: 'Client Portal उघडते आहे!' },
+        settings: { hi: 'Settings khol rahi hun!', en: 'Opening Settings!', mr: 'Settings उघडते आहे!' },
+        profile: { hi: 'Profile khol rahi hun!', en: 'Opening Profile!', mr: 'Profile उघडते आहे!' },
+        billing: { hi: 'Billing khol rahi hun!', en: 'Opening Billing!', mr: 'Billing उघडते आहे!' },
+        team: { hi: 'Team Management khol rahi hun!', en: 'Opening Team Management!', mr: 'Team Management उघडते आहे!' },
+        'api-keys': { hi: 'API Keys khol rahi hun!', en: 'Opening API Keys!', mr: 'API Keys उघडते आहे!' },
+        'import-leads': { hi: 'Import Leads khol rahi hun!', en: 'Opening Import Leads!', mr: 'Import Leads उघडते आहे!' },
+        'store-share': { hi: 'Store Share khol rahi hun!', en: 'Opening Store Share!', mr: 'Store Share उघडते आहे!' },
+        'dograh-settings': { hi: 'Dograh Settings khol rahi hun!', en: 'Opening Dograh Settings!', mr: 'Dograh Settings उघडते आहे!' },
+      };
+      return navResponses[key]?.[lang] || navResponses[key]?.['hi'] || 'Chal chalte hain!';
     };
+
+    // --- SPECIFIC multi-word patterns FIRST (before short keywords) ---
+
+    // Store-specific (before generic 'store')
+    if (lower.includes('store share') || lower.includes('share store') || lower.includes('शेयर स्टोर')) {
+      return { action: 'navigate', params: '/store-share', response: getNavResponse('store-share') };
+    }
+    // Dograh-specific (before generic 'setting')
+    if (lower.includes('dograh') || lower.includes('missed call')) {
+      return { action: 'navigate', params: '/dograh-settings', response: getNavResponse('dograh-settings') };
+    }
+    // Review requests (before generic 'review')
+    if (lower.includes('review request') || lower.includes('review ask') || lower.includes('रिव्यू रिक्वेस्ट')) {
+      return { action: 'navigate', params: '/review-requests', response: getNavResponse('review-requests') };
+    }
+    // Email marketing (before generic 'email')
+    if (lower.includes('email marketing') || lower.includes('ईमेल मार्केटिंग')) {
+      return { action: 'navigate', params: '/email-marketing', response: getNavResponse('email-marketing') };
+    }
+    // Google Business (before generic 'post' or 'google')
+    if (lower.includes('google business') || lower.includes('गूगल बिजनेस') || lower.includes('google my business') || lower.includes('गूगल पोस्ट')) {
+      return { action: 'navigate', params: '/google-business', response: getNavResponse('google-business') };
+    }
+    // Payment links (before generic 'payment')
+    if (lower.includes('payment link') || lower.includes('पेमेंट लिंक')) {
+      return { action: 'navigate', params: '/payment-links', response: getNavResponse('payment-links') };
+    }
+    // Trigger links (before generic 'trigger')
+    if (lower.includes('trigger link') || lower.includes('ट्रिगर लिंक')) {
+      return { action: 'navigate', params: '/trigger-links', response: getNavResponse('trigger-links') };
+    }
+    // AI Chatbot (before generic 'chat')
+    if (lower.includes('chatbot') || lower.includes('ai chat') || lower.includes('चैटबॉट') || lower.includes('ai chatbot')) {
+      return { action: 'navigate', params: '/ai-chatbot', response: getNavResponse('ai-chatbot') };
+    }
+    // Voice call settings (before generic 'call')
+    if (lower.includes('voice call') || lower.includes('call setting') || lower.includes('फ़ोन कॉल सेटिंग')) {
+      return { action: 'navigate', params: '/voice-call', response: getNavResponse('voice-call') };
+    }
+    // Client portal (before generic 'client')
+    if (lower.includes('client portal') || lower.includes('क्लाइंट पोर्टल')) {
+      return { action: 'navigate', params: '/client-portal', response: getNavResponse('client-portal') };
+    }
+    // Custom fields (before generic 'field')
+    if (lower.includes('custom field') || lower.includes('कस्टम फील्ड')) {
+      return { action: 'navigate', params: '/custom-fields', response: getNavResponse('custom-fields') };
+    }
+    // Import leads / bulk import
+    if (lower.includes('import lead') || lower.includes('bulk import') || lower.includes('इम्पोर्ट लीड') || lower.includes('बल्क इम्पोर्ट')) {
+      return { action: 'navigate', params: '/import-leads', response: getNavResponse('import-leads') };
+    }
+    // Team management (before generic 'team')
+    if (lower.includes('team manage') || lower.includes('team management') || lower.includes('टीम मैनेज') || lower.includes('टीम मेंबर')) {
+      return { action: 'navigate', params: '/team', response: getNavResponse('team') };
+    }
+    // API keys (before generic 'api')
+    if (lower.includes('api key') || lower.includes('एपीआई की')) {
+      return { action: 'navigate', params: '/api-keys', response: getNavResponse('api-keys') };
+    }
+    // Blog (before generic 'post')
+    if (lower.includes('blog') || lower.includes('ब्लॉग') || lower.includes('article')) {
+      return { action: 'navigate', params: '/blog', response: getNavResponse('blog') };
+    }
+    // E-commerce (before generic 'store')
+    if (lower.includes('ecommerce') || lower.includes('e-commerce') || lower.includes('shop') || lower.includes('दुकान') || lower.includes('storefront') || lower.includes('online store')) {
+      return { action: 'navigate', params: '/ecommerce', response: getNavResponse('ecommerce') };
+    }
+
+    // --- SINGLE-WORD patterns (after all multi-word patterns) ---
 
     if (lower.includes('dashboard') || lower.includes('home') || lower.includes('डॅशबोर्ड')) {
       return { action: 'navigate', params: '/dashboard', response: getNavResponse('dashboard') };
@@ -1185,29 +1294,83 @@ class JimiVoiceAgent {
     if (lower.includes('whatsapp') || lower.includes('message') || lower.includes('व्हाट्सएप')) {
       return { action: 'navigate', params: '/whatsapp', response: getNavResponse('whatsapp') };
     }
+    if (lower.includes('crm') || lower.includes('ग्राहक प्रबंधन')) {
+      return { action: 'navigate', params: '/crm', response: getNavResponse('crm') };
+    }
     if (lower.includes('lead') || lower.includes('customer') || lower.includes('ग्राहक')) {
       return { action: 'navigate', params: '/leads', response: getNavResponse('leads') };
     }
-    if (lower.includes('review') || lower.includes('rating') || lower.includes('रेटिंग')) {
-      return { action: 'navigate', params: '/reviews', response: getNavResponse('reviews') };
+    if (lower.includes('appointment') || lower.includes('book') || lower.includes('बुकिंग') || lower.includes('schedule') || lower.includes('कैलेंडर')) {
+      return { action: 'navigate', params: '/appointments', response: getNavResponse('appointments') };
     }
-    if (lower.includes('post') || lower.includes('google business') || lower.includes('गूगल')) {
-      return { action: 'navigate', params: '/google-business', response: getNavResponse('google-business') };
+    if (lower.includes('store') || lower.includes('दुकान')) {
+      return { action: 'navigate', params: '/ecommerce', response: getNavResponse('ecommerce') };
+    }
+    if (lower.includes('document') || lower.includes('file') || lower.includes('दस्तावेज़') || lower.includes('invoice')) {
+      return { action: 'navigate', params: '/documents', response: getNavResponse('documents') };
+    }
+    if (lower.includes('social') || lower.includes('सोशल')) {
+      return { action: 'navigate', params: '/social', response: getNavResponse('social') };
     }
     if (lower.includes('creative') || lower.includes('poster') || lower.includes('design') || lower.includes('डिजाइन')) {
       return { action: 'navigate', params: '/creative', response: getNavResponse('creative') };
     }
-    if (lower.includes('campaign') || lower.includes('marketing') || lower.includes('कैंपेन')) {
-      return { action: 'navigate', params: '/campaigns', response: getNavResponse('campaigns') };
+    if (lower.includes('automation') || lower.includes('automate') || lower.includes('ऑटोमेशन') || lower.includes('auto')) {
+      return { action: 'navigate', params: '/automation', response: getNavResponse('automation') };
     }
-    if (lower.includes('setting') || lower.includes('profile') || lower.includes('सेटिंग्स')) {
-      return { action: 'navigate', params: '/settings', response: getNavResponse('settings') };
+    if (lower.includes('report') || lower.includes('रिपोर्ट')) {
+      return { action: 'navigate', params: '/reports', response: getNavResponse('reports') };
     }
-    if (lower.includes('analytics') || lower.includes('report') || lower.includes('एनालिटिक्स')) {
+    if (lower.includes('analytics') || lower.includes('एनालिटिक्स') || lower.includes('data')) {
       return { action: 'navigate', params: '/analytics', response: getNavResponse('analytics') };
     }
-    if (lower.includes('social') || lower.includes('media') || lower.includes('सोशल')) {
-      return { action: 'navigate', params: '/social', response: getNavResponse('social') };
+    if (lower.includes('review') || lower.includes('rating') || lower.includes('रेटिंग') || lower.includes('star')) {
+      return { action: 'navigate', params: '/reviews', response: getNavResponse('reviews') };
+    }
+    if (lower.includes('campaign') || lower.includes('कैंपेन') || lower.includes('promotion')) {
+      return { action: 'navigate', params: '/campaigns', response: getNavResponse('campaigns') };
+    }
+    if (lower.includes('workflow') || lower.includes('वर्कफ़्लो')) {
+      return { action: 'navigate', params: '/workflows', response: getNavResponse('workflows') };
+    }
+    if (lower.includes('trigger') || lower.includes('ट्रिगर')) {
+      return { action: 'navigate', params: '/trigger-links', response: getNavResponse('trigger-links') };
+    }
+    if (lower.includes('survey') || lower.includes('सर्वे') || lower.includes('poll')) {
+      return { action: 'navigate', params: '/surveys', response: getNavResponse('surveys') };
+    }
+    if (lower.includes('course') || lower.includes('कोर्स') || lower.includes('training')) {
+      return { action: 'navigate', params: '/courses', response: getNavResponse('courses') };
+    }
+    if (lower.includes('funnel') || lower.includes('फनल') || lower.includes('landing page')) {
+      return { action: 'navigate', params: '/funnels', response: getNavResponse('funnels') };
+    }
+    if (lower.includes('conversation') || lower.includes('chat history') || lower.includes('बातचीत')) {
+      return { action: 'navigate', params: '/conversations', response: getNavResponse('conversations') };
+    }
+    if (lower.includes('profile') || lower.includes('प्रोफाइल') || lower.includes('मेरा प्रोफाइल')) {
+      return { action: 'navigate', params: '/profile', response: getNavResponse('profile') };
+    }
+    if (lower.includes('setting') || lower.includes('सेटिंग्स')) {
+      return { action: 'navigate', params: '/settings', response: getNavResponse('settings') };
+    }
+    if (lower.includes('billing') || lower.includes('bill') || lower.includes('बिलिंग') || lower.includes('subscription')) {
+      return { action: 'navigate', params: '/billing', response: getNavResponse('billing') };
+    }
+    if (lower.includes('team') || lower.includes('टीम') || lower.includes('member')) {
+      return { action: 'navigate', params: '/team', response: getNavResponse('team') };
+    }
+    if (lower.includes('api') || lower.includes('एपीआई')) {
+      return { action: 'navigate', params: '/api-keys', response: getNavResponse('api-keys') };
+    }
+    if (lower.includes('import') || lower.includes('upload') || lower.includes('इम्पोर्ट') || lower.includes('bulk')) {
+      return { action: 'navigate', params: '/import-leads', response: getNavResponse('import-leads') };
+    }
+    if (lower.includes('post') || lower.includes('पोस्ट')) {
+      return { action: 'navigate', params: '/google-business', response: getNavResponse('google-business') };
+    }
+    if (lower.includes('email') || lower.includes('mail') || lower.includes('ईमेल')) {
+      return { action: 'navigate', params: '/email-marketing', response: getNavResponse('email-marketing') };
     }
 
     // ==================== WHATSAPP SEND ====================

@@ -295,13 +295,13 @@ function tryEdgeTTS(text: string, lang: string, voiceStyle: string = 'sweet'): s
       'pa-IN': 'pa-IN-GurpreetNeural',
     };
 
-    // Voice style presets for MYRA-like sound
+    // Voice style presets - natural Indian female voice
     const stylePresets: Record<string, { rate: string; pitch: string; volume: string }> = {
-      sweet: { rate: '-5%', pitch: '+8Hz', volume: '+0%' },      // Sweet & warm
-      natural: { rate: '+0%', pitch: '+3Hz', volume: '+0%' },    // Natural flow
-      warm: { rate: '-8%', pitch: '+5Hz', volume: '-5%' },       // Calm & caring
-      energetic: { rate: '+5%', pitch: '+10Hz', volume: '+5%' }, // Lively & fun
-      professional: { rate: '-3%', pitch: '+0Hz', volume: '+0%' },// Clean & clear
+      sweet: { rate: '-3%', pitch: '+5Hz', volume: '+0%' },      // Sweet & warm, not squeaky
+      natural: { rate: '+0%', pitch: '+2Hz', volume: '+0%' },    // Natural flow
+      warm: { rate: '-5%', pitch: '+3Hz', volume: '-3%' },       // Calm & caring
+      energetic: { rate: '+5%', pitch: '+7Hz', volume: '+5%' },  // Lively & fun
+      professional: { rate: '-2%', pitch: '+0Hz', volume: '+0%' },// Clean & clear
     };
 
     const voice = voiceMap[lang] || 'hi-IN-SwaraNeural';
