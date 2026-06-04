@@ -41,6 +41,7 @@ function connectToRedis(url: string) {
   });
   
   client.on('error', (err: any) => {
+    if (err.message?.includes('NOAUTH')) return;
     console.error(`[Redis] Connection error: ${err.message}`);
   });
   

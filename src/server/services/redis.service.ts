@@ -38,6 +38,7 @@ export async function initRedis(): Promise<RedisClientType | null> {
     });
 
     redisClient.on('error', (err: any) => {
+      if (err.message?.includes('NOAUTH')) return;
       console.error(`[Redis Service] Error: ${err.message}`);
       isConnected = false;
     });
