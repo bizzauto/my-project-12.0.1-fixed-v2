@@ -504,19 +504,12 @@ class JimiVoiceAgent {
 
     this.recognition.onresult = (event: any) => {
       let finalTranscript = '';
-      let interimTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           finalTranscript += transcript;
-        } else {
-          interimTranscript += transcript;
         }
-      }
-
-      if (interimTranscript && this.onMessage) {
-        this.onMessage(interimTranscript, true);
       }
 
       if (finalTranscript) {
@@ -1376,6 +1369,9 @@ Features:
 Response SHORT rakho (1-2 sentences). Jo language user use kare wohi mein use karun. Tum ALOUD bol rahi ho - natural aur conversational raho. Emojis mat bulao - TTS mein read nahi hote! Special characters (⭐, 💫, ✨, -) mat use karo - voice mein garbled sunayi deta hai!`;
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -1392,7 +1388,15 @@ Response SHORT rakho (1-2 sentences). Jo language user use kare wohi mein use ka
           max_tokens: 150,
           temperature: 0.8,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        console.error('Jimi: NVIDIA API error', response.status);
+        return 'AI service temporary issue hai. Thodi der baad try karo.';
+      }
 
       const data = await response.json();
       let responseText = data?.choices?.[0]?.message?.content?.trim() || 'Samajh nahi aaya. Phir se bolo.';
@@ -1407,7 +1411,11 @@ Response SHORT rakho (1-2 sentences). Jo language user use kare wohi mein use ka
         .trim();
       
       return responseText;
-    } catch (err) {
+    } catch (err: any) {
+      console.error('Jimi: AI call failed:', err.message || err);
+      if (err.name === 'AbortError') {
+        return 'AI service slow hai. Phir se try karo.';
+      }
       return 'AI service se response nahi aaya. Phir se try karo.';
     }
   }
