@@ -750,8 +750,6 @@ class JimiVoiceAgent {
   }
 
   private audioElement: HTMLAudioElement | null = null;
-  private pendingAudioQueue: string[] = [];
-  private isPlayingQueued = false;
 
   async speak(text: string) {
     if (!this.synthesis) return;
@@ -762,87 +760,9 @@ class JimiVoiceAgent {
 
     const detectedLang = this.detectLanguage(text);
 
-    // Try backend TTS first (Google Cloud Neural2 / Edge TTS - much more natural)
-    try {
-      const apiUrl = (import.meta as any).env?.VITE_API_URL || '';
-      const response = await fetch(`${apiUrl}/api/jimi/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: cleanText,
-          lang: detectedLang,
-          gender: 'FEMALE',
-          speed: 0.92,     // Natural conversational pace (slightly slower = more natural)
-          pitch: 1.05,     // +5% for sweetness without cartoonish
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.audio) {
-        // Backend returned natural TTS audio (Neural2/Edge)
-        const audioSrc = `data:audio/mp3;base64,${data.audio}`;
-        this.playAudio(audioSrc);
-        return;
-      }
-
-      // If backend says fallback, try Edge TTS (free)
-      if (data.fallback) {
-        const edgeResponse = await fetch(`${apiUrl}/api/jimi/tts/edge`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: cleanText,
-            lang: detectedLang,
-            gender: 'Female',
-          }),
-        });
-
-        const edgeData = await edgeResponse.json();
-        if (edgeData.audio) {
-          const audioSrc = `data:audio/mp3;base64,${edgeData.audio}`;
-          this.playAudio(audioSrc);
-          return;
-        }
-      }
-    } catch (err) {
-      console.log('Jimi: Backend TTS failed, using browser TTS');
-    }
-
-    // Fallback: Web Speech API (browser TTS)
+    // Always use browser TTS - most reliable
+    // Backend TTS is optional enhancement, not required
     this.speakBrowserTTS(cleanText, detectedLang);
-  }
-
-  private playAudio(src: string) {
-    // Stop any current playback
-    if (this.audioElement) {
-      this.audioElement.pause();
-      this.audioElement = null;
-    }
-
-    this.isSpeaking = true;
-    this.audioElement = new Audio(src);
-    this.audioElement.volume = 1.0;
-
-    this.audioElement.onended = () => {
-      this.isSpeaking = false;
-      this.audioElement = null;
-      // Play next in queue if any
-      this.playNextFromQueue();
-    };
-
-    this.audioElement.onerror = () => {
-      console.error('Jimi: Audio playback error, falling back to browser TTS');
-      this.isSpeaking = false;
-      this.audioElement = null;
-      // Fallback to browser TTS for this text
-      this.speakBrowserTTS(src.includes('data:') ? '' : src);
-    };
-
-    this.audioElement.play().catch(() => {
-      this.isSpeaking = false;
-      this.audioElement = null;
-    });
   }
 
   private speakBrowserTTS(text: string, lang?: string) {
@@ -856,29 +776,22 @@ class JimiVoiceAgent {
     const voice = this.findBestVoiceForLang(utterance.lang);
     if (voice) {
       utterance.voice = voice;
-      console.log('Jimi: Using browser voice -', voice.name);
+      console.log('Jimi: Using voice -', voice.name);
     }
     
     // Natural female voice settings
-    // Rate: 0.92 = slightly slower than normal = natural conversational pace
-    // Pitch: 1.3-1.5 = female range, higher = sweeter
     utterance.rate = 0.92;
-    utterance.pitch = 1.4;    // Sweet but not cartoonish
+    utterance.pitch = 1.4;
     utterance.volume = 1.0;
 
     utterance.onstart = () => { this.isSpeaking = true; };
     utterance.onend = () => { this.isSpeaking = false; };
-    utterance.onerror = () => { this.isSpeaking = false; };
+    utterance.onerror = (e) => { 
+      console.error('Jimi TTS error:', e);
+      this.isSpeaking = false; 
+    };
 
     this.synthesis.speak(utterance);
-  }
-
-  private playNextFromQueue() {
-    if (this.pendingAudioQueue.length === 0 || this.isPlayingQueued) return;
-    this.isPlayingQueued = true;
-    const next = this.pendingAudioQueue.shift();
-    if (next) this.playAudio(next);
-    this.isPlayingQueued = false;
   }
 
   async processUserInput(text: string) {
