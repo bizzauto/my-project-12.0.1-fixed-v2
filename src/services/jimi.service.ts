@@ -427,8 +427,8 @@ class JimiVoiceAgent {
   constructor(config: JimiConfig = {}) {
     this.config = {
       language: 'hi-IN',
-      rate: 0.92,        // Slightly slower than normal - natural conversational pace
-      pitch: 1.3,        // Feminine pitch - sounds like young Indian woman (1.4+ can be squeaky)
+      rate: 0.92,        // Natural conversational pace (0.9x-1.0x)
+      pitch: 1.4,        // Sweet female voice (200-240 Hz range)
       ...config,
     };
     // Load saved mode from localStorage
@@ -671,12 +671,12 @@ class JimiVoiceAgent {
   }
 
   /**
-   * Preprocess text to sound like a natural Indian girl speaking.
-   * Adds micro-pauses, removes robotic patterns, improves rhythm.
+   * Preprocess text to sound like a natural sweet Indian girl speaking.
+   * Removes emojis, adds natural pauses, improves conversational rhythm.
    */
   private preprocessForSpeech(text: string): string {
     let processed = text
-      // Remove emojis entirely - they cause robotic pauses in TTS
+      // Remove ALL emojis - they cause robotic garbled speech in TTS
       .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
       .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
       .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
@@ -684,34 +684,66 @@ class JimiVoiceAgent {
       .replace(/[\u{2600}-\u{26FF}]/gu, '')
       .replace(/[\u{2700}-\u{27BF}]/gu, '')
       .replace(/[\u{2702}-\u{27B0}]/gu, '')
-      // Remove remaining special symbols that cause robotic speech
-      .replace(/[★☆♡♥♪♫♬☆✦✧◇◆□■△▲●○]/g, '')
+      .replace(/[\u{FE00}-\u{FE0F}]/gu, '')   // Variation selectors
+      .replace(/[\u{200D}]/gu, '')             // Zero width joiner
+      .replace(/[\u{20E3}]/gu, '')             // Combining enclosure
+      // Remove special symbols that cause robotic speech
+      .replace(/[★☆♡♥♪♫♬☆✦✧◇◆□■△▲●○❤️💕✨🌟💫😊🤔💭🚫⚡🔥💯🎉🎊]/g, '')
+      .replace(/[─━═│┃╌╍╏─━━══║]/g, '')     // Box drawing
+      .replace(/[→←↑↓⇒⇐⇑⇓]/g, '')           // Arrows
+      // Normalize whitespace
       .replace(/\n/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
 
-    // Add natural micro-pauses for conversational rhythm
-    // After common Hindi conversational fillers
+    // Add natural conversational pauses (micro-pauses for rhythm)
+    // These make the voice sound like a real person thinking and speaking
     processed = processed
-      .replace(/\bHaan\b/gi, 'Haan...')
-      .replace(/\bJi\b/gi, 'Ji,')
-      .replace(/\bArre\b/gi, 'Arre...')
-      .replace(/\bArey\b/gi, 'Arey...')
-      .replace(/\bBilkul\b/gi, 'Bilkul...')
-      .replace(/\bAccha\b/gi, 'Accha...')
-      .replace(/\bTheek hai\b/gi, 'Theek hai...')
-      .replace(/\bChalo\b/gi, 'Chalo...')
-      .replace(/\bNamaste\b/gi, 'Namaste...')
-      .replace(/\bHello\b/gi, 'Hello...')
-      .replace(/\bHey\b/gi, 'Hey...')
-      .replace(/\bToh\b/gi, 'Toh,')
-      .replace(/\bMatlab\b/gi, 'Matlab...')
-      .replace(/\bWoh\b/gi, 'Woh...')
-      .replace(/\bAcha\b/gi, 'Acha...');
+      // Hindi fillers with pauses
+      .replace(/\b(Haan ji|Haanji)\b/gi, '$1,')
+      .replace(/\b(Haan)\b/gi, '$1,')
+      .replace(/\b(Ji)\b/gi, '$1,')
+      .replace(/\b(Arre|Arey)\b/gi, '$1,')
+      .replace(/\b(Bilkul)\b/gi, '$1,')
+      .replace(/\b(Accha|Acha)\b/gi, '$1,')
+      .replace(/\b(Theek hai|Theek)\b/gi, '$1,')
+      .replace(/\b(Chalo)\b/gi, '$1,')
+      .replace(/\b(Namaste)\b/gi, '$1,')
+      .replace(/\b(Hello)\b/gi, '$1,')
+      .replace(/\b(Hey)\b/gi, '$1,')
+      .replace(/\b(Toh)\b/gi, '$1,')
+      .replace(/\b(Matlab)\b/gi, '$1,')
+      .replace(/\b(Woh)\b/gi, '$1,')
+      .replace(/\b(Dekho)\b/gi, '$1,')
+      .replace(/\b(Suno)\b/gi, '$1,')
+      .replace(/\b(Bolo)\b/gi, '$1,')
+      .replace(/\b(Bas)\b/gi, '$1,')
+      .replace(/\b(Sach mein)\b/gi, '$1,')
+      .replace(/\b(Batao)\b/gi, '$1,')
+      // English fillers
+      .replace(/\b(Well)\b/gi, '$1,')
+      .replace(/\b(So)\b/gi, '$1,')
+      .replace(/\b(Actually)\b/gi, '$1,')
+      .replace(/\b(Right)\b/gi, '$1,')
+      .replace(/\b(Okay)\b/gi, '$1,')
+      .replace(/\b(Yeah)\b/gi, '$1,')
+      // Natural pauses at punctuation
+      .replace(/,\s*/g, ', ')
+      .replace(/\.\s*/g, '. ')
+      .replace(/\?\s*/g, '? ')
+      .replace(/!\s*/g, '! ');
 
-    // Shorten text for better TTS performance
-    if (processed.length > 250) {
-      processed = processed.substring(0, 250) + '...';
+    // Limit length for better TTS performance (backend handles longer text)
+    if (processed.length > 500) {
+      processed = processed.substring(0, 500);
+      // Try to end at a sentence boundary
+      const lastPeriod = processed.lastIndexOf('.');
+      const lastQuestion = processed.lastIndexOf('?');
+      const lastExclaim = processed.lastIndexOf('!');
+      const lastSentence = Math.max(lastPeriod, lastQuestion, lastExclaim);
+      if (lastSentence > 200) {
+        processed = processed.substring(0, lastSentence + 1);
+      }
     }
 
     return processed;
@@ -730,7 +762,7 @@ class JimiVoiceAgent {
 
     const detectedLang = this.detectLanguage(text);
 
-    // Try backend TTS first (Google Cloud / Edge TTS - much more natural)
+    // Try backend TTS first (Google Cloud Neural2 / Edge TTS - much more natural)
     try {
       const apiUrl = (import.meta as any).env?.VITE_API_URL || '';
       const response = await fetch(`${apiUrl}/api/jimi/tts`, {
@@ -740,21 +772,21 @@ class JimiVoiceAgent {
           text: cleanText,
           lang: detectedLang,
           gender: 'FEMALE',
-          speed: 1.0,
-          pitch: 0,
+          speed: 0.92,     // Natural conversational pace (slightly slower = more natural)
+          pitch: 1.05,     // +5% for sweetness without cartoonish
         }),
       });
 
       const data = await response.json();
 
       if (data.audio) {
-        // Backend returned natural TTS audio
+        // Backend returned natural TTS audio (Neural2/Edge)
         const audioSrc = `data:audio/mp3;base64,${data.audio}`;
         this.playAudio(audioSrc);
         return;
       }
 
-      // If backend says fallback, try Edge TTS
+      // If backend says fallback, try Edge TTS (free)
       if (data.fallback) {
         const edgeResponse = await fetch(`${apiUrl}/api/jimi/tts/edge`, {
           method: 'POST',
@@ -778,26 +810,7 @@ class JimiVoiceAgent {
     }
 
     // Fallback: Web Speech API (browser TTS)
-    this.synthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = detectedLang;
-    
-    const voice = this.findBestVoiceForLang(detectedLang);
-    if (voice) {
-      utterance.voice = voice;
-      console.log('Jimi: Using browser voice -', voice.name, voice.lang);
-    }
-    
-    utterance.rate = this.config.rate ?? 0.92;
-    utterance.pitch = this.config.pitch ?? 1.45;
-    utterance.volume = 1.0;
-
-    utterance.onstart = () => { this.isSpeaking = true; };
-    utterance.onend = () => { this.isSpeaking = false; };
-    utterance.onerror = () => { this.isSpeaking = false; };
-
-    this.synthesis.speak(utterance);
+    this.speakBrowserTTS(cleanText, detectedLang);
   }
 
   private playAudio(src: string) {
@@ -832,15 +845,31 @@ class JimiVoiceAgent {
     });
   }
 
-  private speakBrowserTTS(text: string) {
+  private speakBrowserTTS(text: string, lang?: string) {
     if (!this.synthesis || !text) return;
     this.synthesis.cancel();
+    
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = this.detectLanguage(text);
-    utterance.rate = this.config.rate ?? 0.92;
-    utterance.pitch = this.config.pitch ?? 1.45;
+    utterance.lang = lang || this.detectLanguage(text);
+    
+    // Find best voice
+    const voice = this.findBestVoiceForLang(utterance.lang);
+    if (voice) {
+      utterance.voice = voice;
+      console.log('Jimi: Using browser voice -', voice.name);
+    }
+    
+    // Natural female voice settings
+    // Rate: 0.92 = slightly slower than normal = natural conversational pace
+    // Pitch: 1.3-1.5 = female range, higher = sweeter
+    utterance.rate = 0.92;
+    utterance.pitch = 1.4;    // Sweet but not cartoonish
+    utterance.volume = 1.0;
+
     utterance.onstart = () => { this.isSpeaking = true; };
     utterance.onend = () => { this.isSpeaking = false; };
+    utterance.onerror = () => { this.isSpeaking = false; };
+
     this.synthesis.speak(utterance);
   }
 
