@@ -754,15 +754,63 @@ class JimiVoiceAgent {
   async speak(text: string) {
     if (!this.synthesis) return;
 
-    // Preprocess text for natural female speech
     const cleanText = this.preprocessForSpeech(text);
     if (!cleanText) return;
 
     const detectedLang = this.detectLanguage(text);
 
-    // Always use browser TTS - most reliable
-    // Backend TTS is optional enhancement, not required
+    // Try backend Edge TTS first (free, natural neural voice)
+    try {
+      const apiUrl = (import.meta as any).env?.VITE_API_URL || '';
+      if (apiUrl) {
+        const response = await fetch(`${apiUrl}/api/jimi/tts/edge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: cleanText,
+            lang: detectedLang,
+          }),
+          signal: AbortSignal.timeout(8000), // 8 second timeout
+        });
+
+        const data = await response.json();
+
+        if (data.audio) {
+          // Got natural audio from Edge TTS
+          this.playBase64Audio(data.audio);
+          return;
+        }
+      }
+    } catch (err) {
+      console.log('Jimi: Backend TTS unavailable, using browser TTS');
+    }
+
+    // Fallback: Browser TTS
     this.speakBrowserTTS(cleanText, detectedLang);
+  }
+
+  private playBase64Audio(base64: string) {
+    if (this.audioElement) {
+      this.audioElement.pause();
+    }
+
+    this.isSpeaking = true;
+    this.audioElement = new Audio(`data:audio/mp3;base64,${base64}`);
+    this.audioElement.volume = 1.0;
+
+    this.audioElement.onended = () => {
+      this.isSpeaking = false;
+      this.audioElement = null;
+    };
+
+    this.audioElement.onerror = () => {
+      this.isSpeaking = false;
+      this.audioElement = null;
+    };
+
+    this.audioElement.play().catch(() => {
+      this.isSpeaking = false;
+    });
   }
 
   private speakBrowserTTS(text: string, lang?: string) {
@@ -772,24 +820,19 @@ class JimiVoiceAgent {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang || this.detectLanguage(text);
     
-    // Find best voice
     const voice = this.findBestVoiceForLang(utterance.lang);
     if (voice) {
       utterance.voice = voice;
-      console.log('Jimi: Using voice -', voice.name);
+      console.log('Jimi: Browser voice -', voice.name);
     }
     
-    // Natural female voice settings
     utterance.rate = 0.92;
     utterance.pitch = 1.4;
     utterance.volume = 1.0;
 
     utterance.onstart = () => { this.isSpeaking = true; };
     utterance.onend = () => { this.isSpeaking = false; };
-    utterance.onerror = (e) => { 
-      console.error('Jimi TTS error:', e);
-      this.isSpeaking = false; 
-    };
+    utterance.onerror = () => { this.isSpeaking = false; };
 
     this.synthesis.speak(utterance);
   }

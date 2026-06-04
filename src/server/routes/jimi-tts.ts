@@ -160,81 +160,91 @@ router.post('/tts', async (req: Request, res: Response) => {
 // POST /api/jimi/tts/edge - Edge TTS (free, no API key)
 router.post('/tts/edge', async (req: Request, res: Response) => {
   try {
-    const { text, lang = 'hi-IN', gender = 'Female' } = req.body;
+    const { text, lang = 'hi-IN' } = req.body;
 
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
     }
 
-    const cleanText = cleanTextForSSML(text);
+    // Clean text
+    const cleanText = text
+      .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+      .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
+      .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+      .replace(/[\u{2600}-\u{26FF}]/gu, '')
+      .replace(/[\u{2700}-\u{27BF}]/gu, '')
+      .replace(/\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     if (!cleanText) {
       return res.json({ fallback: true, text: '', message: 'Empty text' });
     }
 
-    // Edge TTS Neural voices - BEST free option
+    // Edge TTS Neural voices
     const edgeVoiceMap: Record<string, string> = {
-      'hi-IN': 'hi-IN-SwaraNeural',      // Hindi female - sweet & natural
-      'en-US': 'en-US-JennyNeural',       // English female - natural
-      'en-IN': 'en-IN-NeerjaNeural',     // Indian English female
-      'mr-IN': 'mr-IN-AarohiNeural',     // Marathi female
-      'ta-IN': 'ta-IN-PallaviNeural',    // Tamil female
-      'te-IN': 'te-IN-ShrutiNeural',     // Telugu female
-      'bn-IN': 'bn-IN-TanishaaNeural',   // Bengali female
-      'gu-IN': 'hi-IN-SwaraNeural',      // Gujarati (use Hindi)
-      'kn-IN': 'kn-IN-SapnaNeural',      // Kannada female
-      'ml-IN': 'ml-IN-SobhanaNeural',    // Malayalam female
-      'pa-IN': 'pa-IN-GurpreetNeural',   // Punjabi female
+      'hi-IN': 'hi-IN-SwaraNeural',
+      'en-US': 'en-US-JennyNeural',
+      'en-IN': 'en-IN-NeerjaNeural',
+      'mr-IN': 'mr-IN-AarohiNeural',
+      'ta-IN': 'ta-IN-PallaviNeural',
+      'te-IN': 'te-IN-ShrutiNeural',
+      'bn-IN': 'bn-IN-TanishaaNeural',
+      'gu-IN': 'hi-IN-SwaraNeural',
+      'kn-IN': 'kn-IN-SapnaNeural',
+      'ml-IN': 'ml-IN-SobhanaNeural',
+      'pa-IN': 'pa-IN-GurpreetNeural',
     };
 
     const voice = edgeVoiceMap[lang] || 'hi-IN-SwaraNeural';
 
-    // Try edge-tts via subprocess
     try {
       const { execSync } = await import('child_process');
       const fs = await import('fs');
       const path = await import('path');
       const os = await import('os');
+      const crypto = await import('crypto');
 
-      const tmpFile = path.join(os.tmpdir(), `jimi-tts-${Date.now()}.mp3`);
+      const tmpFile = path.join(os.tmpdir(), `jimi-${crypto.randomBytes(8).toString('hex')}.mp3`);
       
-      // Edge TTS with natural settings
-      const rate = '-2%';     // Slightly slower = more natural
-      const pitch = '+5Hz';   // Slightly higher = sweeter
+      // Write text to a temp file to avoid shell escaping issues
+      const textFile = path.join(os.tmpdir(), `jimi-text-${crypto.randomBytes(8).toString('hex')}.txt`);
+      fs.writeFileSync(textFile, cleanText, 'utf-8');
 
-      // Clean text for shell command
-      const escapedText = cleanText.replace(/"/g, '\\"').replace(/\$/g, '\\$');
-      
-      execSync(
-        `edge-tts --voice "${voice}" --rate="${rate}" --pitch="${pitch}" --text "${escapedText}" --write-media "${tmpFile}"`,
-        { timeout: 15000, stdio: 'pipe' }
-      );
+      try {
+        // Use --file flag to read text from file (avoids shell escaping)
+        execSync(
+          `edge-tts --voice "${voice}" --rate="-2%" --pitch="+5Hz" --file "${textFile}" --write-media "${tmpFile}"`,
+          { timeout: 10000, stdio: 'pipe' }
+        );
 
-      const audioBuffer = fs.readFileSync(tmpFile);
-      fs.unlinkSync(tmpFile);
+        const audioBuffer = fs.readFileSync(tmpFile);
+        
+        // Cleanup
+        try { fs.unlinkSync(tmpFile); } catch {}
+        try { fs.unlinkSync(textFile); } catch {}
 
-      res.json({
-        audio: audioBuffer.toString('base64'),
-        format: 'mp3',
-        voice,
-        lang,
-        engine: 'edge-neural',
-        settings: { rate, pitch },
-      });
-    } catch (execError) {
-      // edge-tts not installed
-      res.json({
-        fallback: true,
-        text: cleanText,
-        message: 'Edge TTS not available',
-      });
+        res.json({
+          audio: audioBuffer.toString('base64'),
+          format: 'mp3',
+          voice,
+          lang,
+        });
+      } catch (execError: any) {
+        // Cleanup on error
+        try { fs.unlinkSync(tmpFile); } catch {}
+        try { fs.unlinkSync(textFile); } catch {}
+        
+        console.error('Edge TTS exec error:', execError.message);
+        res.json({ fallback: true, text: cleanText, message: 'Edge TTS failed' });
+      }
+    } catch (err: any) {
+      console.error('Edge TTS error:', err.message);
+      res.json({ fallback: true, text: cleanText, message: 'Edge TTS unavailable' });
     }
   } catch (error: any) {
-    console.error('Edge TTS error:', error);
-    res.json({
-      fallback: true,
-      text: req.body.text || '',
-      message: 'Edge TTS service unavailable',
-    });
+    console.error('TTS endpoint error:', error);
+    res.json({ fallback: true, text: req.body.text || '', message: 'TTS error' });
   }
 });
 
