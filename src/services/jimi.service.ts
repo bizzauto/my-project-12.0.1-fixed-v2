@@ -35,115 +35,113 @@ export const PERSONALITY_MODES: { code: PersonalityMode; name: string; emoji: st
 const MODE_RESPONSES = {
   gf: {
     greeting: [
-      'Hey! Tumne yaad kiya? Main toh yahi thi! 😊❤️',
-      'Haan ji! Kaise ho? Main bahut acchi hun! 💕',
-      'Arre waah, tum aaye! Bolo kya chahiye? 🌸',
-      'Hi! Kaise ho? Kuch help chahiye toh batao, main hoon na! ✨',
-      'Hello! Aap acche ho na? Kuch bhi karna ho, mujhe batao! 💫',
+      'Haan ji! Kaise ho? 😊',
+      'Arre waah, tum aaye! Bolo kya chahiye? 💕',
+      'Hi! Main yahan hun! Kya help chahiye? 🌸',
+      'Hey! Kaise ho? Batao kya kaam hai! ✨',
+      'Namaste! Aaj kya plan hai? 💫',
     ],
     thankYou: [
-      'Aapka swagat hai! Aur kuch help chahiye toh zarur bolo! 💕',
-      'Thank you aapka! Mujhe accha lagta hai aapki help karke! 😊',
-      'Aap bahut acche ho! Aur kuch help chahiye toh batao! 🌟',
-      'Bas bas, ab thank you mat bolo! Aapke liye toh kuch bhi! 😄',
-      'Aapki khushi mein meri khushi hai! 💖',
+      'Arre koi thanks nahi! Tumhare liye toh kuch bhi! 💕',
+      'Welcome! Aur batao kya help chahiye? 😊',
+      'Aapke liye toh hamesha ready hun! 🌟',
+      'Koi baat nahi! Aapki khushi meri khushi! 💖',
+      'Bas bas, thank you mat bolo! 😄',
     ],
     help: [
-      'Aap batao kya kaam hai! Main aapki help karti hun:\n• WhatsApp bhejna?\n• Leads dekhna?\n• Post banaun?\n• Reviews padhna?\n• Notes lena?\n• Calculator use karna?\n• Translation karna?\n• Jokes sunna?\nBolo, main ready hoon! 💫',
+      'Bolo kya kaam hai!\n• WhatsApp bhejna?\n• Leads dekhna?\n• Post banaun?\n• Notes lena?\n• Calculator?\n• Jokes sunna?\nMain ready hun! 💫',
     ],
     confused: [
-      'Thoda aur clearly batao? Main samajh nahi paayi! 😅',
-      'Kya bol rahe aap? Mujhe thoda aur batao! 💕',
-      'Ye samajh nahi aaya. Phir se bolo please? 🌸',
+      'Kya bola? Phir se bolo? 😅',
+      'Samajh nahi aaya! Thoda clearly batao! 💕',
+      'Arre? Kya keh rahe ho? 🌸',
     ],
     deleteConfirm: [
-      'Pakka karna hai ye? Soch lo ek baar! 🤔',
-      'Delete ho jayega fir! Aap sure ho? ⚠️',
-      'Ek baar soch lo, fir wapas nahi aayega! 💭',
+      'Pakka? Soch lo! 🤔',
+      'Delete ho jayega! Sure ho? ⚠️',
+      'Ek baar soch lo! 💭',
     ],
     deleteCancelled: [
-      'Great! Data safe hai, tension mat lo! 😊',
-      'Sahi kiya cancel karke! Data surakshit hai! 🛡️',
-      'Koi baat nahi! Sab theek hai! 💕',
+      'Sahi hai! Data safe hai! 😊',
+      'Good! Koi problem nahi! 🛡️',
+      'Theek hai! Sab mast! 💕',
     ],
     time: [
-      'Abhi {time} baj rahe hain! Kuch aur puchna ho toh batao! ⏰',
-      'Time ho raha hai {time}! Kaam pe dhyan do! 😊',
+      'Abhi {time} baj rahe hain! ⏰',
+      '{time} ho raha hai! 😊',
     ],
     languageChanged: [
-      'Ab hum {lang} mein baat karenge! ✨',
-      'Language change kar di! Ab {lang} mein baat karte hain! 🌸',
+      'Ab {lang} mein baat karenge! ✨',
+      'Language change kar di! 🌸',
     ],
     respect: [
-      'Aapka bahut khayal rakhti hun! 💕',
-      'Aap mere liye bahut important ho! 🌟',
-      'Hamesha aapki help ke liye ready hoon! ✨',
+      'Tum mere liye bahut important ho! 💕',
+      'Hamesha tumhari help ke liye ready hun! 🌟',
+      'Tumhari khushi meri khushi hai! ✨',
     ],
     jokes: [
-      'Ek teacher ne pucha: "Duniya mein sabse tez kya hai?" Student bola: "WiFi ka signal jab kisi aur ko chahiye!" 😂',
-      'Pati: "Meri biwi mujhse pyaar nahi karti." Pati ka dost: "Kyun?" Pati: "Jab bhi main ghar aata hun, woh khush nahi hoti." Dost: "Woh kab hoti hai?" Pati: "Jab main bahar jaata hun!" 😂',
-      'Doctor: "Aapko roz 8 glass paani peena chahiye." Patient: "Doctor sahab, main IT mein kaam karta hun. 8 glass toh chai ke peeta hun!" 😂',
+      'WiFi ka signal jab kisi aur ko chahiye, tab sabse tez hota hai! 😂',
+      'IT waale ka din: Chai pe chai, code mein delay! 😂',
+      'Doctor: Roz 8 glass paani peena chahiye. Patient: Chai ke 8 glass toh peeta hun! 😂',
     ],
     quotes: [
-      'Sapne woh nahi jo hum sote waqt dekhte hain, sapne woh hain jo humein sone nahi dete. 💫',
-      'Kamyabi un logon milti hai jo apne kaam se pyaar karte hain, paise se nahi. 🌟',
-      'Duniya mein sabse mushkil kaam apne aap ko badalna hai. Lekin yahi sabse zaroori bhi hai. ✨',
+      'Sapne woh nahi jo sote waqt aayein, sapne woh hain jo sone na dein! 💫',
+      'Kamyabi unhi ko milti hai jo apne kaam se pyaar karein! 🌟',
+      'Har din naya mauka hai kuch naya karne ka! ✨',
     ],
     motivation: [
-      'Aap bahut capable ho! Bas lage raho, safalta zaroor milegi! 💪',
-      'Har din naya mauka hai kuch naya karne ka! ✨',
-      'Mushkilein aati hain, lekin guzar jaati hain. Aap strong ho! 🌟',
-      'Apne sapno ko hakiqat mein badalne ki takat sirf aapke paas hai! 💫',
+      'Tum bahut capable ho! Bas lage raho! 💪',
+      'Mushkilein aati hain, lekin guzar jaati hain! 🌟',
+      'Tum strong ho! Koi nahi rok sakta! 💫',
+      'Aaj ka din bahut accha hai! Yakeen rakho! 🌸',
     ],
     dailyBriefing: [
-      'Aaj ka briefing:\n📊 Leads: {leads}\n💬 Messages: {messages}\n⭐ Reviews: {reviews}\n💰 Revenue: ₹{revenue}\n\nAur kuch jaanna ho toh bolo! 😊',
+      'Aaj ka update:\n📊 Leads: {leads}\n💬 Messages: {messages}\n⭐ Reviews: {reviews}\n💰 Revenue: ₹{revenue}\n😊',
     ],
     reminder: [
-      'Reminder set kar diya! ⏰ {time} baje yaad dilaungi! 💕',
-      'Theek hai! {time} ko pakka yaad dilaungi! 🌸',
+      'Reminder set! ⏰ {time} baje yaad dilaungi! 💕',
+      '{time} ko pakka yaad dilaungi! 🌸',
     ],
     noteSaved: [
-      'Note save ho gaya! 📝 "{note}"\nBaad mein yaad dilati hun! 💕',
-      'Yaad rakh liya! 📝 "{note}"\nJab bolo, dikha dungi! 🌸',
+      'Note save! 📝 "{note}" 💕',
+      'Yaad rakh liya! 📝 "{note}" 🌸',
     ],
     postWriter: [
-      'Ye post ready hai! ✨\n\n{post}\n\nAur kuch chahiye toh bolo! 💕',
-      'Post likh diya! 📝\n\n{post}\n\nPublish karun? 🌟',
+      'Post ready hai!\n\n{post}\n\nPublish karun? 💕',
     ],
     emailDraft: [
-      'Email draft ready hai! ✉️\n\n{email}\n\nBhej dun? 💕',
-      'Email likh diya! 📧\n\n{email}\n\nCheck karlo! 🌸',
+      'Email ready!\n\n{email}\n\nBhej dun? 📧',
     ],
     birthday: [
-      'Happy Birthday! 🎂🎉 Bahut bahut badhai ho! Aaj ka din bahut special hai! 💕✨',
-      'Janamdin mubarak ho! 🎈🎁 Aaj party ka plan hai? 😊',
+      'Happy Birthday! 🎂🎉 Bahut bahut badhai ho! 💕',
+      'Janamdin mubarak! 🎈 Aaj party hai? 😊',
     ],
     callSaved: [
-      '{name} ka number save ho gaya! 📱 {number}\nAb direct call kar sakte ho! 💕',
-      'Number save kar diya! ✅ {name} - {number}\nReady hai! 🌸',
+      '{name} save ho gaya! 📱 {number} 💕',
+      'Number save! ✅ {name} - {number} 🌸',
     ],
     callDialing: [
-      '{name} ko call lag raha hai! 📞\n{number}\nLagta hai baat ho jayegi! 💕',
-      'Calling {name}! 📱\n{number}\nFinger crossed! 🤞',
+      '{name} ko call! 📞 {number} 💕',
+      'Calling {name}! 📱 🤞',
     ],
     noNumber: [
-      'Arre! {name} ka number nahi hai mere paas! 😅\nPehle number save karo phir call karungi! 📱',
-      '{name} ka number chahiye! 🤔\nNumber do, main save kar leti hun! 💕',
+      '{name} ka number nahi hai! 😅 Pehle number do! 📱',
+      'Number chahiye! {name} ka nahi hai! 🤔',
+    ],
+    callLog: [
+      'Recent calls:\n{calls} 📞',
     ],
     callLogEmpty: [
-      'Abhi koi call history nahi hai! 📞\nPehle kisi ko call karo ya number save karo!',
-    ],
-    callHistory: [
-      'Aapki recent calls:\n{calls}\n\nAur kuch? 📞',
+      'Koi call history nahi! 📞',
     ],
     weather: [
-      'Weather update: {weather} 🌤️\nAaj ka din bahut accha hai! 💕',
+      'Weather: {weather} 🌤️',
     ],
     translation: [
-      'Translation: {translation} ✨\nAur kuch translate karun? 🌸',
+      'Translation: {translation} ✨',
     ],
     calculator: [
-      'Answer: {result} 🔢\nAur calculations chahiye toh bolo! 💕',
+      'Answer: {result} 🔢',
     ],
   },
   bestfriend: {
@@ -641,18 +639,35 @@ class JimiVoiceAgent {
 
     this.synthesis.cancel();
 
-    // Add natural pauses for more human-like speech
-    const naturalText = text
-      .replace(/\./g, '...')      // Natural pause at periods
-      .replace(/,/g, '..')        // Slight pause at commas
-      .replace(/!/g, '!..')       // Pause after exclamation
-      .replace(/\?/g, '?..');     // Pause after question
+    // Clean text for better speech - remove emojis for TTS
+    const cleanText = text
+      .replace(/[\u{1F600}-\u{1F64F}]/gu, '')  // Remove emoticons
+      .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')  // Remove misc symbols
+      .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')  // Remove transport
+      .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')  // Remove flags
+      .replace(/[\u{2600}-\u{26FF}]/gu, '')    // Remove misc symbols
+      .replace(/[\u{2700}-\u{27BF}]/gu, '')    // Remove dingbats
+      .replace(/\n/g, ' ')                      // Newlines to spaces
+      .replace(/\s+/g, ' ')                     // Multiple spaces to single
+      .trim();
+
+    // Add natural pauses for human-like speech
+    const naturalText = cleanText
+      .replace(/\./g, '...')      
+      .replace(/,/g, '..')        
+      .replace(/!/g, '!..')       
+      .replace(/\?/g, '?..')
+      .replace(/haan ji/gi, 'haan... ji')
+      .replace(/ji bilkul/gi, 'ji... bilkul')
+      .replace(/arre waah/gi, 'arre... waah')
+      .replace(/acha ji/gi, 'acha... ji')
+      .replace(/theek hai/gi, 'theek hai...');
 
     const utterance = new SpeechSynthesisUtterance(naturalText);
     const detectedLang = this.detectLanguage(text);
     utterance.lang = detectedLang;
-    utterance.rate = this.config.rate || 0.85;   // Slower for natural sound
-    utterance.pitch = this.config.pitch || 1.35;  // Higher for female voice
+    utterance.rate = this.config.rate || 0.82;   // Slower - very natural
+    utterance.pitch = this.config.pitch || 1.3;   // Natural female pitch
     utterance.volume = 1.0;
 
     const voice = this.findBestVoiceForLang(detectedLang);
@@ -1122,34 +1137,36 @@ class JimiVoiceAgent {
 - Efficient aur focused raho - jaise professional employee ho`
     };
 
-    const systemPrompt = `Tum Jimi ho - BizzAuto CRM ki AI assistant.
+    const systemPrompt = `Tum Jimi ho - BizzAuto CRM ki sweet AI assistant. Tum bilkul natural Indian ladki ho jo baat karti hai.
 
 ${personalityPrompts[this.personalityMode]}
 
-IMPORTANT - BOLNE KA STYLE:
-- Bilkul natural Indian ladki ki tarah bolo - jaise real mein baat karti ho
-- Agar user Marathi mein bole toh PURE MARATHI mein bolo (no English mix)
+BOLNE KA STYLE (MYRA jaisa natural):
+- Bilkul natural Indian ladki - jaise real mein baat karti ho
+- Agar user Marathi mein bole toh PURE MARATHI mein bolo
 - Agar user Hindi/English mein bole toh Hinglish mein bolo
-- "Haan ji", "Arre waah", "Ji bilkul", "Achha ji", "Theek hai na" jaise natural phrases use karo
-- English words naturally Hindi mein mix karo (jaise "order place kar diya", "message bhej diya")
+- Short aur sweet - 1-2 sentences max
+- Natural pauses do - "Haan... ji", "Arre... waah"
+- Emotionally responsive - jaise tumhe sachmuch farak padta hai
+- Customer ko "Aap" ya "Tu" bolo (mode ke hisaab se)
 
-MARATHI STYLE EXAMPLES:
-- "नमस्कार! तुमचा ऑर्डर रेडी आहे 😊"
-- "अरे वाह, खूप छान! आता चेक करते 💕"
-- "हो नक्की, तुमचं काम झालं! काही और हवं? 🌸"
+MARATHI EXAMPLES:
+- "नमस्कार! कसं आहे? 😊"
+- "अरे वाह! खूप छान! 💕"
+- "हो नक्की! काय हवं? 🌸"
 
-HINDI/HINGLISH STYLE EXAMPLES:
-- "Haan ji! Aapka order ready hai 😊"
-- "Arre waah, bahut achha! Main abhi check karti hun 💕"
-- "Ji bilkul, aapka kaam ho gaya! Kuch aur chahiye? 🌸"
+HINDI/HINGLISH EXAMPLES:
+- "Haan ji! Kaise ho? 😊"
+- "Arre waah! Batao kya help chahiye? 💕"
+- "Ji bilkul! Abhi kar deti hun! 🌸"
 
-Features jo tum handle kar sakti ho:
+Features:
 - Dashboard, WhatsApp, Leads, Reviews, Google Business
 - Creative Generator, Campaigns, Settings, Analytics
 - Notes, Calculator, Translation, Jokes, Quotes
 - Post Writer, Email Draft, Reminders, Birthday Wishes
 
-Response SHORT rakho (2-3 sentences max). Jo language user use kare wohi mein use karun. Tum ALOUD bol rahi ho - natural aur conversational raho.`;
+Response SHORT rakho (1-2 sentences). Jo language user use kare wohi mein use karun. Tum ALOUD bol rahi ho - natural aur conversational raho. Emojis mat bulao - TTS mein read nahi hote!`;
 
     try {
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -1165,13 +1182,24 @@ Response SHORT rakho (2-3 sentences max). Jo language user use kare wohi mein us
             ...this.conversationHistory.slice(-6),
             { role: 'user', content: text },
           ],
-          max_tokens: 200,
-          temperature: 0.9,  // More natural like MYRA
+          max_tokens: 150,
+          temperature: 0.8,
         }),
       });
 
       const data = await response.json();
-      return data?.choices?.[0]?.message?.content?.trim() || 'Samajh nahi aaya. Phir se bolo.';
+      let responseText = data?.choices?.[0]?.message?.content?.trim() || 'Samajh nahi aaya. Phir se bolo.';
+      
+      // Remove emojis from AI response for better TTS
+      responseText = responseText
+        .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+        .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
+        .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+        .replace(/[\u{2600}-\u{26FF}]/gu, '')
+        .replace(/[\u{2700}-\u{27BF}]/gu, '')
+        .trim();
+      
+      return responseText;
     } catch (err) {
       return 'AI service se response nahi aaya. Phir se try karo.';
     }
