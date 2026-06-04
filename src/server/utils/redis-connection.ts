@@ -1,6 +1,7 @@
 import IORedis from 'ioredis';
 
 export function createRedisConnection() {
+  // If REDIS_URL is provided, use it directly (most reliable for Coolify)
   if (process.env.REDIS_URL) {
     const client = new IORedis(process.env.REDIS_URL, {
       maxRetriesPerRequest: null,
@@ -18,11 +19,14 @@ export function createRedisConnection() {
     return client;
   }
   
-  // If password is set, use it; otherwise connect without auth
+  // Fallback: individual env vars
+  const host = process.env.REDIS_HOST || 'coolify-redis';
+  const port = parseInt(process.env.REDIS_PORT || '6379');
   const password = process.env.REDIS_PASSWORD || undefined;
+  
   const client = new IORedis({
-    host: process.env.REDIS_HOST || 'coolify-redis',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
+    host,
+    port,
     ...(password ? { password } : {}),
     maxRetriesPerRequest: null,
     retryStrategy(times: number) {
