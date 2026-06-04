@@ -8,44 +8,43 @@ export async function initRedis(): Promise<RedisClientType | null> {
     return redisClient;
   }
 
+  const redisUrl = process.env.REDIS_URL;
+  const password = process.env.REDIS_PASSWORD || undefined;
+  
+  if (!redisUrl && !password) {
+    console.log('Redis Service: No credentials - skipping');
+    return null;
+  }
+
   try {
-    const redisUrl = process.env.REDIS_URL;
-    const password = process.env.REDIS_PASSWORD || undefined;
     const host = process.env.REDIS_HOST || 'coolify-redis';
     const port = process.env.REDIS_PORT || '6379';
     
-    const finalUrl = redisUrl || (password
-      ? `redis://:${password}@${host}:${port}`
-      : `redis://${host}:${port}`);
-    
-    console.log('Redis Service: Using URL =', !!redisUrl, ', Password =', !!password);
+    const finalUrl = redisUrl || `redis://:${password}@${host}:${port}`;
 
     redisClient = createClient({
       url: finalUrl,
       socket: {
         reconnectStrategy: (retries) => {
-          if (retries > 20) {
-            return new Error('Redis reconnection failed');
-          }
+          if (retries > 3) return new Error('Redis failed');
           return Math.min(retries * 100, 3000);
         },
+        connectTimeout: 3000,
+        commandTimeout: 3000,
       },
     });
 
-    redisClient.on('error', (err) => {
-      console.error('Redis error:', err.message);
+    redisClient.on('error', () => {
       isConnected = false;
     });
 
     redisClient.on('connect', () => {
-      console.log('✅ Redis connected');
       isConnected = true;
     });
 
     await redisClient.connect();
     return redisClient;
-  } catch (error) {
-    console.error('Redis connection failed:', error);
+  } catch {
     return null;
   }
 }

@@ -1,56 +1,52 @@
 import IORedis from 'ioredis';
 
 export function createRedisConnection() {
-  // If REDIS_URL is provided, use it directly (most reliable for Coolify)
   const redisUrl = process.env.REDIS_URL;
   const redisPassword = process.env.REDIS_PASSWORD;
   
-  console.log('Redis: REDIS_URL present =', !!redisUrl, ', REDIS_PASSWORD present =', !!redisPassword);
-  
-  if (redisUrl) {
-    console.log('Redis: Connecting via REDIS_URL...');
-    const client = new IORedis(redisUrl, {
-      maxRetriesPerRequest: null,
-      retryStrategy(times: number) {
-        if (times > 3) return null;
-        return Math.min(times * 200, 2000);
-      },
-      enableOfflineQueue: false,
-    });
-    client.on('error', (err: any) => {
-      if (err?.message?.includes('NOAUTH') || err?.message?.includes('WRONGPASS')) {
-        console.warn('Redis: Auth failed with REDIS_URL');
-      }
-    });
-    return client;
+  // If no Redis credentials, return a dummy connection that does nothing
+  if (!redisUrl && !redisPassword) {
+    console.log('Redis: No credentials - running without Redis');
+    return createDummyConnection();
   }
   
-  if (redisPassword) {
-    console.log('Redis: Connecting via REDIS_PASSWORD...');
-    const client = new IORedis({
-      host: process.env.REDIS_HOST || 'coolify-redis',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: redisPassword,
+  try {
+    const opts: any = {
       maxRetriesPerRequest: null,
       retryStrategy(times: number) {
-        if (times > 3) return null;
-        return Math.min(times * 200, 2000);
+        if (times > 1) return null; // Stop retrying after 1 attempt
+        return 200;
       },
       enableOfflineQueue: false,
-    });
+      connectTimeout: 3000,
+      commandTimeout: 3000,
+    };
+
+    let client: IORedis;
+    if (redisUrl) {
+      client = new IORedis(redisUrl, opts);
+    } else {
+      client = new IORedis({
+        host: process.env.REDIS_HOST || 'coolify-redis',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+        password: redisPassword,
+        ...opts,
+      });
+    }
+
+    client.on('error', () => {}); // Suppress errors silently
     return client;
+  } catch {
+    return createDummyConnection();
   }
-  
-  console.log('Redis: No credentials found, connecting without auth');
-  const client = new IORedis({
-    host: process.env.REDIS_HOST || 'coolify-redis',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    maxRetriesPerRequest: null,
-    retryStrategy(times: number) {
-      if (times > 3) return null;
-      return Math.min(times * 200, 2000);
-    },
+}
+
+function createDummyConnection(): IORedis {
+  // Return a disconnected client that won't throw errors
+  const client = new IORedis({ 
+    lazyConnect: true, 
     enableOfflineQueue: false,
+    retryStrategy: () => null,
   });
   return client;
 }
