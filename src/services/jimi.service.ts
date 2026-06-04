@@ -828,8 +828,6 @@ class JimiVoiceAgent {
   private audioElement: HTMLAudioElement | null = null;
 
   async speak(text: string) {
-    if (!this.synthesis) return;
-
     const cleanText = this.preprocessForSpeech(text);
     if (!cleanText) return;
 
