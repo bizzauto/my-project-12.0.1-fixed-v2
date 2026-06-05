@@ -295,5 +295,142 @@
       }
     },
     "tags": ["reviews", "google", "auto-reply"]
+  },
+  {
+    "name": "Ava Executive Assistant - Business Intelligence",
+    "nodes": [
+      {
+        "parameters": {
+          "path": "ava-command",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "name": "Ava Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [250, 300],
+        "webhookId": "ava-executive"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json.body.command}}",
+                "value2": "briefing"
+              }
+            ]
+          }
+        },
+        "name": "Check Command Type",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [470, 300]
+      },
+      {
+        "parameters": {
+          "url": "={{$env.N8N_APP_URL || 'http://app:4000'}}/api/ava/briefing",
+          "method": "GET",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{$env.N8N_AVA_TOKEN}}"
+              },
+              {
+                "name": "x-business-id",
+                "value": "={{$json.body.businessId}}"
+              }
+            ]
+          }
+        },
+        "name": "Get Business Briefing",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [690, 200]
+      },
+      {
+        "parameters": {
+          "url": "https://integrate.api.nvidia.com/v1/chat/completions",
+          "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{$env.NVIDIA_NIM_API_KEY}}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"model\": \"meta/llama-3.3-70b-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are Ava, an elite AI Executive Assistant. Provide a concise executive briefing based on the business data. Be professional, use numbers, and give actionable recommendations. Keep response under 300 words.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate executive briefing from this data: {{JSON.stringify($json.data)}}\"\n    }\n  ],\n  \"max_tokens\": 500,\n  \"temperature\": 0.7\n}"
+        },
+        "name": "AI Generate Briefing",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [910, 200]
+      },
+      {
+        "parameters": {
+          "url": "https://integrate.api.nvidia.com/v1/chat/completions",
+          "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{$env.NVIDIA_NIM_API_KEY}}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"model\": \"meta/llama-3.3-70b-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are Ava, an elite AI Executive Assistant for a business platform. Respond to the user's command professionally. Be concise and actionable.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{$json.body.command}}\"\n    }\n  ],\n  \"max_tokens\": 300,\n  \"temperature\": 0.7\n}"
+        },
+        "name": "AI Process Command",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [690, 400]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={\n  \"success\": true,\n  \"data\": {\n    \"text\": \"={{$json.choices[0].message.content}}\",\n    \"model\": \"ava-n8n\",\n    \"timestamp\": \"{{DateTime.now().toISO()}}\"\n  }\n}"
+        },
+        "name": "Send Response",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [1130, 300]
+      }
+    ],
+    "connections": {
+      "Ava Webhook": {
+        "main": [[{ "node": "Check Command Type", "type": "main", "index": 0 }]]
+      },
+      "Check Command Type": {
+        "main": [
+          [{ "node": "Get Business Briefing", "type": "main", "index": 0 }],
+          [{ "node": "AI Process Command", "type": "main", "index": 0 }]
+        ]
+      },
+      "Get Business Briefing": {
+        "main": [[{ "node": "AI Generate Briefing", "type": "main", "index": 0 }]]
+      },
+      "AI Generate Briefing": {
+        "main": [[{ "node": "Send Response", "type": "main", "index": 0 }]]
+      },
+      "AI Process Command": {
+        "main": [[{ "node": "Send Response", "type": "main", "index": 0 }]]
+      }
+    },
+    "settings": {
+      "saveExecutionProgress": true,
+      "saveManualExecutions": true,
+      "saveDataErrorExecution": "all",
+      "saveDataSuccessExecution": "all"
+    },
+    "tags": ["ava", "executive", "business-intelligence"]
   }
 ]

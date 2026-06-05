@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, MessageSquare, Users, Palette, Star,
   BarChart3, Settings, Bell,
@@ -14,7 +14,8 @@ import { useThemeStore } from '../lib/themeStore';
 import { MobileApp } from '../lib/capacitor-app';
 import { useViewport } from '../hooks/useViewport';
 import NotificationCenter from '../components/NotificationCenter';
-import JimiAssistant from '../components/JimiAssistant';
+import AvaExecutiveAssistant from '../components/AvaExecutiveAssistant';
+import ProjectManager from '../components/ProjectManager';
 
 interface MenuItem {
   id: string;
@@ -485,8 +486,11 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         </div>
       </div>
 
-      {/* ===== JIMI AI ASSISTANT ===== */}
-      <JimiAssistant />
+      {/* ===== AVA EXECUTIVE ASSISTANT ===== */}
+      <AvaExecutiveAssistant />
+      
+      {/* ===== PROJECT MANAGER AI AGENT ===== */}
+      <ProjectManager />
 
       {/* ===== MOBILE BOTTOM NAVIGATION (visible only on mobile) ===== */}
       <div className="md:hidden mobile-bottom-nav">

@@ -1,0 +1,637 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Mic, MicOff, X, Send, Volume2, VolumeX, Bot, User, Globe, Briefcase, Settings, TrendingUp, Users, Calendar, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+interface Message {
+  id: string;
+  text: string;
+  isUser: boolean;
+  timestamp: Date;
+  type?: 'briefing' | 'metric' | 'alert' | 'normal';
+  data?: any;
+}
+
+interface BriefingData {
+  greeting: string;
+  date: string;
+  revenue: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    growth: number;
+    topDeals: { contact: string; value: number; stage: string }[];
+  };
+  sales: {
+    dealsWonToday: number;
+    dealsWonWeek: number;
+    totalPipelineValue: number;
+    conversionRate: number;
+  };
+  leads: {
+    newToday: number;
+    totalActive: number;
+    hotLeads: { name: string; score: number }[];
+    needsFollowUp: { name: string; daysSince: number }[];
+  };
+  pipeline: {
+    totalValue: number;
+    stuckDeals: { contact: string; daysInStage: number }[];
+  };
+  appointments: {
+    today: number;
+    tomorrow: number;
+    missed: number;
+  };
+  support: {
+    openTickets: number;
+    urgentTickets: number;
+  };
+  alerts: { type: string; message: string }[];
+  recommendations: string[];
+}
+
+const AvaExecutiveAssistant: React.FC = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '0',
+      text: 'Good day! I\'m Ava, your AI Executive Assistant. I\'m here to help you manage your business operations. You can ask me about revenue, leads, pipeline, or say "Good morning" for a full briefing. How can I assist you today?',
+      isUser: false,
+      timestamp: new Date(),
+      type: 'normal'
+    },
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [selectedLang, setSelectedLang] = useState<string>('en-IN');
+  const [showLangMenu, setShowLangMenu] = useState(false);
+  const [briefing, setBriefing] = useState<BriefingData | null>(null);
+  const [showBriefing, setShowBriefing] = useState(false);
+  const [isLoadingBriefing, setIsLoadingBriefing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const synthesisRef = useRef<SpeechSynthesis | null>(null);
+
+  const LANGUAGES = [
+    { code: 'en-IN', name: 'English', nativeName: 'English' },
+    { code: 'hi-IN', name: 'Hindi', nativeName: 'हिन्दी' },
+    { code: 'mr-IN', name: 'Marathi', nativeName: 'मराठी' },
+  ];
+
+  useEffect(() => {
+    synthesisRef.current = window.speechSynthesis;
+    return () => {
+      synthesisRef.current?.cancel();
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const addMessage = (text: string, isUser: boolean, type: Message['type'] = 'normal', data?: any) => {
+    setMessages(prev => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        text,
+        isUser,
+        timestamp: new Date(),
+        type,
+        data
+      },
+    ]);
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const fetchBriefing = async () => {
+    setIsLoadingBriefing(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/ava/briefing', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setBriefing(data.data);
+        setShowBriefing(true);
+        
+        // Add briefing message
+        const b = data.data;
+        let briefingText = `${b.greeting}\n\n📊 Executive Briefing - ${b.date}\n\n`;
+        briefingText += `💰 Revenue\n• Today: ${formatCurrency(b.revenue.today)}\n• This Month: ${formatCurrency(b.revenue.thisMonth)} (${b.revenue.growth > 0 ? '+' : ''}${b.revenue.growth}%)\n\n`;
+        briefingText += `📈 Sales\n• Won Today: ${b.sales.dealsWonToday}\n• Pipeline: ${formatCurrency(b.sales.totalPipelineValue)}\n• Conversion: ${b.sales.conversionRate}%\n\n`;
+        briefingText += `👥 Leads\n• New Today: ${b.leads.newToday}\n• Active: ${b.leads.totalActive}\n\n`;
+        briefingText += `📅 Appointments\n• Today: ${b.appointments.today}\n• Tomorrow: ${b.appointments.tomorrow}`;
+        
+        if (b.alerts.length > 0) {
+          briefingText += `\n\n⚠️ Alerts\n${b.alerts.map((a: any) => `• ${a.message}`).join('\n')}`;
+        }
+        
+        if (b.recommendations.length > 0) {
+          briefingText += `\n\n💡 Recommendations\n${b.recommendations.map((r: string) => `• ${r}`).join('\n')}`;
+        }
+        
+        addMessage(briefingText, false, 'briefing', b.data);
+        speakText(`Here's your briefing for ${b.date}. Revenue today is ${formatCurrency(b.revenue.today)}. You have ${b.leads.newToday} new leads and ${b.appointments.today} appointments today.`);
+      }
+    } catch (error) {
+      addMessage('I apologize, but I\'m unable to fetch the briefing at the moment. Please try again later.', false);
+    }
+    setIsLoadingBriefing(false);
+  };
+
+  const speakText = (text: string) => {
+    if (isMuted || !synthesisRef.current) return;
+    
+    synthesisRef.current.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = selectedLang;
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    
+    // Try to find Neerja voice (Indian English)
+    const voices = synthesisRef.current.getVoices();
+    const neerjaVoice = voices.find(v => v.name.includes('Neerja') || v.name.includes('Neural'));
+    if (neerjaVoice) {
+      utterance.voice = neerjaVoice;
+    }
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    
+    synthesisRef.current.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    synthesisRef.current?.cancel();
+    setIsSpeaking(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim()) return;
+
+    const userMessage = inputText.trim();
+    setInputText('');
+    setIsTyping(true);
+
+    addMessage(userMessage, true);
+
+    // Check for briefing request
+    const lower = userMessage.toLowerCase();
+    if (lower.includes('good morning') || lower.includes('briefing') || lower.includes('status') || lower.includes('update') || lower.includes('शुभ प्रभात') || lower.includes('ब्रीफिंग')) {
+      await fetchBriefing();
+      setIsTyping(false);
+      return;
+    }
+
+    // Check for specific commands
+    if (lower.includes('revenue') || lower.includes('पैसा') || lower.includes('कमाई') || lower.includes('income')) {
+      await handleCommand('revenue');
+      setIsTyping(false);
+      return;
+    }
+
+    if (lower.includes('leads') || lower.includes('लीड') || lower.includes('customers')) {
+      await handleCommand('leads');
+      setIsTyping(false);
+      return;
+    }
+
+    if (lower.includes('pipeline') || lower.includes('deals') || lower.includes('डील')) {
+      await handleCommand('pipeline');
+      setIsTyping(false);
+      return;
+    }
+
+    if (lower.includes('appointment') || lower.includes('meeting') || lower.includes('मीटिंग')) {
+      await handleCommand('appointments');
+      setIsTyping(false);
+      return;
+    }
+
+    if (lower.includes('navigate') || lower.includes('open') || lower.includes('go to') || lower.includes('खोलो') || lower.includes('जाओ')) {
+      handleNavigation(userMessage);
+      setIsTyping(false);
+      return;
+    }
+
+    // General AI chat
+    try {
+      const token = localStorage.getItem('token');
+      const history = messages.slice(-10).map(m => ({
+        role: m.isUser ? 'user' : 'assistant',
+        content: m.text
+      }));
+
+      const response = await fetch('/api/ava/chat', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text: userMessage, history })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        addMessage(data.data.text, false);
+        speakText(data.data.text);
+      } else {
+        addMessage('I apologize, but I encountered an issue. Please try again.', false);
+      }
+    } catch (error) {
+      addMessage('I apologize, but I\'m experiencing a temporary connectivity issue. Please try again.', false);
+    }
+
+    setIsTyping(false);
+  };
+
+  const handleCommand = async (command: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/ava/command', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ command })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        addMessage(data.message, false, 'metric', data.data);
+        speakText(data.message);
+      }
+    } catch (error) {
+      addMessage('I apologize, but I couldn\'t fetch the data. Please try again.', false);
+    }
+  };
+
+  const handleNavigation = (text: string) => {
+    const lower = text.toLowerCase();
+    const routes: Record<string, string> = {
+      'dashboard': '/dashboard',
+      'leads': '/leads',
+      'contacts': '/leads',
+      'whatsapp': '/whatsapp',
+      'campaigns': '/campaigns',
+      'analytics': '/analytics',
+      'settings': '/settings',
+      'appointments': '/appointments',
+      'calendar': '/appointments',
+      'social': '/social',
+      'email': '/email-marketing',
+      'reviews': '/reviews',
+      'creative': '/creative',
+      'automation': '/workflows',
+      'reports': '/analytics',
+      'deals': '/deals',
+      'pipeline': '/pipelines',
+      'team': '/team',
+      'documents': '/documents'
+    };
+
+    for (const [key, route] of Object.entries(routes)) {
+      if (lower.includes(key)) {
+        addMessage(`Opening ${key}...`, false);
+        setTimeout(() => navigate(route), 500);
+        return;
+      }
+    }
+
+    addMessage('I can help you navigate to: Dashboard, Leads, WhatsApp, Campaigns, Analytics, Settings, Appointments, Social Media, Email, Reviews, Creative, Automation, Reports, Deals, Pipeline, Team, or Documents. Which would you like to open?', false);
+  };
+
+  const handleToggleListening = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      addMessage('Speech recognition is not supported in your browser. Please use Chrome or Edge.', false);
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = selectedLang;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInputText(transcript);
+      setIsListening(false);
+      // Auto-send after voice input
+      setTimeout(() => {
+        handleSendMessage();
+      }, 300);
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    setIsListening(true);
+    recognition.start();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    if (!isMuted) {
+      stopSpeaking();
+    }
+  };
+
+  return (
+    <>
+      {/* Floating Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`fixed bottom-20 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
+          isOpen
+            ? 'bg-slate-700 hover:bg-slate-800'
+            : isListening
+            ? 'bg-red-500 hover:bg-red-600 animate-pulse'
+            : 'bg-gradient-to-r from-slate-700 to-blue-600 hover:from-slate-800 hover:to-blue-700'
+        }`}
+      >
+        {isOpen ? (
+          <X size={24} className="text-white" />
+        ) : isListening ? (
+          <MicOff size={24} className="text-white" />
+        ) : (
+          <span className="text-2xl">👩‍💼</span>
+        )}
+      </button>
+
+      {/* Listening Indicator */}
+      {isListening && !isOpen && (
+        <div className="fixed bottom-36 right-6 z-50 bg-slate-700 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+          🎤 Listening...
+        </div>
+      )}
+
+      {/* Chat Window */}
+      {isOpen && (
+        <div className="fixed bottom-38 right-6 z-50 w-[400px] max-w-[calc(100vw-48px)] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col" style={{ height: '600px', maxHeight: 'calc(100vh - 150px)' }}>
+          {/* Header */}
+          <div className="bg-gradient-to-r from-slate-700 to-blue-600 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
+                👩‍💼
+              </div>
+              <div>
+                <h3 className="text-white font-semibold flex items-center gap-2">
+                  Ava Executive Assistant
+                </h3>
+                <p className="text-white/80 text-xs">
+                  {isListening ? '🎤 Listening...' : isTyping ? '🧠 Processing...' : isSpeaking ? '🔊 Speaking...' : 'Ready to assist'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Briefing Button */}
+              <button
+                onClick={fetchBriefing}
+                disabled={isLoadingBriefing}
+                className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                title="Get Daily Briefing"
+              >
+                <RefreshCw size={18} className={`text-white ${isLoadingBriefing ? 'animate-spin' : ''}`} />
+              </button>
+              {/* Language Selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowLangMenu(!showLangMenu)}
+                  className="p-2 rounded-full hover:bg-white/20 transition-colors flex items-center gap-1"
+                  title="Change Language"
+                >
+                  <Globe size={18} className="text-white" />
+                </button>
+                {showLangMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50">
+                    {LANGUAGES.map(lang => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          setSelectedLang(lang.code);
+                          setShowLangMenu(false);
+                        }}
+                        className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                          selectedLang === lang.code ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        <span>{lang.nativeName}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Mute Button */}
+              <button
+                onClick={toggleMute}
+                className="p-2 rounded-full hover:bg-white/20 transition-colors"
+              >
+                {isMuted ? (
+                  <VolumeX size={18} className="text-white" />
+                ) : (
+                  <Volume2 size={18} className="text-white" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Briefing Panel */}
+          {showBriefing && briefing && (
+            <div className="bg-gradient-to-r from-slate-600 to-blue-500 px-4 py-3 border-b border-slate-500 overflow-y-auto" style={{ maxHeight: '200px' }}>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-white font-semibold text-sm">📊 Quick Overview</h4>
+                <button onClick={() => setShowBriefing(false)} className="text-white/70 hover:text-white">
+                  <ChevronUp size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white/10 rounded-lg p-2">
+                  <div className="text-white/70">Revenue Today</div>
+                  <div className="text-white font-bold">{formatCurrency(briefing.revenue.today)}</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-2">
+                  <div className="text-white/70">Pipeline</div>
+                  <div className="text-white font-bold">{formatCurrency(briefing.pipeline.totalValue)}</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-2">
+                  <div className="text-white/70">New Leads</div>
+                  <div className="text-white font-bold">{briefing.leads.newToday}</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-2">
+                  <div className="text-white/70">Appointments</div>
+                  <div className="text-white font-bold">{briefing.appointments.today}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.map(msg => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm ${
+                    msg.isUser
+                      ? 'bg-gradient-to-r from-slate-700 to-blue-600 text-white rounded-br-md'
+                      : msg.type === 'briefing'
+                      ? 'bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-800 dark:to-blue-900/30 text-gray-900 dark:text-white rounded-bl-md border border-blue-200 dark:border-blue-700'
+                      : msg.type === 'metric'
+                      ? 'bg-green-50 dark:bg-green-900/30 text-gray-900 dark:text-white rounded-bl-md border border-green-200 dark:border-green-700'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md border border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {!msg.isUser && (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-r from-slate-700 to-blue-600 flex items-center justify-center shrink-0">
+                        <Bot size={14} className="text-white" />
+                      </div>
+                    )}
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                    {msg.isUser && (
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                        <User size={14} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {isTyping && (
+              <div className="flex justify-start animate-fade-in">
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-r from-slate-700 to-blue-600 flex items-center justify-center">
+                      <Bot size={14} className="text-white" />
+                    </div>
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick Actions */}
+          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              <button
+                onClick={fetchBriefing}
+                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-700 whitespace-nowrap flex items-center gap-1"
+              >
+                <RefreshCw size={12} /> Briefing
+              </button>
+              <button
+                onClick={() => handleCommand('revenue')}
+                className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-medium hover:bg-green-200 dark:hover:bg-green-900/50 whitespace-nowrap flex items-center gap-1"
+              >
+                <TrendingUp size={12} /> Revenue
+              </button>
+              <button
+                onClick={() => handleCommand('leads')}
+                className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium hover:bg-blue-200 dark:hover:bg-blue-900/50 whitespace-nowrap flex items-center gap-1"
+              >
+                <Users size={12} /> Leads
+              </button>
+              <button
+                onClick={() => handleCommand('appointments')}
+                className="px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium hover:bg-purple-200 dark:hover:bg-purple-900/50 whitespace-nowrap flex items-center gap-1"
+              >
+                <Calendar size={12} /> Appointments
+              </button>
+            </div>
+          </div>
+
+          {/* Input Area */}
+          <div className="border-t border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-900">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleToggleListening}
+                className={`p-3 rounded-full transition-all ${
+                  isListening
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+                title="Click to speak"
+              >
+                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+              </button>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask about revenue, leads, pipeline..."
+                className="flex-1 px-4 py-2.5 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputText.trim()}
+                className="p-3 rounded-full bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send size={20} />
+              </button>
+            </div>
+            <div className="mt-2 flex items-center justify-center gap-1 text-xs text-gray-400">
+              <span>🟢 Online • Data refreshes in real-time</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default AvaExecutiveAssistant;
