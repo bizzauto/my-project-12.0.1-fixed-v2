@@ -73,6 +73,7 @@ const AvaExecutiveAssistant: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputTextRef = useRef<string>('');
   const navigate = useNavigate();
   const synthesisRef = useRef<SpeechSynthesis | null>(null);
 
@@ -165,24 +166,77 @@ const AvaExecutiveAssistant: React.FC = () => {
     setIsLoadingBriefing(false);
   };
 
-  const speakText = (text: string) => {
-    if (isMuted || !synthesisRef.current) return;
+  const speakText = async (text: string) => {
+    if (isMuted || !text) return;
+    
+    // Stop any current speech
+    synthesisRef.current?.cancel();
+    setIsSpeaking(true);
+    
+    try {
+      // Try Edge TTS with NeerjaNeural voice (BEST quality - FREE)
+      const response = await fetch('/api/jimi/tts/edge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: text,
+          lang: selectedLang || 'en-IN',
+          voiceStyle: 'professional'  // Executive assistant tone - NeerjaNeural
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.audio && !data.fallback) {
+        // Play Edge TTS audio (NeerjaNeural voice)
+        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+        audio.volume = 1.0;
+        audio.onended = () => setIsSpeaking(false);
+        audio.onerror = () => {
+          // Fallback to browser TTS
+          speakWithBrowser(text);
+        };
+        await audio.play();
+        return;
+      }
+    } catch (error) {
+      console.log('Edge TTS failed, using browser fallback');
+    }
+    
+    // Fallback to browser SpeechSynthesis with Neerja voice
+    speakWithBrowser(text);
+  };
+
+  const speakWithBrowser = (text: string) => {
+    if (!synthesisRef.current) {
+      setIsSpeaking(false);
+      return;
+    }
     
     synthesisRef.current.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = selectedLang;
+    utterance.lang = 'en-IN';
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
+    utterance.volume = 1.0;
     
-    // Try to find Neerja voice (Indian English)
+    // Find Neerja or any Indian English female voice
     const voices = synthesisRef.current.getVoices();
-    const neerjaVoice = voices.find(v => v.name.includes('Neerja') || v.name.includes('Neural'));
-    if (neerjaVoice) {
-      utterance.voice = neerjaVoice;
+    const preferredVoice = voices.find(v => 
+      v.name.includes('Neerja') || 
+      v.name.includes('Neural') ||
+      v.name.includes('Indian') ||
+      (v.lang === 'en-IN' && v.name.includes('Female'))
+    ) || voices.find(v => v.lang === 'en-IN');
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+      console.log('Using voice:', preferredVoice.name);
     }
     
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
     
     synthesisRef.current.speak(utterance);
   };
@@ -190,52 +244,61 @@ const AvaExecutiveAssistant: React.FC = () => {
   const stopSpeaking = () => {
     synthesisRef.current?.cancel();
     setIsSpeaking(false);
+    // Also stop any Edge TTS audio
+    const audios = document.querySelectorAll('audio');
+    audios.forEach(audio => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+  const handleSendMessage = async (overrideText?: string) => {
+    const messageToSend = overrideText || inputTextRef.current || inputText;
+    if (!messageToSend.trim()) return;
 
-    const userMessage = inputText.trim();
+    const userMessage = messageToSend.trim();
     setInputText('');
+    inputTextRef.current = '';
     setIsTyping(true);
 
     addMessage(userMessage, true);
 
     // Check for briefing request
     const lower = userMessage.toLowerCase();
-    if (lower.includes('good morning') || lower.includes('briefing') || lower.includes('status') || lower.includes('update') || lower.includes('शुभ प्रभात') || lower.includes('ब्रीफिंग')) {
+    if (lower.includes('good morning') || lower.includes('briefing') || lower.includes('status') || lower.includes('update') || lower.includes('शुभ प्रभात') || lower.includes('ब्रीफिंग') || lower.includes('बताओ') || lower.includes('क्या चल रहा') || lower.includes('how are you') || lower.includes('कैसे हो')) {
       await fetchBriefing();
       setIsTyping(false);
       return;
     }
 
     // Check for specific commands
-    if (lower.includes('revenue') || lower.includes('पैसा') || lower.includes('कमाई') || lower.includes('income')) {
+    if (lower.includes('revenue') || lower.includes('पैसा') || lower.includes('कमाई') || lower.includes('income') || lower.includes('रुपय') || lower.includes('प्रॉफिट') || lower.includes('profit')) {
       await handleCommand('revenue');
       setIsTyping(false);
       return;
     }
 
-    if (lower.includes('leads') || lower.includes('लीड') || lower.includes('customers')) {
+    if (lower.includes('leads') || lower.includes('लीड') || lower.includes('customers') || lower.includes('ग्राहक') || lower.includes('क्लाइंट')) {
       await handleCommand('leads');
       setIsTyping(false);
       return;
     }
 
-    if (lower.includes('pipeline') || lower.includes('deals') || lower.includes('डील')) {
+    if (lower.includes('pipeline') || lower.includes('deals') || lower.includes('डील') || lower.includes('सौदे') || lower.includes('डील्स')) {
       await handleCommand('pipeline');
       setIsTyping(false);
       return;
     }
 
-    if (lower.includes('appointment') || lower.includes('meeting') || lower.includes('मीटिंग')) {
+    if (lower.includes('appointment') || lower.includes('meeting') || lower.includes('मीटिंग') || lower.includes('अपॉइंटमेंट') || lower.includes('बुकिंग') || lower.includes('शेड्यूल')) {
       await handleCommand('appointments');
       setIsTyping(false);
       return;
     }
 
-    if (lower.includes('navigate') || lower.includes('open') || lower.includes('go to') || lower.includes('खोलो') || lower.includes('जाओ')) {
-      handleNavigation(userMessage);
+    // Check for navigation commands
+    const navHandled = handleNavigation(userMessage);
+    if (navHandled) {
       setIsTyping(false);
       return;
     }
@@ -295,37 +358,54 @@ const AvaExecutiveAssistant: React.FC = () => {
 
   const handleNavigation = (text: string) => {
     const lower = text.toLowerCase();
-    const routes: Record<string, string> = {
-      'dashboard': '/dashboard',
-      'leads': '/leads',
-      'contacts': '/leads',
-      'whatsapp': '/whatsapp',
-      'campaigns': '/campaigns',
-      'analytics': '/analytics',
-      'settings': '/settings',
-      'appointments': '/appointments',
-      'calendar': '/appointments',
-      'social': '/social',
-      'email': '/email-marketing',
-      'reviews': '/reviews',
-      'creative': '/creative',
-      'automation': '/workflows',
-      'reports': '/analytics',
-      'deals': '/deals',
-      'pipeline': '/pipelines',
-      'team': '/team',
-      'documents': '/documents'
+    
+    // Navigation routes with English + Hindi keywords
+    const routes: Record<string, string[]> = {
+      '/dashboard': ['dashboard', 'home', 'डैशबोर्ड', 'होम', 'मुख्य पृष्ठ'],
+      '/leads': ['leads', 'lead', 'contacts', 'contact', 'लीड', 'लीड्स', 'संपर्क', 'ग्राहक', 'customers'],
+      '/whatsapp': ['whatsapp', 'message', 'chat', 'व्हाट्सएप', 'मैसेज', 'चैट', 'संदेश'],
+      '/campaigns': ['campaigns', 'campaign', 'कैंपेन', 'प्रचार', 'promotion'],
+      '/analytics': ['analytics', 'insights', 'reports', 'data', 'एनालिटिक्स', 'रिपोर्ट', 'डेटा', 'आंकड़े'],
+      '/settings': ['settings', 'setting', 'config', 'सेटिंग्स', 'कॉन्फ़िग'],
+      '/appointments': ['appointments', 'appointment', 'calendar', 'schedule', 'meeting', 'अपॉइंटमेंट', 'कैलेंडर', 'शेड्यूल', 'मीटिंग', 'बुकिंग'],
+      '/social': ['social', 'social media', 'facebook', 'instagram', 'सोशल', 'सोशल मीडिया'],
+      '/email-marketing': ['email', 'mail', 'ईमेल', 'मेल', 'ईमेल मार्केटिंग'],
+      '/reviews': ['reviews', 'review', 'rating', 'रिव्यू', 'समीक्षा', 'रेटिंग'],
+      '/creative': ['creative', 'poster', 'design', 'क्रिएटिव', 'पोस्टर', 'डिज़ाइन'],
+      '/workflows': ['automation', 'workflow', 'automate', 'ऑटोमेशन', 'वर्कफ़्लो'],
+      '/deals': ['deals', 'deal', 'डील', 'डील्स', 'सौदे'],
+      '/pipelines': ['pipeline', 'pipeline', 'पाइपलाइन'],
+      '/team': ['team', 'members', 'staff', 'टीम', 'सदस्य', 'कर्मचारी'],
+      '/documents': ['documents', 'files', 'docs', 'दस्तावेज़', 'फ़ाइलें', 'डॉक्स'],
+      '/crm': ['crm', 'customer relationship', 'सीआरएम'],
+      '/ecommerce': ['ecommerce', 'e-commerce', 'store', 'shop', 'ई-कॉमर्स', 'स्टोर', 'दुकान'],
+      '/subscriptions': ['subscription', 'billing', 'plan', 'सब्सक्रिप्शन', 'बिलिंग', 'प्लान'],
     };
 
-    for (const [key, route] of Object.entries(routes)) {
-      if (lower.includes(key)) {
-        addMessage(`Opening ${key}...`, false);
-        setTimeout(() => navigate(route), 500);
-        return;
+    // Check for navigation keywords
+    const navKeywords = ['open', 'go to', 'navigate', 'show', 'खोलो', 'जाओ', 'दिखाओ', 'ले चलो', 'खोल', 'जा'];
+    const isNavCommand = navKeywords.some(kw => lower.includes(kw));
+
+    // Find matching route
+    for (const [route, keywords] of Object.entries(routes)) {
+      for (const keyword of keywords) {
+        if (lower.includes(keyword)) {
+          const displayName = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+          addMessage(`Opening ${displayName}...`, false);
+          setTimeout(() => navigate(route), 300);
+          return;
+        }
       }
     }
 
-    addMessage('I can help you navigate to: Dashboard, Leads, WhatsApp, Campaigns, Analytics, Settings, Appointments, Social Media, Email, Reviews, Creative, Automation, Reports, Deals, Pipeline, Team, or Documents. Which would you like to open?', false);
+    // If it's a navigation command but no route matched
+    if (isNavCommand) {
+      addMessage('I can open: Dashboard, Leads, WhatsApp, Campaigns, Analytics, Settings, Appointments, Social Media, Email, Reviews, Creative, Workflows, Deals, Pipeline, Team, Documents, CRM, E-Commerce, or Subscriptions. Which one?', false);
+    } else {
+      // Not a navigation command - return false to let AI chat handle it
+      return false;
+    }
+    return true;
   };
 
   const handleToggleListening = () => {
@@ -348,11 +428,12 @@ const AvaExecutiveAssistant: React.FC = () => {
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       setInputText(transcript);
+      inputTextRef.current = transcript;
       setIsListening(false);
-      // Auto-send after voice input
+      // Auto-send after voice input with the transcript directly
       setTimeout(() => {
-        handleSendMessage();
-      }, 300);
+        handleSendMessage(transcript);
+      }, 200);
     };
 
     recognition.onerror = () => {
@@ -611,7 +692,10 @@ const AvaExecutiveAssistant: React.FC = () => {
                 ref={inputRef}
                 type="text"
                 value={inputText}
-                onChange={e => setInputText(e.target.value)}
+                onChange={e => {
+                  setInputText(e.target.value);
+                  inputTextRef.current = e.target.value;
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask about revenue, leads, pipeline..."
                 className="flex-1 px-4 py-2.5 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

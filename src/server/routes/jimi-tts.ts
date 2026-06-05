@@ -20,14 +20,78 @@ router.post('/chat', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'No API key configured' });
     }
 
+    const employeePrompt = `Naam: Jimi. Employee Mode. Professional Hindi/English. Sirf 1 line.
+
+JAWAB SIRF 1 LINE MEIN:
+- leads/लीड्स/prospects/customers → "Leads page dikha rahi hun ji"
+- reviews/समीक्षा/ratings → "Reviews page dikha rahi hun ji"
+- dashboard/home/डैशबोर्ड → "Dashboard khol rahi hun ji"
+- whatsapp/messages/व्हाट्सएप/chat → "WhatsApp khol rahi hun ji"
+- campaigns/promotions/कैंपेन → "Campaigns page dikha rahi hun ji"
+- appointments/bookings/अपॉइंटमेंट → "Appointments page dikha rahi hun ji"
+- email/ईमेल/mail/marketing → "Email Marketing page dikha rahi hun ji"
+- revenue/income/paise/कमाई → Revenue update with numbers
+- social media/facebook/instagram → "Social Media page dikha rahi hun ji"
+- analytics/insights/एनालिटिक्स → "Analytics page dikha rahi hun ji"
+- settings/सेटिंग्स → "Settings page khol rahi hun ji"
+- documents/files/दस्तावेज़ → "Documents page dikha rahi hun ji"
+- creatives/posters/design/डिजाइन → "Creative page khol rahi hun ji"
+
+AGAR NAHI PATA TOH BOLO "app mein check karo ji". Galat mat bolo.`;
+
+    const projectManagerPrompt = `Tu BizzAuto CRM ka Project Manager hai. Naam: PM. Language: Hinglish.
+
+JAWAB SIRF 1 LINE MEIN. SHORT AUR ACTIONABLE:
+- leads/लीड्स/prospects/customers → "Leads page khol raha hun, wahan sab contacts hain"
+- reviews/समीक्षा/ratings → "Reviews page khol raha hun, sab reviews dikhenge"
+- dashboard/home/डैशबोर्ड → "Dashboard khol raha hun, full overview milega"
+- whatsapp/messages/chat/व्हाट्सएप → "WhatsApp page khol raha hun, sab chats hain"
+- campaigns/promotions/कैंपेन → "Campaigns page khol raha hun, campaigns dikhenge"
+- appointments/bookings/schedule → "Appointments page khol raha hun, bookings dikhenge"
+- email/ईमेल/marketing → "Email Marketing page khol raha hun"
+- social/facebook/instagram/linkedin → "Social Media page khol raha hun"
+- analytics/insights/data → "Analytics page khol raha hun, reports dikhenge"
+- revenue/income/paise/kamai → "Revenue update - Analytics mein dekho ji"
+- settings/सेटिंग्स → "Settings page khol raha hun"
+- documents/files/invoices → "Documents page khol raha hun"
+- creatives/posters/design → "Creative page khol raha hun"
+- ecommerce/store/shop/dukaan → "E-Commerce page khol raha hun"
+- automation/workflows → "Automation page khol raha hun"
+- billing/subscription → "Billing page khol raha hun"
+- courses/training → "Courses page khol raha hun"
+- surveys/polls → "Surveys page khol raha hun"
+- reports → "Reports page khol raha hun"
+- funnels/landing → "Funnels page khol raha hun"
+- team/members → "Team page khol raha hun"
+- profile → "Profile page khol raha hun"
+- conversations/chat history → "Conversations page khol raha hun"
+- google business/posts → "Google Business page khol raha hun"
+- voice call/phone call → "Voice Call page khol raha hun"
+- api keys → "API Keys page khol raha hun"
+- client portal → "Client Portal page khol raha hun"
+- custom fields → "Custom Fields page khol raha hun"
+- blog/articles → "Blog page khol raha hun"
+- trigger links → "Trigger Links page khol raha hun"
+- payment links → "Payment Links page khol raha hun"
+- import leads/bulk import → "Import Leads page khol raha hun"
+- team management → "Team Management page khol raha hun"
+- review requests → "Review Requests page khol raha hun"
+- missed call/dograh → "Dograh Settings page khol raha hun"
+- store share → "Store Share page khol raha hun"
+- funnels/landing pages → "Funnels page khol raha hun"
+
+AGAR NAHI PATA: "Sir, aap Dashboard dekhenge? Ya mujhe batao kya karna hai"
+GALAT MAT BOLO. Feature exist nahi karta toh bolo "Sir, yeh feature abhi available nahi hai".`;
+
     const personalityPrompts: Record<string, string> = {
-      gf: `Naam: Jimi. Language: Hinglish. Tone: Warm, caring. Use "tumhara", "haan", "acha". Max 2 sentences. Natural Indian girl.`,
-      bestfriend: `Naam: Jimi. Language: Casual Hinglish. Tone: Friendly, fun. Use "tu", "yaar". Max 2 sentences.`,
-      employee: `Naam: Jimi. Employee Mode - Sirf BizzAuto CRM ke baare mein baat karo. Professional Hindi/English. Use "Sir/Ma'am", "ji". Max 2 sentences. Agar user BizzAuto se related nahi puch raha toh politely redirect karo CRM features ki taraf. Topics: leads, WhatsApp, campaigns, reviews, dashboard, analytics, settings, billing, creative, social media, automation.`,
+      gf: `Naam: Jimi. GF Mode. Hinglish. Warm, caring. Max 1 line.`,
+      bestfriend: `Naam: Jimi. Best Friend Mode. Casual Hinglish. Max 1 line.`,
+      employee: employeePrompt,
+      projectmanager: projectManagerPrompt,
     };
 
-    const systemPrompt = `Tum Jimi ho - BizzAuto CRM ki sweet AI assistant. ${personalityPrompts[personalityMode] || personalityPrompts.gf}
-BOLNE KA STYLE: Natural Indian ladki. Short aur sweet. TTS ke liye emojis mat use karo. Plain text likho.`;
+    const systemPrompt = `Tum ${personalityMode === 'projectmanager' ? 'PM (Project Manager) ho - BizzAuto CRM ka smart assistant' : 'Jimi ho - BizzAuto CRM ki AI assistant. Indian girl'}. ${personalityPrompts[personalityMode] || personalityPrompts.gf}
+STYLE: Sirf 1 line. Plain text. NO emojis.`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
@@ -120,7 +184,7 @@ function addNaturalPatterns(text: string): string {
 // POST /api/jimi/tts - Main TTS endpoint (tries Piper > Edge > Browser)
 router.post('/tts', async (req: Request, res: Response) => {
   try {
-    const { text, lang = 'hi-IN', voiceStyle = 'sweet' } = req.body;
+    const { text, lang = 'en-IN', voiceStyle = 'natural' } = req.body;
     if (!text) return res.status(400).json({ error: 'Text required' });
 
     const cleaned = addNaturalPatterns(cleanText(text));
@@ -152,7 +216,7 @@ router.post('/tts', async (req: Request, res: Response) => {
 // POST /api/jimi/tts/edge - Edge TTS only
 router.post('/tts/edge', async (req: Request, res: Response) => {
   try {
-    const { text, lang = 'hi-IN', voiceStyle = 'sweet' } = req.body;
+    const { text, lang = 'en-IN', voiceStyle = 'natural' } = req.body;
     if (!text) return res.status(400).json({ error: 'Text required' });
 
     const cleaned = addNaturalPatterns(cleanText(text));
@@ -165,6 +229,92 @@ router.post('/tts/edge', async (req: Request, res: Response) => {
 
     res.json({ fallback: true, text: cleaned });
   } catch (error) {
+    res.json({ fallback: true, text: req.body.text || '' });
+  }
+});
+
+// POST /api/jimi/tts/gemini - Gemini TTS with MYRA's Aoede voice
+router.post('/tts/gemini', async (req: Request, res: Response) => {
+  try {
+    const { text, voiceStyle = 'sweet' } = req.body;
+    if (!text) return res.status(400).json({ error: 'Text required' });
+
+    const cleaned = addNaturalPatterns(cleanText(text));
+    if (!cleaned) return res.json({ fallback: true, text: '' });
+
+    const apiKey = process.env.GEMINI_API_KEY || '';
+    if (!apiKey) {
+      console.log('[Jimi Gemini] No GEMINI_API_KEY configured');
+      return res.json({ fallback: true, text: cleaned });
+    }
+
+    // MYRA uses Gemini Live API with Aoede voice (gemini-2.0-flash-exp supports audio via REST)
+    const geminiStylePrompts: Record<string, string> = {
+      sweet: 'sweet warm caring loving tone. Natural Hinglish with gentle emotion.',
+      natural: 'natural casual friendly conversation. Hinglish comfortably.',
+      warm: 'calm caring soft gentle reassuring. Hinglish with warmth.',
+      energetic: 'bright lively enthusiastic. Hinglish with excitement.',
+      professional: 'professional clear formal but friendly. Clean Hindi/English.',
+    };
+
+    const geminiStyle = geminiStylePrompts[voiceStyle] || geminiStylePrompts.sweet;
+    const geminiController = new AbortController();
+    const geminiTimeout = setTimeout(() => geminiController.abort(), 15000);
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: cleaned }],
+          }],
+          systemInstruction: {
+            parts: [{ text: `CRITICAL: You are a TEXT-TO-SPEECH system, not a chatbot. Output ONLY the exact user text verbatim. NEVER add greetings, confirmations, or extra words. Speak in a ${geminiStyle} tone. Your ONLY job: speak the user's text aloud with the given tone.` }],
+          },
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: 'Aoede',
+                },
+              },
+            },
+          },
+        }),
+        signal: geminiController.signal,
+      }
+    );
+
+    clearTimeout(geminiTimeout);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('[Jimi Gemini] API error:', response.status, errText.substring(0, 200));
+      return res.json({ fallback: true, text: cleaned });
+    }
+
+    const data: any = await response.json();
+    const candidate = data?.candidates?.[0];
+    const parts = candidate?.content?.parts || [];
+    
+    // Find audio part (Gemini returns inlineData with audio)
+    const audioPart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith('audio/'));
+    if (audioPart?.inlineData?.data) {
+      console.log('[Jimi Gemini] TTS success with Aoede voice 🎤');
+      // Return actual mimeType from Gemini response so client plays correct format
+      const mimeType = audioPart.inlineData.mimeType || 'audio/mpeg';
+      const format = mimeType.includes('wav') ? 'wav' : mimeType.includes('ogg') ? 'ogg' : 'mp3';
+      return res.json({ audio: audioPart.inlineData.data, format, mimeType, engine: 'gemini' });
+    }
+
+    // If no audio, return fallback
+    console.log('[Jimi Gemini] No audio in response');
+    res.json({ fallback: true, text: cleaned });
+  } catch (error: any) {
+    console.error('[Jimi Gemini] TTS failed:', error.message);
     res.json({ fallback: true, text: req.body.text || '' });
   }
 });
@@ -227,7 +377,15 @@ router.post('/tts/kyutai', async (req: Request, res: Response) => {
 // ==================== PIPER TTS ====================
 function tryPiperTTS(text: string, lang: string): string | null {
   try {
-    if (!existsSync('/usr/bin/piper') && !existsSync('/usr/local/bin/piper')) {
+    // Check if piper is installed (cross-platform)
+    let piperFound = false;
+    try {
+      execSync('which piper 2>/dev/null || where piper 2>nul', { stdio: 'pipe', timeout: 3000 });
+      piperFound = true;
+    } catch {
+      piperFound = false;
+    }
+    if (!piperFound) {
       return null;
     }
 
@@ -247,7 +405,7 @@ function tryPiperTTS(text: string, lang: string): string | null {
     // Run Piper TTS
     execSync(
       `cat "${textFile}" | piper --model "${voice}" --output_file "${tmpWav}"`,
-      { timeout: 10000, stdio: 'pipe' }
+      { timeout: 20000, stdio: 'pipe' }
     );
 
     // Convert WAV to MP3 if ffmpeg available
@@ -270,33 +428,39 @@ function tryPiperTTS(text: string, lang: string): string | null {
 }
 
 // ==================== EDGE TTS ====================
-function tryEdgeTTS(text: string, lang: string, voiceStyle: string = 'sweet'): string | null {
+function tryEdgeTTS(text: string, lang: string, voiceStyle: string = 'natural'): string | null {
   try {
-    if (!existsSync('/usr/local/bin/edge-tts') && !existsSync('/usr/bin/edge-tts')) {
-      try {
-        execSync('which edge-tts', { stdio: 'pipe' });
-      } catch {
-        return null;
-      }
+    // Check if edge-tts is installed (cross-platform: Windows, Linux, macOS)
+    let edgeTtsFound = false;
+    try {
+      execSync('which edge-tts 2>/dev/null || where edge-tts 2>nul', { stdio: 'pipe', timeout: 3000 });
+      edgeTtsFound = true;
+    } catch {
+      edgeTtsFound = false;
+    }
+    if (!edgeTtsFound) {
+      return null;
     }
 
-    // MYRA-like voice map - Indian female voices
+    // Indian female voice map - NeerjaNeural as PRIMARY for ALL (User preference)
     const voiceMap: Record<string, string> = {
-      'hi-IN': 'hi-IN-SwaraNeural',
-      'en-US': 'en-IN-NeerjaNeural',  // Indian English accent
-      'en-IN': 'en-IN-NeerjaNeural',
-      'mr-IN': 'mr-IN-AarohiNeural',
-      'ta-IN': 'ta-IN-PallaviNeural',
-      'te-IN': 'te-IN-ShrutiNeural',
-      'bn-IN': 'bn-IN-TanishaaNeural',
-      'gu-IN': 'hi-IN-SwaraNeural',
-      'kn-IN': 'kn-IN-SapnaNeural',
-      'ml-IN': 'ml-IN-SobhanaNeural',
-      'pa-IN': 'pa-IN-GurpreetNeural',
+      'hi-IN': 'en-IN-NeerjaNeural',     // Indian English for Hindi (natural Hinglish)
+      'en-US': 'en-IN-NeerjaNeural',     // Indian English accent
+      'en-IN': 'en-IN-NeerjaNeural',     // PRIMARY: Neerja Neural
+      'mr-IN': 'en-IN-NeerjaNeural',     // Neerja for Marathi too
+      'ta-IN': 'en-IN-NeerjaNeural',     // Neerja for Tamil
+      'te-IN': 'en-IN-NeerjaNeural',     // Neerja for Telugu
+      'bn-IN': 'en-IN-NeerjaNeural',     // Neerja for Bengali
+      'gu-IN': 'en-IN-NeerjaNeural',     // Neerja for Gujarati
+      'kn-IN': 'en-IN-NeerjaNeural',     // Neerja for Kannada
+      'ml-IN': 'en-IN-NeerjaNeural',     // Neerja for Malayalam
+      'pa-IN': 'en-IN-NeerjaNeural',     // Neerja for Punjabi
     };
 
-    // Voice style presets - natural Indian female voice
+    // Voice style presets - MYRA-like Indian female voice tuning
+    // MYRA uses Gemini Live Aoede voice: warm, caring, emotionally expressive
     const stylePresets: Record<string, { rate: string; pitch: string; volume: string }> = {
+      myra: { rate: '-5%', pitch: '+8Hz', volume: '-3%' },      // 🎯 MYRA mode: Slow & sweet, warm & caring
       sweet: { rate: '-3%', pitch: '+5Hz', volume: '+0%' },      // Sweet & warm, not squeaky
       natural: { rate: '+0%', pitch: '+2Hz', volume: '+0%' },    // Natural flow
       warm: { rate: '-5%', pitch: '+3Hz', volume: '-3%' },       // Calm & caring
@@ -304,7 +468,7 @@ function tryEdgeTTS(text: string, lang: string, voiceStyle: string = 'sweet'): s
       professional: { rate: '-2%', pitch: '+0Hz', volume: '+0%' },// Clean & clear
     };
 
-    const voice = voiceMap[lang] || 'hi-IN-SwaraNeural';
+    const voice = voiceMap[lang] || 'en-IN-NeerjaNeural';
     const style = stylePresets[voiceStyle] || stylePresets.sweet;
     const tmpMp3 = join(tmpdir(), `jimi-edge-${randomBytes(4).toString('hex')}.mp3`);
     const textFile = join(tmpdir(), `jimi-text-${randomBytes(4).toString('hex')}.txt`);
@@ -317,7 +481,7 @@ function tryEdgeTTS(text: string, lang: string, voiceStyle: string = 'sweet'): s
     
     execSync(
       `edge-tts --voice "${voice}" ${rateArg} ${pitchArg} --file "${textFile}" --write-media "${tmpMp3}"`,
-      { timeout: 10000, stdio: 'pipe' }
+      { timeout: 20000, stdio: 'pipe' }
     );
 
     const audio = readFileSync(tmpMp3).toString('base64');
