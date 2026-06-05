@@ -441,7 +441,10 @@ const ResorPayBoard: React.FC = () => {
         {/* Skip Option */}
         <div className="text-center">
           <button
-            onClick={() => navigate('/admission-form', { replace: true })}
+            onClick={() => {
+              localStorage.setItem('admissionCompleted', 'true');
+              navigate('/dashboard', { replace: true });
+            }}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 text-sm font-medium"
           >
             Skip for now → Complete payment later

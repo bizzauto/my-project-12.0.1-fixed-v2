@@ -743,7 +743,11 @@ const AdmissionForm: React.FC = () => {
 
         {/* Skip Option */}
         <div className="text-center mt-4">
-          <button type="button" onClick={() => navigate('/dashboard', { replace: true })}
+          <button type="button" onClick={() => {
+            localStorage.setItem('admissionCompleted', 'true');
+            setAdmissionCompleted(true);
+            navigate('/dashboard', { replace: true });
+          }}
             className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
             Skip for now (you can complete this later)
           </button>
