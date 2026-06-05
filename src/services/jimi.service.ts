@@ -839,7 +839,13 @@ class JimiVoiceAgent {
 
     const detectedLang = this.detectLanguage(text);
 
-    // 1. Try Edge TTS first (Hindi/Hinglish/Indian languages - works reliably)
+    // STEP 1: INSTANT - Browser TTS plays immediately (no network, no autoplay issues)
+    // This ensures voice ALWAYS works, even if server is down
+    console.log('Jimi: speak() called -', cleanText.substring(0, 50));
+    this.speakBrowserTTS(cleanText, detectedLang);
+
+    // STEP 2: ENHANCEMENT - Try Edge TTS for higher quality voice
+    // If Edge TTS returns quickly, cancel browser TTS and play Edge audio
     try {
       const response = await fetch('/api/jimi/tts/edge', {
         method: 'POST',
@@ -849,43 +855,22 @@ class JimiVoiceAgent {
           lang: detectedLang, 
           voiceStyle: this.voiceSettings.voiceStyle || 'sweet',
         }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(8000),
       });
       const data = await response.json();
       if (data.audio) {
-        // Pass browser TTS fallback in case Audio.play() is blocked by autoplay policy
-        this.playBase64Audio(data.audio, cleanText, detectedLang);
+        // Cancel browser TTS and play higher quality Edge TTS
+        this.synthesis?.cancel();
+        this.playBase64Audio(data.audio);
         return;
       }
     } catch (err) {
-      console.warn('Jimi: Edge TTS unavailable');
+      // Browser TTS is already playing - that's fine
+      console.log('Jimi: Edge TTS not available, browser TTS is playing');
     }
-
-    // 2. Try Kyutai TTS (English only, when Kyutai container is deployed)
-    if (detectedLang.startsWith('en')) {
-      try {
-        const response = await fetch('/api/jimi/tts/kyutai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: cleanText, voiceStyle: this.voiceSettings.voiceStyle || 'sweet' }),
-          signal: AbortSignal.timeout(5000),
-        });
-        const data = await response.json();
-        if (data.audio) {
-          this.playBase64Audio(data.audio, cleanText, detectedLang);
-          return;
-        }
-      } catch (err) {
-        console.log('Jimi: Kyutai TTS unavailable');
-      }
-    }
-
-    // 3. Browser TTS fallback (always works, no server needed)
-    console.log('Jimi: Using browser TTS fallback');
-    this.speakBrowserTTS(cleanText, detectedLang);
   }
 
-  private playBase64Audio(base64: string, fallbackText?: string, fallbackLang?: string) {
+  private playBase64Audio(base64: string) {
     if (this.audioElement) {
       this.audioElement.pause();
     }
@@ -899,18 +884,15 @@ class JimiVoiceAgent {
       this.audioElement = null;
     };
 
-    this.audioElement.onerror = () => {
+    this.audioElement.onerror = (e) => {
+      console.warn('Jimi: Edge TTS audio error:', e);
       this.isSpeaking = false;
       this.audioElement = null;
     };
 
     this.audioElement.play().catch((err) => {
-      console.warn('Jimi: Audio autoplay blocked, falling back to browser TTS:', err);
+      console.warn('Jimi: Edge TTS Audio.play() blocked (browser TTS already playing):', err);
       this.isSpeaking = false;
-      // Fallback to browser TTS when autoplay is blocked by Chrome
-      if (fallbackText) {
-        this.speakBrowserTTS(fallbackText, fallbackLang);
-      }
     });
   }
 
