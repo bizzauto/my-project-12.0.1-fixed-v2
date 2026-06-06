@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
-import { Package, AlertTriangle, Plus, Search, Filter, Download, Upload, TrendingDown, TrendingUp, BarChart3 } from 'lucide-react';
+import { Package, AlertTriangle, Plus, Search, Filter, Download, Upload, TrendingDown, TrendingUp, BarChart3, Loader2 } from 'lucide-react';
+import apiClient from '../lib/api';
 
 interface InventoryItem {
   id: string;
@@ -18,13 +19,42 @@ export default function InventoryManagementPage() {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  const [items] = useState<InventoryItem[]>([
-    { id: '1', name: 'Wireless Earbuds Pro', sku: 'WEP-001', quantity: 245, minStock: 50, price: 1299, cost: 650, category: 'Electronics', status: 'in-stock' },
-    { id: '2', name: 'Cotton T-Shirt', sku: 'CTS-012', quantity: 18, minStock: 30, price: 499, cost: 200, category: 'Clothing', status: 'low-stock' },
-    { id: '3', name: 'Phone Case Premium', sku: 'PCP-005', quantity: 0, minStock: 20, price: 399, cost: 120, category: 'Accessories', status: 'out-of-stock' },
-    { id: '4', name: 'Bluetooth Speaker', sku: 'BTS-003', quantity: 89, minStock: 25, price: 2499, cost: 1100, category: 'Electronics', status: 'in-stock' },
-    { id: '5', name: 'Running Shoes', sku: 'RS-008', quantity: 12, minStock: 15, price: 1999, cost: 800, category: 'Footwear', status: 'low-stock' },
-  ]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  const fetchInventory = async () => {
+    try {
+      const res = await apiClient.get('/ecommerce/products');
+      const products = res.data?.data?.products || res.data?.data || [];
+      setItems(products.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku || `SKU-${p.id.slice(-6).toUpperCase()}`,
+        quantity: p.quantity || 0,
+        minStock: 10,
+        price: p.price || 0,
+        cost: p.cost || Math.round(p.price * 0.5) || 0,
+        category: p.category || 'Uncategorized',
+        status: p.quantity <= 0 ? 'out-of-stock' : p.quantity <= 10 ? 'low-stock' : 'in-stock',
+      })));
+    } catch {
+      // Fallback to empty
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="animate-spin text-orange-600" size={32} />
+      </div>
+    );
+  }
 
   const filtered = items.filter(item => {
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.sku.toLowerCase().includes(search.toLowerCase());

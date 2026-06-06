@@ -41,10 +41,33 @@ const CheckoutPage: React.FC = () => {
       if (cartData?.items) {
         setCartItems(cartData.items);
       } else {
-        navigate('/store');
+        // Try localStorage cart for public mode
+        const localCart = JSON.parse(localStorage.getItem('store_cart') || '[]');
+        if (localCart.length > 0) {
+          setCartItems(localCart.map((item: any, idx: number) => ({
+            id: `local-${idx}`,
+            product: { id: item.product.id, name: item.product.name, price: item.product.price, images: item.product.images || [], mainImage: item.product.mainImage },
+            quantity: item.quantity,
+            variantName: item.variant?.name,
+            variantPrice: item.variant?.price,
+          })));
+        } else {
+          navigate('/store');
+        }
       }
     } catch {
-      navigate('/store');
+      const localCart = JSON.parse(localStorage.getItem('store_cart') || '[]');
+      if (localCart.length > 0) {
+        setCartItems(localCart.map((item: any, idx: number) => ({
+          id: `local-${idx}`,
+          product: { id: item.product.id, name: item.product.name, price: item.product.price, images: item.product.images || [], mainImage: item.product.mainImage },
+          quantity: item.quantity,
+          variantName: item.variant?.name,
+          variantPrice: item.variant?.price,
+        })));
+      } else {
+        navigate('/store');
+      }
     } finally {
       setLoading(false);
     }
@@ -68,7 +91,10 @@ const CheckoutPage: React.FC = () => {
       ? (subtotal * appliedCoupon.value) / 100
       : Math.min(appliedCoupon.value, subtotal)
     : 0;
-  const total = Math.max(0, subtotal - discount);
+  const afterDiscount = Math.max(0, subtotal - discount);
+  const shipping = afterDiscount >= 500 ? 0 : afterDiscount >= 200 ? 49 : 99;
+  const gstAmount = Math.round(afterDiscount * 0.18);
+  const total = afterDiscount + shipping + gstAmount;
 
   const applyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -109,6 +135,9 @@ const CheckoutPage: React.FC = () => {
         couponCode: appliedCoupon?.code || null,
         paymentMethod,
         notes: '',
+        shipping,
+        gst: gstAmount,
+        total,
       });
 
       const order = res.data?.data;
@@ -431,7 +460,16 @@ const CheckoutPage: React.FC = () => {
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Shipping</span>
-                  <span className="text-green-600 font-medium">Free</span>
+                  <span className={shipping === 0 ? 'text-green-600 font-medium' : 'text-gray-900 dark:text-white'}>
+                    {shipping === 0 ? 'Free' : `₹${shipping}`}
+                  </span>
+                </div>
+                {shipping > 0 && (
+                  <p className="text-[10px] text-gray-400">Free shipping on orders above ₹500</p>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">GST (18%)</span>
+                  <span className="text-gray-900 dark:text-white">₹{gstAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200 dark:border-gray-700">
                   <span>Total</span>

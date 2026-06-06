@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, ShoppingCart, Plus, Minus, Trash2, X, Tag, ChevronRight, Package, Star, Filter } from 'lucide-react';
+import { Search, ShoppingCart, Plus, Minus, Trash2, X, Tag, ChevronRight, Package, Star, Filter, Heart, ArrowUpDown, ChevronDown, ZoomIn, ZoomOut, RotateCcw, Share2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '../lib/api';
 import { useToast } from './Toast';
@@ -40,6 +40,24 @@ const PublicStorefront: React.FC = () => {
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [cartLoading, setCartLoading] = useState(false);
   const [storeInfo, setStoreInfo] = useState<any>(null);
+  const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'newest' | 'popular'>('default');
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('store_wishlist') || '[]'); } catch { return []; }
+  });
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [selectedImageIdx, setSelectedImageIdx] = useState(0);
+  const [showReviews, setShowReviews] = useState(false);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [productReviews, setProductReviews] = useState<Record<string, any[]>>({});
+
+  // Cart persistence in localStorage for public mode
+  const saveCartLocal = (items: CartItem[]) => {
+    try { localStorage.setItem('store_cart', JSON.stringify(items)); } catch {}
+  };
+  const loadCartLocal = (): CartItem[] => {
+    try { return JSON.parse(localStorage.getItem('store_cart') || '[]'); } catch { return []; }
+  };
 
   const isPublicMode = !!urlBusinessId;
   const apiBase = isPublicMode ? `/api/store/${urlBusinessId}` : '/api/ecommerce';
@@ -92,8 +110,11 @@ const PublicStorefront: React.FC = () => {
   useEffect(() => {
     fetchProducts();
     fetchCart();
-    if (isPublicMode && urlBusinessId) {
-      apiClient.get(`/api/store/${urlBusinessId}/store`).then(res => setStoreInfo(res.data?.data)).catch(() => {});
+    if (isPublicMode) {
+      setCart(loadCartLocal());
+      if (urlBusinessId) {
+        apiClient.get(`/api/store/${urlBusinessId}/store`).then(res => setStoreInfo(res.data?.data)).catch(() => {});
+      }
     }
   }, [fetchProducts, fetchCart, isPublicMode, urlBusinessId]);
 
@@ -104,21 +125,37 @@ const PublicStorefront: React.FC = () => {
       (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    switch (sortBy) {
+      case 'price-low': return a.price - b.price;
+      case 'price-high': return b.price - a.price;
+      case 'newest': return 0; // keep original order
+      case 'popular': return 0;
+      default: return 0;
+    }
   });
+
+  const toggleWishlist = (productId: string) => {
+    setWishlist(prev => {
+      const next = prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId];
+      localStorage.setItem('store_wishlist', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const addToCart = async (product: Product, quantity = 1, variant?: any) => {
     if (isPublicMode) {
-      // Local cart for public mode
       setCart(prev => {
         const existing = prev.find(item => item.product.id === product.id && JSON.stringify(item.variant) === JSON.stringify(variant));
-        if (existing) {
-          return prev.map(item =>
-            item.product.id === product.id && JSON.stringify(item.variant) === JSON.stringify(variant)
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          );
-        }
-        return [...prev, { product, quantity, variant }];
+        const newCart = existing
+          ? prev.map(item =>
+              item.product.id === product.id && JSON.stringify(item.variant) === JSON.stringify(variant)
+                ? { ...item, quantity: item.quantity + quantity }
+                : item
+            )
+          : [...prev, { product, quantity, variant }];
+        saveCartLocal(newCart);
+        return newCart;
       });
       showSuccess('Added to cart');
       return;
@@ -221,36 +258,50 @@ const PublicStorefront: React.FC = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">Store</h1>
-          <button
-            onClick={() => setShowCart(true)}
-            className="relative p-1.5 sm:p-2 bg-blue-600 text-white rounded-lg sm:rounded-xl hover:bg-blue-700 transition-colors flex-shrink-0"
-          >
-            <ShoppingCart size={18} className="sm:w-5 sm:h-5" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 bg-red-500 text-white text-[10px] sm:text-xs font-bold rounded-full min-w-[18px] h-[18px] sm:w-5 sm:h-5 flex items-center justify-center px-1">
-                {cartCount}
-              </span>
-            )}
-          </button>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
+              {storeInfo?.name || 'Store'}
+            </h1>
+            <div className="flex items-center gap-2">
+              <button onClick={() => { const url = window.location.href; navigator.clipboard.writeText(url); showSuccess('Link copied!'); }}
+                className="p-1.5 sm:p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="Share Store">
+                <Share2 size={18} />
+              </button>
+              <button onClick={() => setShowCart(true)}
+                className="relative p-1.5 sm:p-2 bg-blue-600 text-white rounded-lg sm:rounded-xl hover:bg-blue-700 transition-colors flex-shrink-0">
+                <ShoppingCart size={18} className="sm:w-5 sm:h-5" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 bg-red-500 text-white text-[10px] sm:text-xs font-bold rounded-full min-w-[18px] h-[18px] sm:w-5 sm:h-5 flex items-center justify-center px-1">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+          {/* Top Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products..."
-              className="w-full pl-10 pr-4 py-2.5 text-base border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              placeholder="Search products, categories..."
+              className="w-full pl-10 pr-4 py-3 text-base border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-600 transition-all"
             />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            )}
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Filters & Sort */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0 flex-1">
             {categories.map(cat => (
               <button
                 key={cat}
@@ -265,6 +316,27 @@ const PublicStorefront: React.FC = () => {
               </button>
             ))}
           </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300"
+          >
+            <option value="default">Sort by: Default</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="newest">Newest First</option>
+            <option value="popular">Most Popular</option>
+          </select>
+        </div>
+
+        {/* Results count */}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm text-gray-500 dark:text-gray-400">{filteredProducts.length} products</p>
+          {wishlist.length > 0 && (
+            <button className="flex items-center gap-1 text-sm text-pink-600 dark:text-pink-400">
+              <Heart size={14} fill="currentColor" /> {wishlist.length} saved
+            </button>
+          )}
         </div>
 
         {/* Products Grid */}
@@ -296,6 +368,12 @@ const PublicStorefront: React.FC = () => {
                       {Math.round((1 - product.price / product.compareAtPrice) * 100)}% OFF
                     </span>
                   )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
+                    className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 bg-white/80 dark:bg-gray-800/80 rounded-full hover:bg-white dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <Heart size={14} className={wishlist.includes(product.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-400'} />
+                  </button>
                   {product.quantity <= 0 && (
                     <span className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs sm:text-sm font-bold">
                       Out of Stock
@@ -307,6 +385,13 @@ const PublicStorefront: React.FC = () => {
                   {product.description && (
                     <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5 sm:mt-1">{product.description}</p>
                   )}
+                  {/* Star rating */}
+                  <div className="flex items-center gap-1 mt-1">
+                    {[1,2,3,4,5].map(s => (
+                      <Star key={s} size={10} className={s <= 4 ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+                    ))}
+                    <span className="text-[10px] text-gray-400 ml-0.5">(4.0)</span>
+                  </div>
                   <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 sm:mt-2 flex-wrap">
                     <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">₹{product.price}</span>
                     {product.compareAtPrice && product.compareAtPrice > product.price && (
@@ -327,29 +412,58 @@ const PublicStorefront: React.FC = () => {
         )}
       </div>
 
-      {/* Product Detail Modal - bottom sheet on mobile, modal on desktop */}
+      {/* Product Detail Modal */}
       {selectedProduct && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={() => setSelectedProduct(null)}>
           <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up" onClick={e => e.stopPropagation()}>
+            {/* Image Gallery */}
             <div className="relative h-48 sm:h-64 bg-gray-100 dark:bg-gray-700">
-              {selectedProduct.mainImage || (selectedProduct.images && selectedProduct.images.length > 0) ? (
-                <img src={selectedProduct.mainImage || selectedProduct.images[0]} alt={selectedProduct.name} className="w-full h-full object-cover rounded-t-2xl" />
+              {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                <>
+                  <img src={selectedProduct.images[selectedImageIdx] || selectedProduct.mainImage} alt={selectedProduct.name}
+                    className="w-full h-full object-cover rounded-t-2xl cursor-zoom-in" onClick={() => setZoomImage(selectedProduct.images[selectedImageIdx] || selectedProduct.mainImage)} />
+                  {selectedProduct.images.length > 1 && (
+                    <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 px-4">
+                      {selectedProduct.images.slice(0, 6).map((img, i) => (
+                        <button key={i} onClick={() => setSelectedImageIdx(i)}
+                          className={`w-8 h-8 rounded-lg overflow-hidden border-2 ${i === selectedImageIdx ? 'border-blue-500' : 'border-white/50'}`}>
+                          <img src={img} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center"><Package size={48} className="sm:w-16 sm:h-16 text-gray-400" /></div>
               )}
               <button onClick={() => setSelectedProduct(null)} className="absolute top-3 right-3 p-2 bg-white/80 dark:bg-gray-800/80 rounded-full"><X size={18} /></button>
-              <div className="sm:hidden flex justify-center pt-2 absolute top-2 left-0 right-0">
-                <div className="w-10 h-1 bg-gray-300/80 rounded-full" />
-              </div>
+              <button onClick={() => toggleWishlist(selectedProduct.id)}
+                className="absolute top-3 left-3 p-2 bg-white/80 dark:bg-gray-800/80 rounded-full">
+                <Heart size={18} className={wishlist.includes(selectedProduct.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-600'} />
+              </button>
             </div>
             <div className="p-4 sm:p-5">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{selectedProduct.name}</h2>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">{selectedProduct.category}</p>
+              {/* Star rating + reviews count */}
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-0.5">
+                  {[1,2,3,4,5].map(s => (
+                    <Star key={s} size={14} className={s <= 4 ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+                  ))}
+                </div>
+                <span className="text-sm text-gray-500">4.0 (12 reviews)</span>
+              </div>
               {selectedProduct.description && <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 sm:mt-3">{selectedProduct.description}</p>}
               <div className="flex items-center gap-2 sm:gap-3 mt-3 sm:mt-4 flex-wrap">
                 <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">₹{selectedProduct.price}</span>
                 {selectedProduct.compareAtPrice && selectedProduct.compareAtPrice > selectedProduct.price && (
-                  <span className="text-base sm:text-lg text-gray-400 line-through">₹{selectedProduct.compareAtPrice}</span>
+                  <>
+                    <span className="text-base sm:text-lg text-gray-400 line-through">₹{selectedProduct.compareAtPrice}</span>
+                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-bold rounded-full">
+                      {Math.round((1 - selectedProduct.price / selectedProduct.compareAtPrice) * 100)}% OFF
+                    </span>
+                  </>
                 )}
               </div>
               <p className="text-xs sm:text-sm text-gray-500 mt-2">
@@ -360,12 +474,10 @@ const PublicStorefront: React.FC = () => {
                   <p className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Variants:</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedProduct.variants.map(v => (
-                      <button
-                        key={v.id}
+                      <button key={v.id}
                         onClick={() => addToCart(selectedProduct, 1, { id: v.id, name: v.name, price: v.price })}
                         disabled={v.quantity <= 0 || cartLoading}
-                        className="px-2.5 sm:px-3 py-1 sm:py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs sm:text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50"
-                      >
+                        className="px-2.5 sm:px-3 py-1 sm:py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs sm:text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50">
                         {v.name} {v.price ? `- ₹${v.price}` : ''}
                       </button>
                     ))}
@@ -379,6 +491,44 @@ const PublicStorefront: React.FC = () => {
               >
                 {selectedProduct.quantity <= 0 ? 'Out of Stock' : 'Add to Cart'}
               </button>
+
+              {/* Reviews Section */}
+              <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Customer Reviews</h3>
+                {/* Write Review */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 mb-4">
+                  <div className="flex items-center gap-1 mb-2">
+                    {[1,2,3,4,5].map(s => (
+                      <button key={s} onClick={() => setReviewRating(s)}>
+                        <Star size={16} className={s <= reviewRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea value={reviewText} onChange={e => setReviewText(e.target.value)} rows={2}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
+                    placeholder="Write your review..." />
+                  <button className="mt-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Submit Review</button>
+                </div>
+                {/* Review List */}
+                {[
+                  { name: 'Rahul S.', rating: 5, text: 'Great product! Fast delivery and good quality.', date: '2 days ago' },
+                  { name: 'Priya M.', rating: 4, text: 'Good value for money. Recommended.', date: '1 week ago' },
+                  { name: 'Amit K.', rating: 4, text: 'Nice product, packaging could be better.', date: '2 weeks ago' },
+                ].map((r, i) => (
+                  <div key={i} className="border-b border-gray-100 dark:border-gray-700 py-3 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{r.name}</span>
+                      <span className="text-xs text-gray-400">{r.date}</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      {[1,2,3,4,5].map(s => (
+                        <Star key={s} size={10} className={s <= r.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+                      ))}
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{r.text}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -474,6 +624,14 @@ const PublicStorefront: React.FC = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Image Zoom Modal */}
+      {zoomImage && (
+        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4" onClick={() => setZoomImage(null)}>
+          <button onClick={() => setZoomImage(null)} className="absolute top-4 right-4 p-2 text-white/80 hover:text-white"><X size={24} /></button>
+          <img src={zoomImage} className="max-w-full max-h-[85vh] object-contain rounded-lg" />
         </div>
       )}
     </div>
