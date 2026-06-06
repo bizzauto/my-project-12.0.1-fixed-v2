@@ -21,7 +21,7 @@ const oauthStates = new Map<string, { businessId: string; expiresAt: number }>()
 router.get('/auth/url', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URL || `${req.protocol}://${req.get('host')}/api/google-business/auth/callback`;
+    const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URL || `https://bizzautoai.com/api/google-business/auth/callback`;
 
     if (!clientId) {
       return res.status(500).json({ success: false, error: 'Google Client ID not configured' });
@@ -76,7 +76,7 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
       code,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: process.env.GOOGLE_BUSINESS_REDIRECT_URL || `${req.protocol}://${req.get('host')}/api/google-business/auth/callback`,
+      redirect_uri: process.env.GOOGLE_BUSINESS_REDIRECT_URL || `https://bizzautoai.com/api/google-business/auth/callback`,
       grant_type: 'authorization_code',
     });
 
