@@ -66,7 +66,7 @@ const ModeAwareAuthLayout: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 // Authenticated pages — lazy-loaded for code splitting
-const Dashboard = lazy(() => import('./components/DashboardPage'));
+const Dashboard = lazy(() => import('./components/UnifiedDashboardPage'));
 const WhatsAppModule = lazy(() => import('./components/WhatsAppModule'));
 const CRMPage = lazy(() => import('./components/CRMPage'));
 const LeadGenerationPage = lazy(() => import('./components/LeadGenerationPage'));
@@ -398,13 +398,7 @@ function AppRoutes() {
           </ModeAwareAuthLayout>
         </ProtectedRoute>
       } />
-      <Route path="/analytics" element={
-        <ProtectedRoute>
-          <ModeAwareAuthLayout>
-            <SalesAnalyticsPage />
-          </ModeAwareAuthLayout>
-        </ProtectedRoute>
-      } />
+      <Route path="/analytics" element={<Navigate to="/dashboard" replace />} />
       <Route path="/my-account" element={
         <ProtectedRoute>
           <CustomerAccountPage />
@@ -494,16 +488,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute>
-            <ModeAwareAuthLayout>
-              <ReportsPage />
-            </ModeAwareAuthLayout>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/reports" element={<Navigate to="/dashboard" replace />} />
       <Route
         path="/import-leads"
         element={
