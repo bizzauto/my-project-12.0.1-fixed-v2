@@ -93,9 +93,70 @@ router.get('/google/url', (req: Request, res: Response) => {
   res.redirect(url.toString());
 });
 
+// GET /api/auth/google/link-url - Generate Google OAuth URL for linking to existing account
+router.get('/google/link-url', authenticate, (req: AuthRequest, res: Response) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+  const frontendUrl = (req.query.redirect as string) || `${process.env.FRONTEND_URL || 'https://bizzautoai.com'}`;
+
+  if (!clientId) {
+    return res.status(400).json({ error: 'Google OAuth not configured' });
+  }
+
+  // Create a JWT with the user's ID and mode=link
+  const linkToken = jwt.sign(
+    { userId: req.userId, mode: 'link' },
+    process.env.JWT_SECRET!,
+    { expiresIn: '10m' }
+  );
+
+  const scopes = ['openid', 'email', 'profile'].join(' ');
+  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', scopes);
+  url.searchParams.set('access_type', 'offline');
+  url.searchParams.set('prompt', 'consent');
+  url.searchParams.set('state', `link:${linkToken}:${frontendUrl}`);
+
+  res.json({ url: url.toString() });
+});
+
+// POST /api/auth/google/unlink - Unlink Google account from current user
+router.post('/google/unlink', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.userId },
+      data: { googleId: null },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to unlink Google account' });
+  }
+});
+
 // GET /api/auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', async (req: Request, res: Response) => {
-  const frontendUrl = req.query.state as string || process.env.FRONTEND_URL || 'https://bizzautoai.com';
+  const stateRaw = req.query.state as string || '';
+  const isLinkMode = stateRaw.startsWith('link:');
+  let frontendUrl: string;
+  let linkUserId: string | null = null;
+
+  if (isLinkMode) {
+    // state = "link:<jwt>:<frontendUrl>"
+    const parts = stateRaw.split(':');
+    const linkToken = parts[1];
+    frontendUrl = parts[2] || process.env.FRONTEND_URL || 'https://bizzautoai.com';
+    try {
+      const decoded = jwt.verify(linkToken, process.env.JWT_SECRET!) as any;
+      linkUserId = decoded.userId;
+    } catch {
+      return res.redirect(`${frontendUrl}/settings?error=link_token_expired`);
+    }
+  } else {
+    frontendUrl = stateRaw || process.env.FRONTEND_URL || 'https://bizzautoai.com';
+  }
 
   try {
     const { code } = req.query;
@@ -139,7 +200,34 @@ router.get('/google/callback', async (req: Request, res: Response) => {
 
     const { email, name, sub: googleId, picture } = payload;
 
-    // Find or create user
+    // LINK MODE: Link Google account to already logged-in user
+    if (isLinkMode && linkUserId) {
+      // Check if this Google account is already linked to another user
+      const existingGoogleUser = await prisma.user.findFirst({
+        where: { googleId, id: { not: linkUserId } },
+      });
+      if (existingGoogleUser) {
+        return res.redirect(`${frontendUrl}/settings?error=google_already_linked`);
+      }
+
+      // Check if this email belongs to a different user
+      const emailUser = await prisma.user.findFirst({
+        where: { email, id: { not: linkUserId } },
+      });
+      if (emailUser) {
+        return res.redirect(`${frontendUrl}/settings?error=email_already_used`);
+      }
+
+      // Link Google ID to the current user
+      await prisma.user.update({
+        where: { id: linkUserId },
+        data: { googleId, image: picture || undefined },
+      });
+
+      return res.redirect(`${frontendUrl}/settings?success=google_linked`);
+    }
+
+    // Find or create user (login/signup mode)
     let user = await prisma.user.findFirst({
       where: { OR: [{ googleId }, { email }] },
       include: { business: true },

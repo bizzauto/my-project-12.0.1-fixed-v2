@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useAuthStore } from '../lib/authStore';
 import { useToast } from '../components/Toast';
-import { businessAPI } from '../lib/api';
+import { businessAPI, authAPI } from '../lib/api';
 import TwoFactorSetupModal from './TwoFactorSetupModal';
 import { Save, Building, Phone, Mail, MapPin, Globe, Clock, Palette, Image, Shield, Lock, Loader2 } from 'lucide-react';
 
@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const [loading2FA, setLoading2FA] = useState(true);
   const [disablePassword, setDisablePassword] = useState('');
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
 
   const [formData, setFormData] = useState({
     name: business?.name || '',
@@ -104,6 +105,64 @@ export default function SettingsPage() {
       setLoading(false);
     }
   };
+
+  const handleConnectGoogle = async () => {
+    setConnectingGoogle(true);
+    try {
+      const res = await authAPI.googleLinkUrl();
+      const url = res.data?.url;
+      if (url) {
+        window.location.href = url;
+      } else {
+        toast.error('Failed to generate Google auth URL');
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to connect Google');
+    } finally {
+      setConnectingGoogle(false);
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    if (!confirm('Disconnect Google account? You may not be able to sign in with Google anymore.')) return;
+    try {
+      await authAPI.googleUnlink();
+      // Update local user state
+      useAuthStore.setState((state: any) => ({
+        user: { ...state.user, googleId: null }
+      }));
+      toast.success('Google account disconnected');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to disconnect Google');
+    }
+  };
+
+  // Check URL params for Google link result
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success') === 'google_linked') {
+      toast.success('Google account linked successfully!');
+      // Refresh user data
+      authAPI.getProfile().then(res => {
+        if (res.data?.user) {
+          useAuthStore.setState((state: any) => ({
+            user: { ...state.user, ...res.data.user }
+          }));
+        }
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (params.get('error')) {
+      const errors: Record<string, string> = {
+        google_already_linked: 'This Google account is already linked to another user',
+        email_already_used: 'This email is already used by another account',
+        link_token_expired: 'Link session expired. Please try again.',
+        google_not_configured: 'Google OAuth is not configured',
+      };
+      toast.error(errors[params.get('error')!] || 'Google connection failed');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   return (
     <div className="p-4 sm:p-5 md:p-6 lg:p-8">
@@ -499,7 +558,6 @@ export default function SettingsPage() {
             { name: 'Twitter/X', icon: '🐦', color: 'sky', connected: !!business?.twitterAccessToken, desc: 'Tweets and threads' },
             { name: 'Google Business', icon: '🏢', color: 'red', connected: !!business?.gbpAccessToken, desc: 'Reviews, posts, insights' },
             { name: 'YouTube', icon: '📺', color: 'red', connected: !!business?.youtubeAccessToken, desc: 'Channel management, videos' },
-            { name: 'Google OAuth', icon: '🔐', color: 'red', connected: !!user?.googleId, desc: 'Sign in with Google' },
             { name: 'Apple Sign-In', icon: '🍎', color: 'gray', connected: !!user?.appleId, desc: 'Sign in with Apple' },
           ].map((social) => (
             <div key={social.name} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
@@ -523,6 +581,41 @@ export default function SettingsPage() {
               </div>
             </div>
           ))}
+
+          {/* Google OAuth - Interactive */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔐</span>
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">Google OAuth</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Sign in with Google</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {user?.googleId ? (
+                <>
+                  <span className="flex items-center gap-1 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-medium">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span> Connected
+                  </span>
+                  <button
+                    onClick={handleDisconnectGoogle}
+                    className="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleConnectGoogle}
+                  disabled={connectingGoogle}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                >
+                  {connectingGoogle ? <Loader2 size={12} className="animate-spin" /> : null}
+                  Connect
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
