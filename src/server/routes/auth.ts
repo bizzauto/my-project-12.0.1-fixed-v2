@@ -73,7 +73,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // GET /api/auth/google/url - Generate Google OAuth URL for redirect
 router.get('/google/url', (req: Request, res: Response) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URL || `https://bizzautoai.com/api/auth/google/callback`;
   const frontendUrl = (req.query.redirect as string) || `${process.env.FRONTEND_URL || 'https://bizzautoai.com'}`;
 
   if (!clientId) {
@@ -96,7 +96,7 @@ router.get('/google/url', (req: Request, res: Response) => {
 // GET /api/auth/google/link-url - Generate Google OAuth URL for linking to existing account
 router.get('/google/link-url', authenticate, (req: AuthRequest, res: Response) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URL || `https://bizzautoai.com/api/auth/google/callback`;
   const frontendUrl = (req.query.redirect as string) || `${process.env.FRONTEND_URL || 'https://bizzautoai.com'}`;
 
   if (!clientId) {
@@ -118,7 +118,9 @@ router.get('/google/link-url', authenticate, (req: AuthRequest, res: Response) =
   url.searchParams.set('scope', scopes);
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
-  url.searchParams.set('state', `link:${linkToken}:${frontendUrl}`);
+  // Use base64url encoding for state to avoid : splitting issues
+  const statePayload = JSON.stringify({ mode: 'link', token: linkToken, redirect: frontendUrl });
+  url.searchParams.set('state', Buffer.from(statePayload).toString('base64url'));
 
   res.json({ url: url.toString() });
 });
@@ -139,23 +141,23 @@ router.post('/google/unlink', authenticate, async (req: AuthRequest, res: Respon
 // GET /api/auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', async (req: Request, res: Response) => {
   const stateRaw = req.query.state as string || '';
-  const isLinkMode = stateRaw.startsWith('link:');
-  let frontendUrl: string;
+  const frontendUrlDefault = process.env.FRONTEND_URL || 'https://bizzautoai.com';
+  let frontendUrl: string = frontendUrlDefault;
   let linkUserId: string | null = null;
+  let isLinkMode = false;
 
-  if (isLinkMode) {
-    // state = "link:<jwt>:<frontendUrl>"
-    const parts = stateRaw.split(':');
-    const linkToken = parts[1];
-    frontendUrl = parts[2] || process.env.FRONTEND_URL || 'https://bizzautoai.com';
-    try {
-      const decoded = jwt.verify(linkToken, process.env.JWT_SECRET!) as any;
-      linkUserId = decoded.userId;
-    } catch {
-      return res.redirect(`${frontendUrl}/settings?error=link_token_expired`);
+  // Try to parse state as base64url JSON (new format)
+  try {
+    const decoded = JSON.parse(Buffer.from(stateRaw, 'base64url').toString());
+    if (decoded.mode === 'link' && decoded.token) {
+      isLinkMode = true;
+      frontendUrl = decoded.redirect || frontendUrlDefault;
+      const jwtPayload = jwt.verify(decoded.token, process.env.JWT_SECRET!) as any;
+      linkUserId = jwtPayload.userId;
     }
-  } else {
-    frontendUrl = stateRaw || process.env.FRONTEND_URL || 'https://bizzautoai.com';
+  } catch {
+    // Fallback: not a link-mode state, treat as frontendUrl (login mode)
+    frontendUrl = stateRaw || frontendUrlDefault;
   }
 
   try {
@@ -166,7 +168,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URL || `https://bizzautoai.com/api/auth/google/callback`;
 
     // Exchange code for tokens
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
