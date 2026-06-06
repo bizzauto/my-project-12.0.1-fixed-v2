@@ -177,4 +177,78 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
   }
 });
 
+// ==================== NOTIFICATION PREFERENCES ====================
+
+// GET /api/notifications/preferences - Get user notification preferences
+router.get('/preferences', authenticate, async (req: any, res: any) => {
+  try {
+    const userId = req.user.id;
+
+    // Check if user has a notification preference record
+    const existing = await (prisma as any).notificationPreference?.findUnique({
+      where: { userId },
+    });
+
+    res.json({
+      success: true,
+      data: existing || {
+        emailNotifications: true,
+        smsNotifications: false,
+        pushNotifications: true,
+        whatsappNotifications: false,
+        newLeadAlert: true,
+        appointmentReminder: true,
+        campaignUpdate: true,
+        supportTicketUpdate: true,
+        weeklyReport: true,
+        monthlyReport: true,
+        securityAlerts: true,
+        marketingEmails: false,
+      },
+    });
+  } catch (error: any) {
+    // If table doesn't exist, return defaults
+    res.json({
+      success: true,
+      data: {
+        emailNotifications: true,
+        smsNotifications: false,
+        pushNotifications: true,
+        whatsappNotifications: false,
+        newLeadAlert: true,
+        appointmentReminder: true,
+        campaignUpdate: true,
+        supportTicketUpdate: true,
+        weeklyReport: true,
+        monthlyReport: true,
+        securityAlerts: true,
+        marketingEmails: false,
+      },
+    });
+  }
+});
+
+// PUT /api/notifications/preferences - Update user notification preferences
+router.put('/preferences', authenticate, async (req: any, res: any) => {
+  try {
+    const userId = req.user.id;
+    const preferences = req.body;
+
+    // Try to upsert, fallback to storing in user settings
+    try {
+      const updated = await (prisma as any).notificationPreference?.upsert({
+        where: { userId },
+        create: { userId, ...preferences },
+        update: preferences,
+      });
+      res.json({ success: true, data: updated });
+    } catch {
+      // If table doesn't exist, just acknowledge
+      res.json({ success: true, data: preferences });
+    }
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

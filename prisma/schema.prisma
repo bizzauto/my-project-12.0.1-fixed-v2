@@ -42,6 +42,10 @@ model User {
   resetToken          String?
   resetTokenExpiresAt DateTime?
 
+  // Email Verification Token
+  verificationToken String?
+  tokenExpiry       DateTime?
+
   notifications Notification[]
   themePref     ThemePreference?
   aiContents    AIContent[]

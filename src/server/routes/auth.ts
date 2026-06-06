@@ -1161,4 +1161,109 @@ router.post('/refresh', async (req: Request, res: Response) => {
   }
 });
 
+// ==================== EMAIL VERIFICATION ====================
+
+// POST /api/auth/send-verification - Send verification email
+router.post('/send-verification', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ success: false, error: 'Email already verified' });
+    }
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        verificationToken,
+        tokenExpiry,
+      },
+    });
+
+    // Send verification email
+    const { EmailService } = await import('../services/email.service.js');
+    await EmailService.sendVerificationEmail(user.email, user.name || 'User', verificationToken);
+
+    res.json({ success: true, message: 'Verification email sent' });
+  } catch (error: any) {
+    console.error('Send verification error:', error);
+    res.status(500).json({ success: false, error: 'Failed to send verification email' });
+  }
+});
+
+// GET /api/auth/verify-email?token=xxx - Verify email with token
+router.get('/verify-email', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.query;
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ success: false, error: 'Verification token is required' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        verificationToken: token,
+        tokenExpiry: { gte: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired verification token' });
+    }
+
+    // Update user - verify email and clear token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        verificationToken: null,
+        tokenExpiry: null,
+      },
+    });
+
+    res.json({ success: true, message: 'Email verified successfully' });
+  } catch (error: any) {
+    console.error('Verify email error:', error);
+    res.status(500).json({ success: false, error: 'Failed to verify email' });
+  }
+});
+
+// GET /api/auth/verification-status - Check verification status
+router.get('/verification-status', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerified: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      data: { verified: user.emailVerified },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to check verification status' });
+  }
+});
+
 export default router;

@@ -103,6 +103,27 @@ export class EmailService {
   }
 
   /**
+   * Send email verification link
+   */
+  static async sendVerificationEmail(
+    to: string,
+    name: string,
+    verificationToken: string
+  ): Promise<void> {
+    const transporter = this.getTransporter();
+    const appName = process.env.APP_NAME || 'BizzAuto';
+    const appUrl = process.env.APP_URL || 'https://bizzauto.com';
+    const verifyUrl = `${appUrl}/verify-email?token=${verificationToken}`;
+
+    await transporter.sendMail({
+      from: `"${appName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      to,
+      subject: `Verify your email - ${appName}`,
+      html: this.getVerificationTemplate(name, verifyUrl, appName, appUrl),
+    });
+  }
+
+  /**
    * Test SMTP connection
    */
   static async testConnection(): Promise<{ success: boolean; error?: string }> {
@@ -394,6 +415,56 @@ export class EmailService {
       <div class="warning">
         <strong>Important:</strong> Each code can only be used once. Save these securely and never share them with anyone.
       </div>
+      <p>Best regards,<br>The ${appName} Team</p>
+    </div>
+    <div class="footer">
+      <p>${appUrl}</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  private static getVerificationTemplate(
+    name: string,
+    verifyUrl: string,
+    appName: string,
+    appUrl: string
+  ): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; }
+    .header h1 { color: white; margin: 0; }
+    .content { background: #f9f9f9; padding: 30px; }
+    .button { display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+    .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Verify Your Email</h1>
+    </div>
+    <div class="content">
+      <h2>Hello ${name},</h2>
+      <p>Thank you for signing up for ${appName}! Please verify your email address to activate your account.</p>
+      <center>
+        <a href="${verifyUrl}" class="button">Verify Email Address</a>
+      </center>
+      <div class="warning">
+        <strong>Important:</strong> This verification link will expire in 24 hours.
+      </div>
+      <p>Or copy and paste this link:</p>
+      <code>${verifyUrl}</code>
+      <p>If you didn't create an account, you can safely ignore this email.</p>
       <p>Best regards,<br>The ${appName} Team</p>
     </div>
     <div class="footer">

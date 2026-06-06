@@ -525,6 +525,136 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+
+      {/* Account Deletion Section (GDPR) */}
+      <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 sm:p-5 md:p-6 border border-red-200 dark:border-red-900">
+        <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
+          ⚠️ Danger Zone
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Permanently delete your account and all associated data. This action cannot be undone.
+        </p>
+
+        <AccountDeletionSection />
+      </div>
+    </div>
+  );
+}
+
+function AccountDeletionSection() {
+  const { user } = useAuthStore();
+  const toast = useToast();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (confirmText !== 'DELETE MY ACCOUNT') {
+      toast.error('Please type "DELETE MY ACCOUNT" to confirm');
+      return;
+    }
+    if (!password) {
+      toast.error('Password is required');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/user/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password, confirmText }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Account deleted successfully');
+        localStorage.removeItem('token');
+        window.location.href = '/';
+      } else {
+        toast.error(data.error || 'Failed to delete account');
+      }
+    } catch {
+      toast.error('Failed to delete account');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div>
+      {!showConfirm ? (
+        <button
+          onClick={() => setShowConfirm(true)}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+        >
+          Delete Account
+        </button>
+      ) : (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 space-y-4">
+          <p className="text-sm text-red-700 dark:text-red-400">
+            <strong>Warning:</strong> This will permanently delete:
+          </p>
+          <ul className="text-sm text-red-600 dark:text-red-400 list-disc list-inside space-y-1">
+            <li>Your account and profile</li>
+            <li>All business data (contacts, conversations, campaigns)</li>
+            <li>All AI-generated content and automations</li>
+            <li>All integrations and connected accounts</li>
+            <li>All subscription and billing data</li>
+          </ul>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Enter your password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              placeholder="Your password"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Type <span className="font-bold">DELETE MY ACCOUNT</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              placeholder="DELETE MY ACCOUNT"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setShowConfirm(false);
+                setPassword('');
+                setConfirmText('');
+              }}
+              className="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={!password || confirmText !== 'DELETE MY ACCOUNT' || deleting}
+              className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {deleting ? 'Deleting...' : 'Delete My Account'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

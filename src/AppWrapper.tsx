@@ -10,6 +10,7 @@ import NetworkStatus from './components/NetworkStatus';
 import { UIModeProvider, useUIMode } from './contexts/UIModeContext';
 import UIModeToggle from './components/UIModeToggle';
 import PWAInstallBanner from './components/PWAInstallBanner';
+import CookieConsentBanner from './components/CookieConsentBanner';
 import { lazy, Suspense } from 'react';
 const ModernPage = lazy(() => import('./components/ModernPage'));
 
@@ -20,10 +21,12 @@ const RegisterPage = lazy(() => import('./components/RegisterPage'));
 const PricingPage = lazy(() => import('./components/PricingPage'));
 const TermsPage = lazy(() => import('./components/TermsPage'));
 const PrivacyPage = lazy(() => import('./components/PrivacyPage'));
+const RefundPolicyPage = lazy(() => import('./components/RefundPolicyPage'));
 const AboutPage = lazy(() => import('./components/AboutPage'));
 const ContactPage = lazy(() => import('./components/ContactPage'));
 const FeaturesPage = lazy(() => import('./components/FeaturesPage'));
 const ForgotPasswordPage = lazy(() => import('./components/ForgotPasswordPage'));
+const VerifyEmailPage = lazy(() => import('./components/VerifyEmailPage'));
 const AuthCallback = lazy(() => import('./components/AuthCallback'));
 const NotFoundPage = lazy(() => import('./components/NotFoundPage'));
 
@@ -39,7 +42,8 @@ const AI_ROUTES = new Set([
   '/client-portal', '/agency', '/missed-call-settings', '/dograh-settings',
   '/snapshots', '/bulk-import', '/import-leads', '/shipping-settings',
   '/documents', '/profile', '/settings', '/billing', '/team', '/api-keys',
-  '/audit-log', '/store-share',
+  '/audit-log', '/store-share', '/support-tickets', '/notification-preferences',
+  '/webhooks',
 ]);
 
 const ModeAwareAuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -101,6 +105,12 @@ const PaymentLinks = lazy(() => import('./components/PaymentLinks'));
 const ClientPortal = lazy(() => import('./components/ClientPortal'));
 const ConversationsPage = lazy(() => import('./components/ConversationsPage'));
 const CustomFieldsBuilder = lazy(() => import('./components/CustomFieldsBuilder'));
+const SupportTicketsPage = lazy(() => import('./components/SupportTicketsPage'));
+const ChangelogPage = lazy(() => import('./components/ChangelogPage'));
+const StatusPage = lazy(() => import('./components/StatusPage'));
+const NotificationPreferencesPage = lazy(() => import('./components/NotificationPreferencesPage'));
+const ApiDocsPage = lazy(() => import('./components/ApiDocsPage'));
+const WebhooksPage = lazy(() => import('./components/WebhooksPage'));
 const BlogManager = lazy(() => import('./components/BlogManager'));
 const ReviewRequests = lazy(() => import('./components/ReviewRequests'));
 const AgencyDashboard = lazy(() => import('./components/AgencyDashboard'));
@@ -176,9 +186,14 @@ function AppRoutes() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/refund" element={<RefundPolicyPage />} />
       <Route path="/about" element={<AboutPage />} />
+        <Route path="/changelog" element={<ChangelogPage />} />
+        <Route path="/status" element={<StatusPage />} />
+        <Route path="/api-docs" element={<ApiDocsPage />} />
       <Route path="/contact" element={<ContactPage />} />
       <Route path="/features" element={<FeaturesPage />} />
 
@@ -304,6 +319,27 @@ function AppRoutes() {
         <ProtectedRoute>
           <ModeAwareAuthLayout>
             <StoreSharePage />
+          </ModeAwareAuthLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/support-tickets" element={
+        <ProtectedRoute>
+          <ModeAwareAuthLayout>
+            <SupportTicketsPage />
+          </ModeAwareAuthLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/notification-preferences" element={
+        <ProtectedRoute>
+          <ModeAwareAuthLayout>
+            <NotificationPreferencesPage />
+          </ModeAwareAuthLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/webhooks" element={
+        <ProtectedRoute>
+          <ModeAwareAuthLayout>
+            <WebhooksPage />
           </ModeAwareAuthLayout>
         </ProtectedRoute>
       } />
@@ -675,6 +711,7 @@ function AppRoutes() {
     <ThemeSelector />
     <UIModeToggle />
     <PWAInstallBanner />
+    <CookieConsentBanner />
     </ToastProvider>
   );
 }
