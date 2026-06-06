@@ -228,6 +228,8 @@ const AdmissionForm: React.FC = () => {
         if (!form.primaryGoal.trim()) { setError('Primary goal is required'); return false; }
         return true;
       case 5:
+        return true;
+      case 6:
         if (!form.agreeTerms) { setError('You must agree to Terms of Service'); return false; }
         if (!form.agreePrivacy) { setError('You must agree to Privacy Policy'); return false; }
         return true;
