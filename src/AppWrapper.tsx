@@ -44,7 +44,7 @@ const AI_ROUTES = new Set([
   '/snapshots', '/bulk-import', '/import-leads', '/shipping-settings',
   '/documents', '/profile', '/settings', '/billing', '/team', '/api-keys',
   '/audit-log', '/store-share', '/support-tickets', '/notification-preferences',
-  '/webhooks', '/referrals',
+  '/webhooks', '/referrals', '/revenue', '/qr-generator', '/audit-export',
 ]);
 
 const ModeAwareAuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -113,6 +113,9 @@ const NotificationPreferencesPage = lazy(() => import('./components/Notification
 const ApiDocsPage = lazy(() => import('./components/ApiDocsPage'));
 const WebhooksPage = lazy(() => import('./components/WebhooksPage'));
 const ReferralsPage = lazy(() => import('./components/ReferralsPage'));
+const RevenueDashboardPage = lazy(() => import('./components/RevenueDashboardPage'));
+const QRCodeGeneratorPage = lazy(() => import('./components/QRCodeGeneratorPage'));
+const AuditTrailExportPage = lazy(() => import('./components/AuditTrailExportPage'));
 const BlogManager = lazy(() => import('./components/BlogManager'));
 const ReviewRequests = lazy(() => import('./components/ReviewRequests'));
 const AgencyDashboard = lazy(() => import('./components/AgencyDashboard'));
@@ -349,6 +352,27 @@ function AppRoutes() {
         <ProtectedRoute>
           <ModeAwareAuthLayout>
             <ReferralsPage />
+          </ModeAwareAuthLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/revenue" element={
+        <ProtectedRoute>
+          <ModeAwareAuthLayout>
+            <RevenueDashboardPage />
+          </ModeAwareAuthLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/qr-generator" element={
+        <ProtectedRoute>
+          <ModeAwareAuthLayout>
+            <QRCodeGeneratorPage />
+          </ModeAwareAuthLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/audit-export" element={
+        <ProtectedRoute>
+          <ModeAwareAuthLayout>
+            <AuditTrailExportPage />
           </ModeAwareAuthLayout>
         </ProtectedRoute>
       } />
