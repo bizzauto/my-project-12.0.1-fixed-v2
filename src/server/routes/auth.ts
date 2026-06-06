@@ -96,6 +96,7 @@ router.get('/google/url', (req: Request, res: Response) => {
 // GET /api/auth/google/link-url - Generate Google OAuth URL for linking to existing account
 router.get('/google/link-url', authenticate, (req: AuthRequest, res: Response) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
+  console.log('[DEBUG] GOOGLE_CLIENT_ID:', clientId ? 'SET' : 'NOT SET', clientId?.substring(0, 20));
   const redirectUri = process.env.GOOGLE_REDIRECT_URL || `https://bizzautoai.com/api/auth/google/callback`;
   const frontendUrl = (req.query.redirect as string) || `${process.env.FRONTEND_URL || 'https://bizzautoai.com'}`;
 
@@ -140,6 +141,7 @@ router.post('/google/unlink', authenticate, async (req: AuthRequest, res: Respon
 
 // GET /api/auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', async (req: Request, res: Response) => {
+  console.log('[DEBUG] Google callback hit, state:', req.query.state?.substring(0, 50));
   const stateRaw = req.query.state as string || '';
   const frontendUrlDefault = process.env.FRONTEND_URL || 'https://bizzautoai.com';
   let frontendUrl: string = frontendUrlDefault;
