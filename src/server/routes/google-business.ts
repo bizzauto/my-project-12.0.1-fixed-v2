@@ -17,6 +17,14 @@ const GBP_SCOPES = [
 // Store OAuth state temporarily (in production, use Redis)
 const oauthStates = new Map<string, { businessId: string; expiresAt: number }>();
 
+// Cleanup expired states every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of oauthStates) {
+    if (val.expiresAt < now) oauthStates.delete(key);
+  }
+}, 5 * 60 * 1000);
+
 // ── GET /api/google-business/auth/url — Generate OAuth URL ──
 router.get('/auth/url', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -57,17 +65,27 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
     const { code, state, error } = req.query;
 
     if (error) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/google-business?error=${error}`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=${error}`);
     }
 
     if (!code || !state) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/google-business?error=missing_params`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=missing_params`);
     }
 
-    // Validate state
-    const stateData = oauthStates.get(state as string);
+    // Validate state - try Map first, then decode directly
+    let stateData = oauthStates.get(state as string);
     if (!stateData || stateData.expiresAt < Date.now()) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/google-business?error=invalid_state`);
+      // Fallback: decode state directly (handles Docker restart / Map loss)
+      try {
+        const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
+        if (decoded.businessId && decoded.timestamp && Date.now() - decoded.timestamp < 30 * 60 * 1000) {
+          stateData = { businessId: decoded.businessId, expiresAt: Date.now() + 10 * 60 * 1000 };
+          console.log('[GBP] State recovered from decoded token:', stateData.businessId);
+        }
+      } catch {}
+    }
+    if (!stateData) {
+      return res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=invalid_state`);
     }
     oauthStates.delete(state as string);
 
@@ -88,13 +106,26 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
     });
 
     // Get Business accounts
-    const accountsResponse = await axios.get('https://mybusinessbusinessinformation.googleapis.com/v1/accounts', {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
+    let accountsResponse;
+    try {
+      accountsResponse = await axios.get('https://mybusinessbusinessinformation.googleapis.com/v1/accounts', {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+    } catch (apiErr: any) {
+      const status = apiErr.response?.status;
+      if (status === 403) {
+        console.error('GBP API 403 — Google Business Profile API not enabled in Google Cloud Console');
+        return res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=api_not_enabled`);
+      }
+      if (status === 401) {
+        return res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=token_expired`);
+      }
+      throw apiErr;
+    }
 
     const accounts = accountsResponse.data?.accounts || [];
     if (accounts.length === 0) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/google-business?error=no_business_found`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=no_business_found`);
     }
 
     // Use first account (or let user select)
@@ -131,8 +162,16 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
     // Redirect to frontend with success
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/google-business?connected=true`);
   } catch (error: any) {
-    console.error('GBP callback error:', error);
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/google-business?error=callback_failed`);
+    console.error('GBP callback error:', error?.message || error);
+    console.error('GBP callback error stack:', error?.stack);
+    console.error('GBP callback query:', JSON.stringify(req.query));
+    if (error?.response?.status === 403) {
+      res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=api_not_enabled`);
+    } else if (error?.response?.status === 401) {
+      res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=token_expired`);
+    } else {
+      res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=callback_failed&msg=${encodeURIComponent(error?.message || 'unknown')}`);
+    }
   }
 });
 

@@ -1,29 +1,173 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 interface Props {
   onError?: (msg: string) => void;
+  onSuccess?: (data: any) => void;
   text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
   label?: string;
   className?: string;
 }
 
-const GoogleLoginButton: React.FC<Props> = ({ onError, text = 'continue_with', label = 'Continue with Google', className = '' }) => {
-  const handleGoogleLogin = () => {
-    window.location.href = `${API_URL}/api/auth/google/url?redirect=${encodeURIComponent(window.location.origin)}`;
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          prompt: (callback?: (notification: any) => void) => void;
+          renderButton: (parent: HTMLElement, config: any) => void;
+        };
+      };
+    };
+  }
+}
+
+const GoogleLoginButton: React.FC<Props> = ({
+  onError,
+  onSuccess,
+  text = 'continue_with',
+  label = 'Continue with Google',
+  className = '',
+}) => {
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
+
+  // Handle the credential (ID token) from Google
+  const handleCredentialResponse = async (response: { credential: string }) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Google sign-in failed');
+      }
+
+      // Store tokens and user data
+      const { user, business, token, refreshToken } = data.data;
+      localStorage.setItem('token', token);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify(user));
+      if (business) localStorage.setItem('business', JSON.stringify(business));
+
+      // Notify parent component
+      if (onSuccess) {
+        onSuccess(data.data);
+      } else {
+        // Default: reload to trigger auth state update
+        window.location.href = '/dashboard';
+      }
+    } catch (err: any) {
+      console.error('Google auth error:', err);
+      if (onError) {
+        onError(err.message || 'Google sign-in failed');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Initialize Google Identity Services
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) {
+      console.warn('[WARN] VITE_GOOGLE_CLIENT_ID is not set — Google sign-in will not work.');
+      return;
+    }
+
+    let mounted = true;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const initGoogle = () => {
+      if (!mounted) return;
+      if (!window.google?.accounts?.id) {
+        retryTimer = setTimeout(initGoogle, 200);
+        return;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+
+      // Render the Google button inside our container
+      if (buttonRef.current && mounted) {
+        window.google.accounts.id.renderButton(buttonRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: text === 'signin_with' ? 'signin_with' : text === 'signup_with' ? 'signup_with' : 'continue_with',
+          width: buttonRef.current.offsetWidth || 320,
+          shape: 'rectangular',
+          logo_alignment: 'left',
+        });
+        setSdkReady(true);
+      }
+    };
+
+    initGoogle();
+
+    return () => {
+      mounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [GOOGLE_CLIENT_ID, text]);
+
+  // Fallback: manual prompt if button render fails
+  const handleClick = () => {
+    if (loading) return;
+
+    if (sdkReady && window.google?.accounts?.id) {
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          // Fallback: try the popup flow
+          if (onError) {
+            onError('Google sign-in popup was blocked. Please allow popups and try again.');
+          }
+        }
+      });
+    } else if (window.google?.accounts?.id) {
+      window.google.accounts.id.prompt();
+    } else {
+      if (onError) onError('Google sign-in is loading. Please try again in a moment.');
+    }
+  };
+
+  if (!GOOGLE_CLIENT_ID) {
+    return null;
+  }
 
   return (
     <div className={`flex justify-center w-full ${className}`}>
-      <button
-        type="button"
-        onClick={handleGoogleLogin}
-        className="flex items-center justify-center gap-2.5 w-full max-w-[320px] h-11 px-4 bg-white border border-gray-300 rounded-lg shadow-sm hover:shadow-md hover:bg-gray-50 transition-all text-sm font-medium text-gray-700"
-      >
-        <GoogleGIcon />
-        {label}
-      </button>
+      {/* Rendered Google button (takes priority) */}
+      <div ref={buttonRef} className="w-full max-w-[320px]" />
+
+      {/* Fallback button shown while SDK loads or if render fails */}
+      {!sdkReady && (
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={loading}
+          className="flex items-center justify-center gap-2.5 w-full max-w-[320px] h-11 px-4 bg-white border border-gray-300 rounded-lg shadow-sm hover:shadow-md hover:bg-gray-50 transition-all text-sm font-medium text-gray-700 disabled:opacity-50"
+        >
+          {loading ? (
+            <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <GoogleGIcon />
+          )}
+          {label}
+        </button>
+      )}
     </div>
   );
 };
