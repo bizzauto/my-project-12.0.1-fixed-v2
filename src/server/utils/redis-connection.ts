@@ -15,8 +15,11 @@ export function createRedisConnection() {
 
   console.log(`[Redis] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${redisPassword ? 'SET' : 'NOT SET'}, REDIS_HOST: ${redisHost || 'NOT SET'}`);
 
-  if (!redisUrl && !redisPassword && !redisHost) {
-    console.log('[Redis] No credentials configured — Redis disabled');
+  // NUCLEAR: If Redis is not explicitly configured by user, disable it
+  // Coolify auto-injects REDIS_URL/REDIS_HOST for its linked Redis service
+  // but that Redis uses ACL which causes NOAUTH spam
+  if (!redisPassword && !process.env.REDIS_ENABLED) {
+    console.log('[Redis] No REDIS_PASSWORD or REDIS_ENABLED — Redis disabled. Set REDIS_ENABLED=true to enable.');
     redisDisabled = true;
     return null;
   }

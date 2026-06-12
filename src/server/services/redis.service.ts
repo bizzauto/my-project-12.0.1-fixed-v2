@@ -15,6 +15,13 @@ export async function initRedis(): Promise<IORedis | null> {
 
   console.log(`[Redis Service] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${password ? 'SET' : 'NOT SET'}`);
 
+  // Same nuclear check as redis-connection.ts
+  if (!password && !process.env.REDIS_ENABLED) {
+    console.log('[Redis Service] No REDIS_PASSWORD or REDIS_ENABLED — Redis disabled.');
+    redisDisabled = true;
+    return null;
+  }
+
   if (!redisUrl && !password) {
     console.log('[Redis Service] No credentials - skipping');
     redisDisabled = true;
