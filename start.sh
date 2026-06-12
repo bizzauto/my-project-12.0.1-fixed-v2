@@ -25,7 +25,8 @@ if [ -z "$REDIS_URL" ]; then
 fi
 
 echo "Redis URL present: $([ -n \"$REDIS_URL\" ] && echo 'YES' || echo 'NO')"
-echo "Running Prisma DB push..."
+echo "Running Prisma generate + db push..."
+npx prisma generate 2>&1 || echo "Warning: Prisma generate failed, continuing..."
 timeout 60 npx prisma db push --accept-data-loss --skip-generate 2>&1 || echo "Warning: Prisma DB push failed or timed out, continuing..."
 
 echo "Starting server..."
