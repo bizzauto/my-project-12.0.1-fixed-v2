@@ -60,7 +60,7 @@ const GoogleBusinessPage: React.FC = () => {
         'invalid_state': 'Session expired. Please try again.',
         'no_business_found': 'No Google Business Profile found',
         'access_denied': 'Access denied. Please grant required permissions.',
-        'api_not_enabled': 'Google Business Profile API needs approval from Google. Check your Cloud Console or contact support.'
+        'api_not_enabled': 'Google Business Profile API needs approval from Google. Check your Cloud Console or contact support.',
         'token_expired': 'Authentication expired. Please try again.',
         'callback_failed': 'Connection failed. Please check that Google Business Profile API is enabled and try again.'
       };
