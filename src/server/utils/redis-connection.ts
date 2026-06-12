@@ -1,17 +1,27 @@
 import IORedis from 'ioredis';
 
+let redisDisabled = false;
+
 export function createRedisConnection() {
+  if (redisDisabled) return null;
+
   const redisUrl = process.env.REDIS_URL;
   const redisPassword = process.env.REDIS_PASSWORD;
-  
+
   console.log(`[Redis] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${redisPassword ? 'SET' : 'NOT SET'}`);
-  
+
+  if (!redisUrl && !redisPassword) {
+    console.log('[Redis] No credentials configured — Redis disabled');
+    redisDisabled = true;
+    return null;
+  }
+
   // Method 1: Try REDIS_URL (most reliable)
   if (redisUrl) {
     console.log('[Redis] Connecting via REDIS_URL...');
     return connectToRedis(redisUrl);
   }
-  
+
   // Method 2: Try REDIS_PASSWORD + host/port
   if (redisPassword) {
     const host = process.env.REDIS_HOST || 'coolify-redis';
@@ -20,12 +30,8 @@ export function createRedisConnection() {
     console.log(`[Redis] Connecting via password to ${host}:${port}...`);
     return connectToRedis(url);
   }
-  
-  // Method 3: Try without auth (for local dev or unauthenticated Redis)
-  const host = process.env.REDIS_HOST || 'localhost';
-  const port = process.env.REDIS_PORT || '6379';
-  console.log(`[Redis] Connecting without auth to ${host}:${port}...`);
-  return connectToRedis(`redis://${host}:${port}`);
+
+  return null;
 }
 
 function connectToRedis(url: string) {
@@ -39,18 +45,20 @@ function connectToRedis(url: string) {
     connectTimeout: 5000,
     commandTimeout: 5000,
   });
-  
+
   client.on('error', (err: any) => {
     if (err.message?.includes('NOAUTH')) {
-      console.error('[Redis] AUTHENTICATION REQUIRED: Set REDIS_PASSWORD in .env or use redis://:password@host:port format in REDIS_URL');
+      console.error('[Redis] NOAUTH — credentials rejected. Disabling Redis for this session.');
+      redisDisabled = true;
+      client.disconnect();
       return;
     }
     console.error(`[Redis] Connection error: ${err.message}`);
   });
-  
+
   client.on('connect', () => {
     console.log('[Redis] Connected successfully');
   });
-  
+
   return client;
 }

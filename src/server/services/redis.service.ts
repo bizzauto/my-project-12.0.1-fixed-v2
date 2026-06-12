@@ -2,26 +2,29 @@ import { createClient, RedisClientType } from 'redis';
 
 let redisClient: RedisClientType | null = null;
 let isConnected = false;
+let redisDisabled = false;
 
 export async function initRedis(): Promise<RedisClientType | null> {
+  if (redisDisabled) return null;
   if (redisClient && isConnected) {
     return redisClient;
   }
 
   const redisUrl = process.env.REDIS_URL;
   const password = process.env.REDIS_PASSWORD || undefined;
-  
+
   console.log(`[Redis Service] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${password ? 'SET' : 'NOT SET'}`);
-  
+
   if (!redisUrl && !password) {
     console.log('[Redis Service] No credentials - skipping');
+    redisDisabled = true;
     return null;
   }
 
   try {
     const host = process.env.REDIS_HOST || 'coolify-redis';
     const port = process.env.REDIS_PORT || '6379';
-    
+
     const finalUrl = redisUrl || `redis://:${password}@${host}:${port}`;
     console.log(`[Redis Service] Connecting to ${host}:${port}...`);
 
@@ -29,7 +32,7 @@ export async function initRedis(): Promise<RedisClientType | null> {
       url: finalUrl,
       socket: {
         reconnectStrategy: (retries) => {
-          if (retries > 3) return new Error('Redis failed');
+          if (redisDisabled || retries > 2) return new Error('Redis disabled');
           return Math.min(retries * 100, 3000);
         },
         connectTimeout: 5000,
@@ -39,7 +42,11 @@ export async function initRedis(): Promise<RedisClientType | null> {
 
     redisClient.on('error', (err: any) => {
       if (err.message?.includes('NOAUTH')) {
-        console.error('[Redis Service] AUTHENTICATION REQUIRED: Set REDIS_PASSWORD in .env or use redis://:password@host:port format in REDIS_URL');
+        console.error('[Redis Service] NOAUTH — credentials rejected. Disabling Redis for this session.');
+        redisDisabled = true;
+        isConnected = false;
+        redisClient?.disconnect().catch(() => {});
+        redisClient = null;
         return;
       }
       console.error(`[Redis Service] Error: ${err.message}`);

@@ -9,18 +9,18 @@ echo "REDIS_PASSWORD set: $([ -n \"$REDIS_PASSWORD\" ] && echo 'YES' || echo 'NO
 echo "REDIS_HOST set: $([ -n \"$REDIS_HOST\" ] && echo 'YES' || echo 'NO')"
 echo "All env vars with REDIS: $(env | grep -i redis | head -5)"
 
-# Auto-detect Redis from Docker network (Coolify uses coolify-redis)
-if [ -z "$REDIS_HOST" ] || [ "$REDIS_HOST" = "localhost" ]; then
-  export REDIS_HOST="coolify-redis"
-  export REDIS_PORT="6379"
-fi
-
 # Build REDIS_URL only if not already set by Coolify
+# IMPORTANT: Only build URL WITH auth. Never connect without password.
 if [ -z "$REDIS_URL" ]; then
   if [ -n "$REDIS_PASSWORD" ]; then
-    export REDIS_URL="redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}"
+    host="${REDIS_HOST:-coolify-redis}"
+    port="${REDIS_PORT:-6379}"
+    export REDIS_URL="redis://:${REDIS_PASSWORD}@${host}:${port}"
+    echo "Built REDIS_URL with password for ${host}:${port}"
   else
-    export REDIS_URL="redis://${REDIS_HOST}:${REDIS_PORT}"
+    echo "No REDIS_URL or REDIS_PASSWORD set — Redis will be disabled"
+    # Clear any REDIS_HOST that would cause unauthenticated connections
+    unset REDIS_HOST 2>/dev/null || true
   fi
 fi
 
