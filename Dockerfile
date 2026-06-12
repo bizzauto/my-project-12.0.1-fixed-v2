@@ -3,6 +3,9 @@
 # ============================================================
 FROM node:22-alpine AS builder
 
+# Force development so npm ci installs ALL deps (esbuild, vite needed for build)
+ENV NODE_ENV=development
+
 RUN apk add --no-cache openssl
 
 WORKDIR /app
