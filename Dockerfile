@@ -18,7 +18,7 @@ ENV NVIDIA_NIM_API_KEY=nvapi-RzxIqao_iWko4dxnKeqAU61SX4TwS_MYAz0nQn7yo5gts0F7ywo
 ENV VITE_GEMINI_API_KEY=
 
 ENV NODE_OPTIONS="--max-old-space-size=4096"
-RUN npm run build:docker && find dist -name "*.map" -delete
+RUN rm -rf dist && npm run build:docker && find dist -name "*.map" -delete
 
 # ---- Production stage ----
 FROM node:22-alpine

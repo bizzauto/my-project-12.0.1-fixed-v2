@@ -5,8 +5,27 @@ import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Ensure dist/server directory exists
 const distDir = path.join(__dirname, '../dist/server');
+
+// CLEAN: Remove old tsc-compiled files that conflict with esbuild bundle
+// These leftover .d.ts, .d.ts.map, and subdirectory files cause
+// the redis npm package to be imported at runtime even though
+// esbuild bundles everything into index.js
+if (fs.existsSync(distDir)) {
+  const clean = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        fs.rmSync(full, { recursive: true, force: true });
+      } else if (entry.name !== 'index.js' && entry.name !== 'worker.js') {
+        fs.rmSync(full, { force: true });
+      }
+    }
+  };
+  clean(distDir);
+  console.log('🧹 Cleaned old dist/server files');
+}
+
 if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
 }
