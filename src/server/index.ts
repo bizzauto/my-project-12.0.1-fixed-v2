@@ -125,6 +125,7 @@ import { startAuditPruneCron, stopAuditPruneCron } from './services/audit-prune.
 import adminInfrastructureRoutes from './routes/admin-infrastructure.js';
 import admissionRoutes from './routes/admission.js';
 import caCopilotRoutes from './routes/ca-copilot.js';
+import caFileCompareRoutes from './routes/ca-file-compare.js';
 
 dotenv.config();
 
@@ -397,6 +398,7 @@ app.use('/api/deals', dealsRoutes);
   app.use('/api/pipelines', pipelinesRoutes);
   app.use('/api/admission', admissionRoutes);
 app.use('/api/ca-copilot', caCopilotRoutes);
+app.use('/api/ca-copilot', caFileCompareRoutes);
 app.use('/api/store-features', storeFeaturesRoutes);
 app.use('/api/store-advanced', storeAdvancedRoutes);
 app.use('/api/store-customize', storeCustomizeRoutes);

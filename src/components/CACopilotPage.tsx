@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import apiClient from '../lib/api';
 
-type Tab = 'bank-reconciliation' | 'invoice-matching' | 'gst-reconciliation' | 'ledger-scrutiny' | 'ai-audit' | 'reports';
+type Tab = 'file-compare' | 'bank-reconciliation' | 'invoice-matching' | 'gst-reconciliation' | 'ledger-scrutiny' | 'ai-audit' | 'reports';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'file-compare', label: 'File Compare', icon: <ArrowRightLeft size={18} /> },
   { id: 'bank-reconciliation', label: 'Bank Reconciliation', icon: <ArrowRightLeft size={18} /> },
   { id: 'invoice-matching', label: 'Invoice Matching', icon: <Receipt size={18} /> },
   { id: 'gst-reconciliation', label: 'GST Reconciliation', icon: <Calculator size={18} /> },
@@ -499,6 +500,232 @@ const CAReports: React.FC = () => {
 };
 
 // ============================================================
+// FILE COMPARE - Upload Excel/PDF, compare ledger vs bank
+// ============================================================
+const FileCompare: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [ledgerFiles, setLedgerFiles] = useState<File[]>([]);
+  const [bankFiles, setBankFiles] = useState<File[]>([]);
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [ledgerAccount, setLedgerAccount] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [accountConfirmed, setAccountConfirmed] = useState(false);
+
+  const handleCompare = async () => {
+    if (ledgerFiles.length === 0 && bankFiles.length === 0) return;
+    if (ledgerAccount.trim() && bankAccount.trim() && ledgerAccount.trim() !== bankAccount.trim()) {
+      alert('Account numbers do not match! Please verify the accounts.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      ledgerFiles.forEach(f => formData.append('ledger', f));
+      bankFiles.forEach(f => formData.append('bank', f));
+      formData.append('ledgerAccount', ledgerAccount);
+      formData.append('bankAccount', bankAccount);
+
+      const res = await apiClient.post('/ca-copilot/compare', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setResult(res.data.data);
+      setAccountConfirmed(true);
+    } catch (err: any) {
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
+  const handleExport = async (format: 'excel' | 'pdf') => {
+    if (!result?._exportData) return;
+    setExporting(format);
+    try {
+      const res = await apiClient.post(`/ca-copilot/export/${format}`, { exportData: result._exportData }, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ca-copilot-comparison.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) { console.error(err); }
+    setExporting(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <h3 className="text-lg font-semibold mb-4">Upload Files to Compare</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-sm font-medium text-gray-500 mb-2">Ledger Files (up to 3)</h4>
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center hover:border-blue-400 transition">
+              <Upload size={32} className="mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-gray-500 mb-2">Drop files or click to upload</p>
+              <input type="file" accept=".xlsx,.xls,.csv,.pdf" multiple onChange={e => setLedgerFiles(Array.from(e.target.files || []))} className="hidden" id="ledger-upload" />
+              <label htmlFor="ledger-upload" className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Choose Files</label>
+            </div>
+            {ledgerFiles.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {ledgerFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg">
+                    <FileText size={14} className="text-blue-600" />
+                    <span className="flex-1 truncate">{f.name}</span>
+                    <button onClick={() => setLedgerFiles(prev => prev.filter((_, j) => j !== i))} className="text-red-500 hover:text-red-700"><XCircle size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-gray-500 mb-2">Bank Statement Files (up to 3)</h4>
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center hover:border-green-400 transition">
+              <Upload size={32} className="mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-gray-500 mb-2">Drop files or click to upload</p>
+              <input type="file" accept=".xlsx,.xls,.csv,.pdf" multiple onChange={e => setBankFiles(Array.from(e.target.files || []))} className="hidden" id="bank-upload" />
+              <label htmlFor="bank-upload" className="cursor-pointer px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Choose Files</label>
+            </div>
+            {bankFiles.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {bankFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-lg">
+                    <FileText size={14} className="text-green-600" />
+                    <span className="flex-1 truncate">{f.name}</span>
+                    <button onClick={() => setBankFiles(prev => prev.filter((_, j) => j !== i))} className="text-red-500 hover:text-red-700"><XCircle size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+          <div>
+            <label className="block text-sm font-medium mb-1">Ledger Account Number</label>
+            <input type="text" value={ledgerAccount} onChange={e => { setLedgerAccount(e.target.value); setAccountConfirmed(false); }} placeholder="Enter ledger account number" className="w-full px-4 py-2.5 border rounded-xl bg-white dark:bg-gray-700 dark:border-gray-600 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Bank Account Number</label>
+            <input type="text" value={bankAccount} onChange={e => { setBankAccount(e.target.value); setAccountConfirmed(false); }} placeholder="Enter bank account number" className="w-full px-4 py-2.5 border rounded-xl bg-white dark:bg-gray-700 dark:border-gray-600 text-sm" />
+          </div>
+        </div>
+        {ledgerAccount.trim() && bankAccount.trim() && (
+          <div className={`mt-2 flex items-center gap-2 text-sm ${ledgerAccount.trim() === bankAccount.trim() ? 'text-green-600' : 'text-red-600 font-semibold'}`}>
+            {ledgerAccount.trim() === bankAccount.trim() ? <><CheckCircle size={14} /> Account numbers match</> : <><XCircle size={14} /> Account numbers DO NOT match — please verify!</>}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 mt-4">
+          <button onClick={handleCompare} disabled={loading || (ledgerFiles.length === 0 && bankFiles.length === 0)} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRightLeft size={16} />}
+            Compare Files
+          </button>
+          {result && (
+            <>
+              <button onClick={() => handleExport('excel')} disabled={!!exporting} className="px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm hover:bg-green-700 flex items-center gap-2">
+                {exporting === 'excel' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Excel
+              </button>
+              <button onClick={() => handleExport('pdf')} disabled={!!exporting} className="px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700 flex items-center gap-2">
+                {exporting === 'pdf' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF
+              </button>
+            </>
+          )}
+        </div>
+      </Card>
+
+      {result && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            <StatCard label="Ledger" value={result.summary.totalLedger} icon={<FileText size={16} />} color="bg-blue-100 text-blue-600" />
+            <StatCard label="Bank" value={result.summary.totalBank} icon={<FileText size={16} />} color="bg-green-100 text-green-600" />
+            <StatCard label="Matched" value={result.summary.matched} icon={<CheckCircle size={16} />} color="bg-green-100 text-green-600" />
+            <StatCard label="Unmatched L" value={result.summary.unmatchedLedger} icon={<XCircle size={16} />} color="bg-orange-100 text-orange-600" />
+            <StatCard label="Unmatched B" value={result.summary.unmatchedBank} icon={<XCircle size={16} />} color="bg-red-100 text-red-600" />
+            <StatCard label="Amount Diff" value={result.summary.amountMismatches} icon={<AlertTriangle size={16} />} color="bg-yellow-100 text-yellow-600" />
+            <StatCard label="Match Rate" value={result.summary.matchRate} icon={<TrendingUp size={16} />} color="bg-purple-100 text-purple-600" />
+          </div>
+
+          {result.recommendations?.length > 0 && (
+            <Card className="border-l-4 border-blue-500">
+              <h3 className="font-semibold mb-2">Recommendations</h3>
+              <ul className="space-y-1">{result.recommendations.map((r: string, i: number) => <li key={i} className="text-sm text-gray-600 dark:text-gray-400 flex gap-2"><ChevronRight size={14} className="mt-0.5 text-blue-500 shrink-0" />{r}</li>)}</ul>
+            </Card>
+          )}
+
+          {/* Unmatched Bank */}
+          {result.unmatchedBank?.length > 0 && (
+            <Card>
+              <h3 className="text-lg font-semibold mb-3 text-red-600">Unmatched Bank Entries ({result.unmatchedBank.length})</h3>
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white dark:bg-gray-800"><tr className="border-b dark:border-gray-700"><th className="text-left py-2 px-2">Date</th><th className="text-left py-2 px-2">Description</th><th className="text-right py-2 px-2">Amount</th><th className="text-left py-2 px-2">Party</th></tr></thead>
+                  <tbody>{result.unmatchedBank.map((u: any, i: number) => (
+                    <tr key={i} className="border-b dark:border-gray-700/50 bg-red-50 dark:bg-red-900/10"><td className="py-2 px-2">{u.date}</td><td className="py-2 px-2 max-w-[300px] truncate">{u.description}</td><td className="py-2 px-2 text-right font-mono">₹{u.amount.toLocaleString('en-IN')}</td><td className="py-2 px-2">{u.party}</td></tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {/* Unmatched Ledger */}
+          {result.unmatchedLedger?.length > 0 && (
+            <Card>
+              <h3 className="text-lg font-semibold mb-3 text-orange-600">Unmatched Ledger Entries ({result.unmatchedLedger.length})</h3>
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white dark:bg-gray-800"><tr className="border-b dark:border-gray-700"><th className="text-left py-2 px-2">Date</th><th className="text-left py-2 px-2">Description</th><th className="text-right py-2 px-2">Amount</th><th className="text-left py-2 px-2">Party</th></tr></thead>
+                  <tbody>{result.unmatchedLedger.map((u: any, i: number) => (
+                    <tr key={i} className="border-b dark:border-gray-700/50 bg-orange-50 dark:bg-orange-900/10"><td className="py-2 px-2">{u.date}</td><td className="py-2 px-2 max-w-[300px] truncate">{u.description}</td><td className="py-2 px-2 text-right font-mono">₹{u.amount.toLocaleString('en-IN')}</td><td className="py-2 px-2">{u.party}</td></tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {/* Amount Mismatches */}
+          {result.amountMismatches?.length > 0 && (
+            <Card>
+              <h3 className="text-lg font-semibold mb-3 text-yellow-600">Amount Mismatches ({result.amountMismatches.length})</h3>
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white dark:bg-gray-800"><tr className="border-b dark:border-gray-700"><th className="text-left py-2 px-2">Bank Amt</th><th className="text-left py-2 px-2">Ledger Amt</th><th className="text-right py-2 px-2">Diff</th><th className="text-left py-2 px-2">Bank Desc</th><th className="text-left py-2 px-2">Ledger Desc</th></tr></thead>
+                  <tbody>{result.amountMismatches.map((m: any, i: number) => (
+                    <tr key={i} className="border-b dark:border-gray-700/50 bg-yellow-50 dark:bg-yellow-900/10"><td className="py-2 px-2 font-mono">₹{m.bank.amount.toLocaleString('en-IN')}</td><td className="py-2 px-2 font-mono">₹{m.ledger.amount.toLocaleString('en-IN')}</td><td className="py-2 px-2 text-right font-mono text-red-600 font-semibold">₹{m.amountDiff.toLocaleString('en-IN')}</td><td className="py-2 px-2 max-w-[200px] truncate">{m.bank.description}</td><td className="py-2 px-2 max-w-[200px] truncate">{m.ledger.description}</td></tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {/* Party-wise Report */}
+          {result.partyWise?.length > 0 && (
+            <Card>
+              <h3 className="text-lg font-semibold mb-3 text-purple-600">Party-wise Report ({result.partyWise.length} parties)</h3>
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white dark:bg-gray-800"><tr className="border-b dark:border-gray-700"><th className="text-left py-2 px-2">Party / Customer / Supplier</th><th className="text-right py-2 px-2">Ledger Entries</th><th className="text-right py-2 px-2">Bank Entries</th><th className="text-right py-2 px-2">Ledger Total</th><th className="text-right py-2 px-2">Bank Total</th><th className="text-right py-2 px-2">Difference</th><th className="text-center py-2 px-2">Status</th></tr></thead>
+                  <tbody>{result.partyWise.map((p: any, i: number) => (
+                    <tr key={i} className={`border-b dark:border-gray-700/50 ${p.hasMismatch ? 'bg-red-50 dark:bg-red-900/10' : ''}`}>
+                      <td className="py-2 px-2 font-medium">{p.party}</td>
+                      <td className="py-2 px-2 text-right">{p.ledgerCount}</td>
+                      <td className="py-2 px-2 text-right">{p.bankCount}</td>
+                      <td className="py-2 px-2 text-right font-mono">₹{p.ledgerTotal.toLocaleString('en-IN')}</td>
+                      <td className="py-2 px-2 text-right font-mono">₹{p.bankTotal.toLocaleString('en-IN')}</td>
+                      <td className={`py-2 px-2 text-right font-mono font-semibold ${p.hasMismatch ? 'text-red-600' : 'text-green-600'}`}>₹{p.difference.toLocaleString('en-IN')}</td>
+                      <td className="py-2 px-2 text-center">{p.hasMismatch ? <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">MISMATCH</span> : <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold">OK</span>}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
 // MAIN PAGE
 // ============================================================
 const CACopilotPage: React.FC = () => {
@@ -506,6 +733,7 @@ const CACopilotPage: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'file-compare': return <FileCompare />;
       case 'bank-reconciliation': return <BankReconciliation />;
       case 'invoice-matching': return <InvoiceMatching />;
       case 'gst-reconciliation': return <GSTReconciliation />;
