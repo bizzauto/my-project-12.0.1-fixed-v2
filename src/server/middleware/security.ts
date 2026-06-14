@@ -16,16 +16,14 @@ export const securityHeaders = helmet({
       fontSrc: ["'self'", "https:", "data:"],
       connectSrc: ["'self'", "https:", "wss:"],
       mediaSrc: ["'self'", "https:", "blob:"],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'", "https://accounts.google.com", "https://*.google.com", "https://*.googleapis.com"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: []
     }
   },
   
-  // Prevent clickjacking
-  frameguard: {
-    action: 'deny'
-  },
+  // Allow Google OAuth iframes while preventing clickjacking
+  frameguard: false,
   
   // Prevent MIME type sniffing
   noSniff: true,
@@ -62,7 +60,7 @@ export const additionalSecurityHeaders = (req: Request, res: Response, next: Nex
   
   // Remove sensitive headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   
   // Custom security header
@@ -249,7 +247,7 @@ export function apiSecurityHeaders(req: Request, res: Response, next: NextFuncti
 
   // API response format
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-API-Version', '1.0');
 
   // Rate limit info header
