@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { GBPAutoPostService } from '../services/gbp-auto-post.service.js';
-import { encrypt } from '../utils/auth.js';
+import { encrypt, decrypt } from '../utils/auth.js';
 import axios from 'axios';
 
 const router = Router();
@@ -13,6 +13,53 @@ const GBP_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
 ].join(' ');
+
+// ── Helper: Refresh expired GBP access token ──
+async function refreshGBPToken(businessId: string): Promise<string | null> {
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { gbpAccessToken: true, gbpRefreshToken: true, gbpTokenExpiry: true },
+    });
+    if (!business?.gbpAccessToken || !business?.gbpRefreshToken) return null;
+
+    // Check if token is still valid (with 5 min buffer)
+    if (business.gbpTokenExpiry && business.gbpTokenExpiry.getTime() > Date.now() + 5 * 60 * 1000) {
+      return decrypt(business.gbpAccessToken);
+    }
+
+    // Token expired or about to expire — refresh it
+    console.log('[GBP] Refreshing expired access token for business:', businessId);
+    const refreshToken = decrypt(business.gbpRefreshToken);
+    const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    });
+
+    const { access_token, expires_in } = tokenResponse.data;
+    await prisma.business.update({
+      where: { id: businessId },
+      data: {
+        gbpAccessToken: encrypt(access_token),
+        gbpTokenExpiry: new Date(Date.now() + expires_in * 1000),
+      },
+    });
+    console.log('[GBP] Token refreshed successfully');
+    return access_token;
+  } catch (err: any) {
+    console.error('[GBP] Token refresh failed:', err?.message);
+    return null;
+  }
+}
+
+// ── Helper: Get valid access token (auto-refresh if needed) ──
+async function getValidAccessToken(businessId: string): Promise<string> {
+  const token = await refreshGBPToken(businessId);
+  if (!token) throw new Error('GOOGLE_BUSINESS_NOT_CONNECTED');
+  return token;
+}
 
 // Store OAuth state temporarily (in production, use Redis)
 const oauthStates = new Map<string, { businessId: string; expiresAt: number }>();
@@ -177,6 +224,74 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── GET /api/google-business/setup-check — Validate configuration ──
+router.get('/setup-check', authenticate, async (req: AuthRequest, res: Response) => {
+  const checks: Record<string, { ok: boolean; message: string; fix?: string }> = {};
+
+  // 1. Check env vars
+  checks.clientId = {
+    ok: !!process.env.GOOGLE_CLIENT_ID,
+    message: process.env.GOOGLE_CLIENT_ID ? 'GOOGLE_CLIENT_ID is set' : 'GOOGLE_CLIENT_ID is missing',
+    fix: 'Set GOOGLE_CLIENT_ID in your .env file',
+  };
+  checks.clientSecret = {
+    ok: !!process.env.GOOGLE_CLIENT_SECRET,
+    message: process.env.GOOGLE_CLIENT_SECRET ? 'GOOGLE_CLIENT_SECRET is set' : 'GOOGLE_CLIENT_SECRET is missing',
+    fix: 'Set GOOGLE_CLIENT_SECRET in your .env file',
+  };
+  checks.redirectUri = {
+    ok: !!process.env.GOOGLE_BUSINESS_REDIRECT_URL,
+    message: process.env.GOOGLE_BUSINESS_REDIRECT_URL || 'GOOGLE_BUSINESS_REDIRECT_URL not set (will use default)',
+  };
+
+  // 2. Check if connected
+  const business = await prisma.business.findUnique({
+    where: { id: req.user.businessId },
+    select: { gbpAccessToken: true, gbpRefreshToken: true, gbpAccountId: true, gbpLocationId: true, gbpTokenExpiry: true },
+  });
+  checks.connected = {
+    ok: !!(business?.gbpAccessToken && business?.gbpAccountId),
+    message: business?.gbpAccessToken ? 'Connected to Google Business' : 'Not connected',
+  };
+  checks.tokenValid = {
+    ok: !!(business?.gbpTokenExpiry && business.gbpTokenExpiry.getTime() > Date.now()),
+    message: business?.gbpTokenExpiry
+      ? (business.gbpTokenExpiry.getTime() > Date.now() ? 'Token is valid' : 'Token expired (will auto-refresh)')
+      : 'No token available',
+  };
+  checks.hasRefreshToken = {
+    ok: !!business?.gbpRefreshToken,
+    message: business?.gbpRefreshToken ? 'Refresh token available' : 'No refresh token (re-auth needed)',
+  };
+
+  // 3. If connected, test the API access
+  if (business?.gbpAccessToken && business?.gbpAccountId) {
+    try {
+      const accessToken = await getValidAccessToken(req.user.businessId);
+      await axios.get('https://mybusinessbusinessinformation.googleapis.com/v1/accounts', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      checks.apiAccess = { ok: true, message: 'Google Business Profile API access confirmed' };
+    } catch (err: any) {
+      const status = err?.response?.status;
+      checks.apiAccess = {
+        ok: false,
+        message: status === 403
+          ? 'API access denied (403) — APIs need approval from Google'
+          : status === 401
+            ? 'API authentication failed (401) — token invalid'
+            : `API error: ${status || err?.message}`,
+        fix: status === 403
+          ? 'Go to https://console.cloud.google.com → APIs & Services → Enable these APIs: Google Business Profile APIs (Business Information API, Reviews API, LocalPosts API). Then submit OAuth consent screen for verification.'
+          : undefined,
+      };
+    }
+  }
+
+  const allOk = Object.values(checks).every(c => c.ok);
+  res.json({ success: true, data: { allOk, checks } });
+});
+
 // Get Google Business connection status
 router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -184,8 +299,10 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
       where: { id: req.user.businessId },
       select: {
         gbpAccessToken: true,
+        gbpRefreshToken: true,
         gbpAccountId: true,
         gbpLocationId: true,
+        gbpTokenExpiry: true,
         name: true,
       },
     });
@@ -199,6 +316,8 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
         accountId: business?.gbpAccountId || null,
         locationId: business?.gbpLocationId || null,
         businessName: business?.name || null,
+        hasRefreshToken: !!business?.gbpRefreshToken,
+        tokenValid: business?.gbpTokenExpiry ? business.gbpTokenExpiry.getTime() > Date.now() : false,
       },
     });
   } catch (error: any) {
@@ -267,30 +386,23 @@ router.get('/locations', authenticate, async (req: AuthRequest, res: Response) =
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpAccountId: true },
+      select: { gbpAccountId: true },
     });
 
-    if (!business?.gbpAccessToken) {
+    if (!business?.gbpAccountId) {
       return res.status(400).json({ success: false, error: 'Google Business not connected' });
     }
 
-    const axios = await import('axios');
-    const { decrypt } = await import('../utils/auth.js');
-    const accessToken = decrypt(business.gbpAccessToken);
+    const accessToken = await getValidAccessToken(req.user.businessId);
 
-    // Fetch locations from Google My Business API
-    const response = await axios.default.get(
-      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
+    const response = await axios.get(
+      `https://mybusinessbusinessinformation.googleapis.com/v1/accounts/${business.gbpAccountId}/locations`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
     res.json({ success: true, data: response.data.locations || [] });
   } catch (error: any) {
-    console.error('GBP locations fetch error:', error);
+    console.error('GBP locations fetch error:', error?.response?.status, error?.message);
     res.status(500).json({ success: false, error: 'Failed to fetch locations', details: error.message });
   }
 });
@@ -300,30 +412,43 @@ router.get('/reviews', authenticate, async (req: AuthRequest, res: Response) => 
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
+      select: { gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
-      return res.status(400).json({ success: false, error: 'Google Business not configured' });
+    if (!business?.gbpAccountId || !business?.gbpLocationId) {
+      return res.status(400).json({ success: false, error: 'Google Business not connected. Please connect first.' });
     }
 
-    const axios = await import('axios');
-    const { decrypt } = await import('../utils/auth.js');
-    const accessToken = decrypt(business.gbpAccessToken);
+    const accessToken = await getValidAccessToken(req.user.businessId);
 
-    const response = await axios.default.get(
-      `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/reviews`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    // Try new API first, fallback to v4
+    let reviews: any[] = [];
+    try {
+      const response = await axios.get(
+        `https://mybusinessreviews.googleapis.com/v1/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/reviews`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      reviews = response.data.reviews || [];
+    } catch (newApiErr: any) {
+      console.log('[GBP] New reviews API failed, trying v4:', newApiErr?.response?.status);
+      const response = await axios.get(
+        `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/reviews`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      reviews = response.data.reviews || [];
+    }
 
-    res.json({ success: true, data: response.data.reviews || [] });
+    res.json({ success: true, data: reviews });
   } catch (error: any) {
-    console.error('GBP reviews fetch error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch reviews', details: error.message });
+    console.error('GBP reviews fetch error:', error?.response?.status, error?.response?.data || error?.message);
+    const status = error?.response?.status;
+    if (status === 403) {
+      res.status(400).json({ success: false, error: 'Google Business Profile API not enabled. Please enable APIs in Google Cloud Console.' });
+    } else if (status === 401) {
+      res.status(401).json({ success: false, error: 'Authentication expired. Please reconnect Google Business.' });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to fetch reviews', details: error.message });
+    }
   }
 });
 
@@ -333,32 +458,30 @@ router.post('/reviews/:reviewId/reply', authenticate, async (req: AuthRequest, r
     const { reply } = req.body;
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
+      select: { gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
-      return res.status(400).json({ success: false, error: 'Google Business not configured' });
+    if (!business?.gbpAccountId || !business?.gbpLocationId) {
+      return res.status(400).json({ success: false, error: 'Google Business not connected' });
     }
 
-    const axios = await import('axios');
-    const { decrypt } = await import('../utils/auth.js');
-    const accessToken = decrypt(business.gbpAccessToken);
+    const accessToken = await getValidAccessToken(req.user.businessId);
 
-    await axios.default.put(
+    await axios.put(
       `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/reviews/${req.params.reviewId}/reply`,
       { comment: reply },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
     );
 
     res.json({ success: true, message: 'Reply posted' });
   } catch (error: any) {
-    console.error('GBP review reply error:', error);
-    res.status(500).json({ success: false, error: 'Failed to post reply', details: error.message });
+    console.error('GBP review reply error:', error?.response?.status, error?.response?.data || error?.message);
+    const status = error?.response?.status;
+    if (status === 403) {
+      res.status(400).json({ success: false, error: 'API not enabled. Please enable Google Business Profile APIs in Cloud Console.' });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to post reply', details: error.message });
+    }
   }
 });
 
@@ -368,16 +491,14 @@ router.post('/posts', authenticate, async (req: AuthRequest, res: Response) => {
     const { content, mediaUrl, callToAction } = req.body;
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
+      select: { gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
-      return res.status(400).json({ success: false, error: 'Google Business not configured' });
+    if (!business?.gbpAccountId || !business?.gbpLocationId) {
+      return res.status(400).json({ success: false, error: 'Google Business not connected' });
     }
 
-    const axios = await import('axios');
-    const { decrypt } = await import('../utils/auth.js');
-    const accessToken = decrypt(business.gbpAccessToken);
+    const accessToken = await getValidAccessToken(req.user.businessId);
 
     const postData: any = {
       languageCode: 'en',
@@ -391,26 +512,26 @@ router.post('/posts', authenticate, async (req: AuthRequest, res: Response) => {
 
     if (callToAction) {
       postData.action = {
-        actionType: callToAction.type, // CALL_NOW, LEARN_MORE, etc.
+        actionType: callToAction.type,
         url: callToAction.url,
       };
     }
 
-    const response = await axios.default.post(
+    const response = await axios.post(
       `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/localPosts`,
       postData,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
     );
 
     res.json({ success: true, data: response.data });
   } catch (error: any) {
-    console.error('GBP post creation error:', error);
-    res.status(500).json({ success: false, error: 'Failed to create post', details: error.message });
+    console.error('GBP post creation error:', error?.response?.status, error?.response?.data || error?.message);
+    const status = error?.response?.status;
+    if (status === 403) {
+      res.status(400).json({ success: false, error: 'API not enabled. Please enable Google Business Profile APIs in Cloud Console.' });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to create post', details: error.message });
+    }
   }
 });
 
@@ -419,29 +540,23 @@ router.get('/posts', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
+      select: { gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
-      return res.status(400).json({ success: false, error: 'Google Business not configured' });
+    if (!business?.gbpAccountId || !business?.gbpLocationId) {
+      return res.status(400).json({ success: false, error: 'Google Business not connected' });
     }
 
-    const axios = await import('axios');
-    const { decrypt } = await import('../utils/auth.js');
-    const accessToken = decrypt(business.gbpAccessToken);
+    const accessToken = await getValidAccessToken(req.user.businessId);
 
-    const response = await axios.default.get(
+    const response = await axios.get(
       `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/localPosts`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
     res.json({ success: true, data: response.data.localPosts || [] });
   } catch (error: any) {
-    console.error('GBP posts fetch error:', error);
+    console.error('GBP posts fetch error:', error?.response?.status, error?.response?.data || error?.message);
     res.status(500).json({ success: false, error: 'Failed to fetch posts', details: error.message });
   }
 });
@@ -451,29 +566,23 @@ router.delete('/posts/:id', authenticate, async (req: AuthRequest, res: Response
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
+      select: { gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
-      return res.status(400).json({ success: false, error: 'Google Business not configured' });
+    if (!business?.gbpAccountId || !business?.gbpLocationId) {
+      return res.status(400).json({ success: false, error: 'Google Business not connected' });
     }
 
-    const axios = await import('axios');
-    const { decrypt } = await import('../utils/auth.js');
-    const accessToken = decrypt(business.gbpAccessToken);
+    const accessToken = await getValidAccessToken(req.user.businessId);
 
-    await axios.default.delete(
+    await axios.delete(
       `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/localPosts/${req.params.id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
     res.json({ success: true, message: 'Post deleted successfully' });
   } catch (error: any) {
-    console.error('GBP post delete error:', error);
+    console.error('GBP post delete error:', error?.response?.status, error?.message);
     res.status(500).json({ success: false, error: 'Failed to delete post', details: error.message });
   }
 });
@@ -483,33 +592,23 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const business = await prisma.business.findUnique({
       where: { id: req.user.businessId },
-      select: { gbpAccessToken: true, gbpAccountId: true, gbpLocationId: true },
+      select: { gbpAccountId: true, gbpLocationId: true },
     });
 
-    if (!business?.gbpAccessToken || !business?.gbpAccountId || !business?.gbpLocationId) {
-      return res.status(400).json({ success: false, error: 'Google Business not configured' });
+    if (!business?.gbpAccountId || !business?.gbpLocationId) {
+      return res.status(400).json({ success: false, error: 'Google Business not connected' });
     }
 
-    const axios = await import('axios');
-    const { decrypt } = await import('../utils/auth.js');
-    const accessToken = decrypt(business.gbpAccessToken);
+    const accessToken = await getValidAccessToken(req.user.businessId);
 
-    // Fetch insights from Google My Business API
-    const response = await axios.default.get(
+    const response = await axios.get(
       `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/insights`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
-    res.json({
-      success: true,
-      data: response.data || {}
-    });
+    res.json({ success: true, data: response.data || {} });
   } catch (error: any) {
-    console.error('GBP stats fetch error:', error);
+    console.error('GBP stats fetch error:', error?.response?.status, error?.message);
     res.status(500).json({ success: false, error: 'Failed to fetch statistics', details: error.message });
   }
 });
