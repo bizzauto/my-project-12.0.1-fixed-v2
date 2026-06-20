@@ -35,7 +35,7 @@ const NotFoundPage = lazy(() => import('./components/NotFoundPage'));
 import AuthLayout from './layouts/AuthLayout';
 
 const AI_ROUTES = new Set([
-  '/dashboard', '/whatsapp', '/crm', '/leads', '/lead-finder', '/outreach', '/appointments', '/ecommerce',
+  '/dashboard', '/whatsapp', '/crm', '/appointments', '/ecommerce',
   '/social', '/google-business', '/ai-chatbot', '/voice-call', '/creative',
   '/automation', '/reports', '/analytics', '/reviews', '/email-marketing',
   '/workflows', '/trigger-links', '/surveys', '/blog', '/review-requests',
