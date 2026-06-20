@@ -4,7 +4,7 @@ import {
   Home, MessageSquare, Users, Palette, Star,
   BarChart3, Settings, Bell,
   Shield, LogOut,
-  Zap, UserPlus, MapPin, Bot, PhoneCall,
+  Zap, UserPlus, MapPin, Bot, PhoneCall, Send,
   ShoppingCart, FileText, Clock, MoreVertical, Share2, Moon, Sun, Menu, X, Mail,
   Workflow, Link, GraduationCap, MessageCircle, FormInput, PenTool,
   CreditCard, Building2, PhoneOff, Camera, Upload, Store, Calculator
@@ -30,6 +30,8 @@ const menuItems: MenuItem[] = [
   { id: '/whatsapp', label: 'WhatsApp', icon: <MessageSquare size={20} />, badge: 6 },
   { id: '/crm', label: 'CRM', icon: <Users size={20} /> },
   { id: '/leads', label: 'Leads', icon: <UserPlus size={20} /> },
+  { id: '/lead-finder', label: 'AI Lead Finder', icon: <MapPin size={20} /> },
+  { id: '/outreach', label: 'WhatsApp Outreach', icon: <Send size={20} /> },
   { id: '/appointments', label: 'Appointments', icon: <Clock size={20} /> },
   { id: '/ecommerce', label: 'E-Commerce', icon: <ShoppingCart size={20} /> },
   { id: '/store', label: 'Store', icon: <Store size={20} />, isExternal: true },
