@@ -1,6 +1,8 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Search, Download, MessageSquare, Mail, Phone, Plus, X, Eye, Send, Trash2, MapPin, Package, Truck, CheckCircle, AlertCircle, RefreshCw, ArrowUpRight, TrendingUp, UserPlus, Settings, Upload, Zap, MailOpen, Shield } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RT, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import LeadFinderPage from './LeadFinderPage';
+import OutreachCampaignPage from './OutreachCampaignPage';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 interface Lead { id:string; name:string; phone:string; email?:string; company?:string; source:string; tags:string[]; location?:string; product?:string; supplier?:string; requirement?:string; status:'new'|'contacted'|'qualified'|'won'|'lost'; dealValue?:number; createdAt:string; lastActivity?:string; metadata?:any; }
@@ -28,6 +30,7 @@ export default function LeadGenerationPage(){
   const[fSrc,setFSrc]=useState('all');
   const[fSt,setFSt]=useState('all');
   const[q,setQ]=useState('');
+  const[activeTab,setActiveTab]=useState<'all'|'finder'|'outreach'>('all');
   const[sort,setSort]=useState<'date'|'name'|'value'>('date');
   const[sDir,setSDir]=useState<'asc'|'desc'>('desc');
   const[showReply,setShowReply]=useState(false);
@@ -202,14 +205,26 @@ export default function LeadGenerationPage(){
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div><h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><UserPlus size={28} className="text-blue-600"/> Lead Generation</h1><p className="text-gray-500 dark:text-gray-400 mt-1">Capture, manage & convert leads from multiple sources</p></div>
-        <div className="flex items-center gap-3">
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
+        <button onClick={()=>setActiveTab('all')} className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab==='all'?'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm':'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}><Users size={16} className="inline mr-1.5"/> All Leads</button>
+        <button onClick={()=>setActiveTab('finder')} className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab==='finder'?'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm':'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}><MapPin size={16} className="inline mr-1.5"/> AI Lead Finder</button>
+        <button onClick={()=>setActiveTab('outreach')} className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab==='outreach'?'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm':'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}><Send size={16} className="inline mr-1.5"/> WhatsApp Outreach</button>
+      </div>
+
+      {activeTab==='finder'&&<LeadFinderPage/>}
+      {activeTab==='outreach'&&<OutreachCampaignPage/>}
+      {activeTab==='all'&&(
+      <>
+       <div className="flex items-center justify-end gap-3">
           <button onClick={()=>fetchLeads()} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><RefreshCw size={18}/></button>
           <button onClick={()=>setShowExport(true)} className={`${btn} bg-green-600 hover:bg-green-700`}><Download size={16}/> Export</button>
           <button onClick={()=>setShowReply(true)} className={`${btn} bg-purple-600 hover:bg-purple-700`}><Send size={16}/> Bulk Reply</button>
           <button onClick={()=>setShowForm(true)} className={`${btn} bg-blue-600 hover:bg-blue-700`}><Plus size={16}/> Add Lead</button>
           <button onClick={()=>setShowBulkAdd(true)} className={`${btn} bg-purple-600 hover:bg-purple-700`}><Upload size={16}/> Bulk Add</button>
-        </div>
-      </div>
+       </div>
 
  {/* Email Lead Integration - Multi Platform */}
  <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl shadow-sm p-4 border border-orange-200 dark:border-orange-700 mb-4">
@@ -484,6 +499,8 @@ export default function LeadGenerationPage(){
  </div>
  </Modal>
 
+ </>
+ )}
     </div>
   );
 }
