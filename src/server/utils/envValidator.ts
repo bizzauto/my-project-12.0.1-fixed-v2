@@ -49,12 +49,12 @@ export function validateEnvironment(): ValidationResult {
       continue;
     }
 
-    if (config.minLength && value.length < config.minLength) {
-      errors.push(`❌ TOO SHORT: ${key} — minimum ${config.minLength} chars, got ${value.length}`);
+    if ((config as any).minLength && value.length < (config as any).minLength) {
+      errors.push(`❌ TOO SHORT: ${key} — minimum ${(config as any).minLength} chars, got ${value.length}`);
       continue;
     }
 
-    if (config.pattern && !config.pattern.test(value)) {
+    if ((config as any).pattern && !(config as any).pattern.test(value)) {
       errors.push(`❌ INVALID FORMAT: ${key} — ${config.description}`);
       continue;
     }

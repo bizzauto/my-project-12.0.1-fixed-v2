@@ -42,7 +42,7 @@ router.post('/export-data', async (req: Request, res: Response) => {
       include: { items: true },
     });
     
-    const conversations = await prisma.conversation.findMany({
+    const conversations = await (prisma as any).conversation.findMany({
       where: { contactId: contact.id },
     });
     
@@ -51,7 +51,7 @@ router.post('/export-data', async (req: Request, res: Response) => {
     });
     
     const reviews = await prisma.review.findMany({
-      where: { contactId: contact.id },
+      where: { contactId: contact.id } as any,
     });
     
     // Compile export data
@@ -72,7 +72,7 @@ router.post('/export-data', async (req: Request, res: Response) => {
         status: order.status,
         total: order.total,
         items: order.items.map(item => ({
-          name: item.productName || 'Product',
+          name: (item as any).productName || 'Product',
           quantity: item.quantity,
           price: item.price,
         })),
@@ -86,7 +86,7 @@ router.post('/export-data', async (req: Request, res: Response) => {
       })),
       reviews: reviews.map(r => ({
         rating: r.rating,
-        comment: r.comment,
+        comment: (r as any).comment,
         createdAt: r.createdAt,
       })),
       consentHistory: {

@@ -10,8 +10,8 @@ router.use(authenticate);
 
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { type, status, page = '1', limit = '20' } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { type, status, page = '1', limit = '20' } = req.query as Record<string, string>;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const where: any = { businessId: req.user.businessId };
     if (type) where.type = type;
     if (status) where.status = status;
@@ -24,7 +24,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       prisma.document.count({ where }),
     ]);
 
-    res.json({ success: true, data: { documents, pagination: { page: parseInt(page), limit: parseInt(limit), total, totalPages: Math.ceil(total / parseInt(limit)) } } });
+    res.json({ success: true, data: { documents, pagination: { page: parseInt(page as string), limit: parseInt(limit as string), total, totalPages: Math.ceil(total / parseInt(limit as string)) } } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -84,8 +84,8 @@ router.post('/templates', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest
 
 router.get('/ai-content', async (req: AuthRequest, res: Response) => {
   try {
-    const { type, page = '1', limit = '20' } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { type, page = '1', limit = '20' } = req.query as Record<string, string>;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const where: any = { userId: req.user.id };
     if (type) where.type = type;
 
@@ -94,7 +94,7 @@ router.get('/ai-content', async (req: AuthRequest, res: Response) => {
       prisma.aIContent.count({ where }),
     ]);
 
-    res.json({ success: true, data: { content, pagination: { page: parseInt(page), limit: parseInt(limit), total } } });
+    res.json({ success: true, data: { content, pagination: { page: parseInt(page as string), limit: parseInt(limit as string), total } } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

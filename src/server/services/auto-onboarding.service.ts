@@ -203,7 +203,7 @@ export class AutoOnboardingService {
         clientName: paymentData.contactName,
         clientEmail: paymentData.contactEmail,
         sentVia: 'auto',
-      },
+      } as any,
     });
   }
 

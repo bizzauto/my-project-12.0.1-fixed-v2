@@ -55,7 +55,7 @@ export function apiVersioning(req: VersionedRequest, _res: Response, next: NextF
       success: false,
       error: `API version '${version}' is not supported. Supported versions: ${SUPPORTED_VERSIONS.join(', ')}`,
       supportedVersions: SUPPORTED_VERSIONS,
-    });
+    }) as any;
   }
 
   // Set version and deprecation headers for deprecated versions

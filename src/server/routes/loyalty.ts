@@ -76,9 +76,7 @@ router.get('/points/:contactId', authenticate, async (req: AuthRequest, res: Res
         orderBy: { createdAt: 'desc' },
         skip,
         take: parseInt(limit as string),
-        include: {
-          order: { select: { id: true, total: true, status: true } },
-        },
+        include: {} as any,
       }),
       prisma.loyaltyPoints.count({ where: { businessId, contactId } }),
       prisma.loyaltyPoints.aggregate({

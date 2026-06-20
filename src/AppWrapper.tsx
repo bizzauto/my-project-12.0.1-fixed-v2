@@ -35,7 +35,7 @@ const NotFoundPage = lazy(() => import('./components/NotFoundPage'));
 import AuthLayout from './layouts/AuthLayout';
 
 const AI_ROUTES = new Set([
-  '/dashboard', '/whatsapp', '/crm', '/leads', '/appointments', '/ecommerce',
+  '/dashboard', '/whatsapp', '/crm', '/appointments', '/ecommerce',
   '/social', '/google-business', '/ai-chatbot', '/voice-call', '/creative',
   '/automation', '/reports', '/analytics', '/reviews', '/email-marketing',
   '/workflows', '/trigger-links', '/surveys', '/blog', '/review-requests',
@@ -70,6 +70,8 @@ const Dashboard = lazy(() => import('./components/UnifiedDashboardPage'));
 const WhatsAppModule = lazy(() => import('./components/WhatsAppModule'));
 const CRMPage = lazy(() => import('./components/CRMPage'));
 const LeadGenerationPage = lazy(() => import('./components/LeadGenerationPage'));
+const LeadFinderPage = lazy(() => import('./components/LeadFinderPage'));
+const OutreachCampaignPage = lazy(() => import('./components/OutreachCampaignPage'));
 const AppointmentsPage = lazy(() => import('./components/AppointmentsPage'));
 const ECommercePage = lazy(() => import('./components/ECommercePage'));
 const PublicStorefront = lazy(() => import('./components/PublicStorefront'));
@@ -305,6 +307,26 @@ function AppRoutes() {
           <ProtectedRoute>
             <ModeAwareAuthLayout>
               <LeadGenerationPage />
+            </ModeAwareAuthLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/lead-finder"
+        element={
+          <ProtectedRoute>
+            <ModeAwareAuthLayout>
+              <LeadFinderPage />
+            </ModeAwareAuthLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/outreach"
+        element={
+          <ProtectedRoute>
+            <ModeAwareAuthLayout>
+              <OutreachCampaignPage />
             </ModeAwareAuthLayout>
           </ProtectedRoute>
         }

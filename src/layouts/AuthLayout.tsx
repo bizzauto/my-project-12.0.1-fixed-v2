@@ -4,7 +4,7 @@ import {
   Home, MessageSquare, Users, Palette, Star,
   BarChart3, Settings, Bell,
   Shield, LogOut,
-  Zap, UserPlus, MapPin, Bot, PhoneCall,
+  Zap, UserPlus, MapPin, Bot, PhoneCall, Send,
   ShoppingCart, FileText, Clock, MoreVertical, Share2, Moon, Sun, Menu, X, Mail,
   Workflow, Link, GraduationCap, MessageCircle, FormInput, PenTool,
   CreditCard, Building2, PhoneOff, Camera, Upload, Store, Calculator

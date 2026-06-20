@@ -77,8 +77,6 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
       prisma.triggerLink.findMany({
         where,
         include: {
-          campaign: { select: { id: true, name: true } },
-          workflow: { select: { id: true, name: true } },
           _count: { select: { clicks: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -113,8 +111,6 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
     const link = await prisma.triggerLink.findFirst({
       where: { id, businessId },
       include: {
-        campaign: { select: { id: true, name: true } },
-        workflow: { select: { id: true, name: true } },
         _count: { select: { clicks: true } },
       },
     });
@@ -210,10 +206,6 @@ router.post('/', authenticate, validate(createTriggerLinkSchema), async (req: Re
         workflowId: workflowId || null,
         tags: tags || [],
       },
-      include: {
-        campaign: { select: { id: true, name: true } },
-        workflow: { select: { id: true, name: true } },
-      },
     });
 
     res.status(201).json({ success: true, data: link });
@@ -257,10 +249,6 @@ router.put('/:id', authenticate, async (req: Request, res: Response) => {
         ...(campaignId !== undefined && { campaignId: campaignId || null }),
         ...(workflowId !== undefined && { workflowId: workflowId || null }),
         ...(tags !== undefined && { tags }),
-      },
-      include: {
-        campaign: { select: { id: true, name: true } },
-        workflow: { select: { id: true, name: true } },
       },
     });
 
@@ -342,9 +330,6 @@ router.get('/:id/clicks', authenticate, async (req: Request, res: Response) => {
     const [clicks, total] = await Promise.all([
       prisma.triggerLinkClick.findMany({
         where: { linkId: id },
-        include: {
-          contact: { select: { id: true, name: true, email: true } },
-        },
         orderBy: { clickedAt: 'desc' },
         skip,
         take: limit,

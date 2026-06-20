@@ -116,7 +116,7 @@ export async function pruneAuditLogs(options?: {
       LIMIT ${currentBatch}
     `;
 
-    if (oldestEntries.length === 0) break;
+    if ((oldestEntries as any).length === 0) break;
 
     // Delete this batch
     const ids = oldestEntries.map((e: { id: string }) => e.id);

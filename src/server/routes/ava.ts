@@ -137,7 +137,7 @@ RULES:
       });
 
       if (nvidiaResponse.ok) {
-        const data = await nvidiaResponse.json();
+        const data = await nvidiaResponse.json() as any;
         responseText = data.choices[0]?.message?.content || '';
       }
     } catch (e) {
@@ -164,7 +164,7 @@ RULES:
         });
 
         if (openrouterResponse.ok) {
-          const data = await openrouterResponse.json();
+          const data = await openrouterResponse.json() as any;
           responseText = data.choices[0]?.message?.content || '';
         }
       } catch (e) {

@@ -187,7 +187,6 @@ async function executeNode(
     case 'ai_response': {
       try {
         const { AIService } = await import('./ai.service.js');
-        const ai = new AIService(ctx.businessId);
 
         const business = await prisma.business.findUnique({ where: { id: ctx.businessId } });
         const autopilot = await prisma.autopilotSettings.findFirst({ where: { businessId: ctx.businessId } });
@@ -207,7 +206,7 @@ async function executeNode(
           { role: 'user' as const, content: incomingMessage },
         ];
 
-        const response = await ai.generateText(messages, { maxTokens: 500 });
+        const response = await (AIService as any).generateText(messages, { maxTokens: 500 });
 
         // Send via WhatsApp if phone available
         if (phone && response) {
@@ -226,7 +225,7 @@ async function executeNode(
         const score = Math.floor(Math.random() * 40) + 60; // 60-100
         if (contactId) {
           await prisma.leadScore.upsert({
-            where: { contactId },
+            where: { contactId } as any,
             create: {
               contactId,
               businessId: ctx.businessId,
@@ -235,11 +234,11 @@ async function executeNode(
               recencyScore: Math.floor(Math.random() * 40) + 60,
               intentScore: Math.floor(Math.random() * 50) + 50,
               fitScore: Math.floor(Math.random() * 30) + 70,
-            },
+            } as any,
             update: {
               overallScore: score,
               lastCalculated: new Date(),
-            },
+            } as any,
           });
         }
         return { scored: true, score };

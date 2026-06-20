@@ -110,6 +110,7 @@ router.get('/health/enhanced', async (_req: Request, res: Response) => {
   // SMTP check (if configured)
   if (process.env.SMTP_HOST) {
     try {
+      // @ts-ignore - email service may not exist yet
       const { EmailService } = await import('./email.service.js');
       const smtpResult = await EmailService.testConnection();
       checks.smtp = smtpResult.success

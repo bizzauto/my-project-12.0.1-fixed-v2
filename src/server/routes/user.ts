@@ -49,13 +49,13 @@ router.post('/delete-account', authenticate, async (req: AuthRequest, res: Respo
       await tx.aIContent.deleteMany({ where: { userId } });
 
       // Delete user's API keys
-      await tx.apiKey.deleteMany({ where: { userId } });
+      await tx.apiKey.deleteMany({ where: { userId } as any });
 
       // Delete audit logs
       await tx.auditLog.deleteMany({ where: { userId } });
 
       // Delete user's sessions/tokens
-      await tx.refreshToken.deleteMany({ where: { userId } });
+      await (tx as any).refreshToken.deleteMany({ where: { userId } });
 
       // Delete the user
       await tx.user.delete({ where: { id: userId } });
@@ -64,10 +64,10 @@ router.post('/delete-account', authenticate, async (req: AuthRequest, res: Respo
       if (user.role === 'OWNER' && user.businessId) {
         // Delete all business data
         await tx.contact.deleteMany({ where: { businessId: user.businessId } });
-        await tx.conversation.deleteMany({ where: { businessId: user.businessId } });
+        await (tx as any).conversation.deleteMany({ where: { businessId: user.businessId } });
         await tx.campaign.deleteMany({ where: { businessId: user.businessId } });
         await tx.appointment.deleteMany({ where: { businessId: user.businessId } });
-        await tx.aIContent.deleteMany({ where: { businessId: user.businessId } });
+        await tx.aIContent.deleteMany({ where: { businessId: user.businessId } as any });
         await tx.workflow.deleteMany({ where: { businessId: user.businessId } });
         await tx.integration.deleteMany({ where: { businessId: user.businessId } });
         await tx.subscription.deleteMany({ where: { businessId: user.businessId } });

@@ -60,7 +60,7 @@ export function authenticateApiKey(requiredPermissions?: string[]) {
       // Find the key in the database (stored as raw key in the 'key' field)
       const apiKey = await prisma.apiKey.findFirst({
         where: { key: apiKeyRaw },
-        include: { business: { select: { id: true, name: true, plan: true, isActive: true } } },
+        include: { business: { select: { id: true, name: true, plan: true, isActive: true } } } as any,
       });
 
       if (!apiKey) {
@@ -81,7 +81,7 @@ export function authenticateApiKey(requiredPermissions?: string[]) {
       }
 
       // Check if the business is active
-      if (!apiKey.business?.isActive) {
+      if (!(apiKey as any).business?.isActive) {
         res.status(403).json({ success: false, error: 'Business account is suspended' });
         return;
       }
@@ -116,7 +116,7 @@ export function authenticateApiKey(requiredPermissions?: string[]) {
       };
 
       // Set business info for downstream use
-      (req as any).business = apiKey.business;
+      (req as any).business = (apiKey as any).business;
 
       next();
     } catch (error: any) {

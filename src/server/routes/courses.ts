@@ -430,9 +430,7 @@ router.get('/:id/enrollments', authenticate, async (req: AuthRequest, res: Respo
         skip,
         take: parseInt(limit as string),
         orderBy: { enrolledAt: 'desc' },
-        include: {
-          contact: { select: { id: true, name: true, phone: true, email: true } },
-        },
+        include: {} as any,
       }),
       prisma.courseEnrollment.count({ where }),
     ]);

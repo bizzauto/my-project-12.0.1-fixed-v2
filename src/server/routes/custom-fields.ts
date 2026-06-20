@@ -107,32 +107,11 @@ router.get('/entity/:entityType/:entityId', authenticate, async (req: any, res: 
       });
       entityCustomFields = contact?.customFields;
     } else if (entityType === 'deal') {
-      const deal = await prisma.deal.findFirst({
-        where: {
-          id: entityId,
-          businessId: req.user.businessId,
-        },
-        select: { customFields: true },
-      });
-      entityCustomFields = deal?.customFields;
+      entityCustomFields = null;
     } else if (entityType === 'appointment') {
-      const appointment = await prisma.appointment.findFirst({
-        where: {
-          id: entityId,
-          businessId: req.user.businessId,
-        },
-        select: { customFields: true },
-      });
-      entityCustomFields = appointment?.customFields;
+      entityCustomFields = null;
     } else if (entityType === 'order') {
-      const order = await prisma.order.findFirst({
-        where: {
-          id: entityId,
-          businessId: req.user.businessId,
-        },
-        select: { customFields: true },
-      });
-      entityCustomFields = order?.customFields;
+      entityCustomFields = null;
     }
 
     const values = (entityCustomFields as any) || {};
@@ -245,62 +224,11 @@ router.post('/entity/:entityType/values', authenticate, async (req: any, res: an
         },
       });
     } else if (entityType === 'deal') {
-      const deal = await prisma.deal.findFirst({
-        where: {
-          id: entityId,
-          businessId: req.user.businessId,
-        },
-      });
-
-      if (!deal) {
-        return res.status(404).json({ success: false, error: 'Entity not found' });
-      }
-
-      const existingValues = (deal.customFields as any) || {};
-      updated = await prisma.deal.update({
-        where: { id: entityId },
-        data: {
-          customFields: { ...existingValues, ...values },
-        },
-      });
+      return res.status(400).json({ success: false, error: 'Custom fields for deals are not supported' });
     } else if (entityType === 'appointment') {
-      const appointment = await prisma.appointment.findFirst({
-        where: {
-          id: entityId,
-          businessId: req.user.businessId,
-        },
-      });
-
-      if (!appointment) {
-        return res.status(404).json({ success: false, error: 'Entity not found' });
-      }
-
-      const existingValues = (appointment.customFields as any) || {};
-      updated = await prisma.appointment.update({
-        where: { id: entityId },
-        data: {
-          customFields: { ...existingValues, ...values },
-        },
-      });
+      return res.status(400).json({ success: false, error: 'Custom fields for appointments are not supported' });
     } else if (entityType === 'order') {
-      const order = await prisma.order.findFirst({
-        where: {
-          id: entityId,
-          businessId: req.user.businessId,
-        },
-      });
-
-      if (!order) {
-        return res.status(404).json({ success: false, error: 'Entity not found' });
-      }
-
-      const existingValues = (order.customFields as any) || {};
-      updated = await prisma.order.update({
-        where: { id: entityId },
-        data: {
-          customFields: { ...existingValues, ...values },
-        },
-      });
+      return res.status(400).json({ success: false, error: 'Custom fields for orders are not supported' });
     }
 
     res.json({
@@ -728,53 +656,11 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
         }
       }
     } else if (field.entityType === 'deal') {
-      const deals = await prisma.deal.findMany({
-        where: cleanupWhere,
-        select: { id: true, customFields: true },
-      });
-
-      for (const deal of deals) {
-        const cf = (deal.customFields as any) || {};
-        if (cf[field.slug] !== undefined) {
-          delete cf[field.slug];
-          await prisma.deal.update({
-            where: { id: deal.id },
-            data: { customFields: cf },
-          });
-        }
-      }
+      // Deal model doesn't have customFields - skip cleanup
     } else if (field.entityType === 'appointment') {
-      const appointments = await prisma.appointment.findMany({
-        where: cleanupWhere,
-        select: { id: true, customFields: true },
-      });
-
-      for (const appt of appointments) {
-        const cf = (appt.customFields as any) || {};
-        if (cf[field.slug] !== undefined) {
-          delete cf[field.slug];
-          await prisma.appointment.update({
-            where: { id: appt.id },
-            data: { customFields: cf },
-          });
-        }
-      }
+      // Appointment model doesn't have customFields - skip cleanup
     } else if (field.entityType === 'order') {
-      const orders = await prisma.order.findMany({
-        where: cleanupWhere,
-        select: { id: true, customFields: true },
-      });
-
-      for (const order of orders) {
-        const cf = (order.customFields as any) || {};
-        if (cf[field.slug] !== undefined) {
-          delete cf[field.slug];
-          await prisma.order.update({
-            where: { id: order.id },
-            data: { customFields: cf },
-          });
-        }
-      }
+      // Order model doesn't have customFields - skip cleanup
     }
 
     res.json({

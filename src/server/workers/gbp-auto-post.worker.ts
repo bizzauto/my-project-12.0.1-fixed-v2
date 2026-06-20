@@ -128,7 +128,7 @@ export async function stopAutoPostScheduler() {
   if (!gbpAutoPostQueue) return;
   const repeatableJobs = await gbpAutoPostQueue.getRepeatableJobs();
   for (const job of repeatableJobs) {
-    await gbpAutoPostQueue.removeRepeatable(job.key);
+    await (gbpAutoPostQueue as any).removeRepeatable(job.key);
   }
   console.log('📅 GBP Auto-Post Scheduler stopped');
 }

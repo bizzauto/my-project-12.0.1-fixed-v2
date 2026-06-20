@@ -106,7 +106,7 @@ class WhatsAppMediaCleanupService {
           format,
           totalSize: exportData.totalSize
         }
-      }
+      } as any
     });
 
     return exportData;
@@ -194,7 +194,8 @@ class WhatsAppMediaCleanupService {
         oldFiles: 0,
         totalSize: 0,
         oldFilesSize: 0,
-        filesToDelete: []
+        filesToDelete: [],
+        warnings: []
       };
     }
 
@@ -286,12 +287,12 @@ class WhatsAppMediaCleanupService {
     // For now, return mock structure
     const stats = await this.getCleanupStats();
     
-    if (stats.oldFiles.length === 0) return [];
+    if (stats.filesToDelete.length === 0) return [];
 
     // Group files by potential user (based on filepath)
     const userGroups = new Map<string, MediaFile[]>();
     
-    for (const file of stats.oldFiles) {
+    for (const file of stats.filesToDelete) {
       // Extract user identifier from path
       // Path format: uploads/whatsapp/{userId}/...
       const parts = file.filepath.split(path.sep);
@@ -412,7 +413,7 @@ class WhatsAppMediaCleanupService {
                 ageInDays: file.ageInDays,
                 reason
               }
-            }
+            } as any
           });
         } else {
           failed++;

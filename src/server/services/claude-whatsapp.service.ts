@@ -619,7 +619,7 @@ Return ONLY the rewritten message, no explanation.`;
             providerMessageId: result.providerMessageId,
             sentAt: result.success ? new Date() : undefined,
             errorMessage: result.error,
-          },
+          } as any,
         });
       } else {
         await prisma.message.create({
@@ -662,8 +662,8 @@ Return ONLY the rewritten message, no explanation.`;
 
       // WhatsApp messages (excluding Claude channel)
       const waMessages = await prisma.message.findMany({
-        where: { businessId, direction: 'outbound', timestamp: { gte: from, lte: to } },
-        select: { provider: true, status: true },
+        where: { businessId, direction: 'outbound', timestamp: { gte: from, lte: to } } as any,
+        select: { provider: true, status: true } as any,
       });
 
       const byChannel: Record<Channel, { count: number; cost: number }> = {
@@ -680,7 +680,7 @@ Return ONLY the rewritten message, no explanation.`;
 
       for (const m of waMessages) {
         if (m.status !== 'sent' && m.status !== 'delivered') continue;
-        const ch = (m.provider as Channel) || 'whatsapp_meta';
+        const ch = ((m as any).provider as Channel) || 'whatsapp_meta';
         const rate = CHANNEL_RATES[ch]?.utility || CHANNEL_RATES.whatsapp_meta.utility;
         byChannel[ch].count++;
         byChannel[ch].cost += rate;

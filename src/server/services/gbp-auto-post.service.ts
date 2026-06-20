@@ -47,7 +47,7 @@ export class GBPAutoPostService {
       time: business.gbpAutoPostTime,
       timezone: business.gbpAutoPostTimezone,
       days: (business.gbpAutoPostDays as string[]) || [],
-      templates: (business.gbpAutoPostTemplates as GBPAutoPostTemplate[]) || [],
+      templates: (business.gbpAutoPostTemplates as unknown as GBPAutoPostTemplate[]) || [],
     };
   }
 

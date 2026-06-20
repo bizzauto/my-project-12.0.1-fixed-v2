@@ -194,7 +194,7 @@ export class UnofficialWhatsAppService {
     }
 
     try {
-      const parsed = JSON.parse(integration.credentials as string);
+      const parsed = JSON.parse((integration as any).credentials as string);
       // Decrypt sensitive fields
       if (parsed.apiKey) {
         try { parsed.apiKey = decrypt(parsed.apiKey); } catch { /* keep as-is */ }
@@ -239,8 +239,8 @@ export class UnofficialWhatsAppService {
 
     await prisma.integration.upsert({
       where: { businessId_type: { businessId, type: 'unofficial_whatsapp' } },
-      update: { credentials: JSON.stringify(toStore), updatedAt: new Date() },
-      create: { businessId, type: 'unofficial_whatsapp', credentials: JSON.stringify(toStore) },
+      update: { credentials: JSON.stringify(toStore), updatedAt: new Date() } as any,
+      create: { businessId, type: 'unofficial_whatsapp', credentials: JSON.stringify(toStore) } as any,
     });
     return cfg;
   }
@@ -297,7 +297,7 @@ export class UnofficialWhatsAppService {
     try {
       const statusUrl = this.resolvePath(paths.status, cfg.session);
       const statusRes = await client.get(statusUrl).catch((e) => ({ data: { connected: false, error: e.message } }));
-      const connected = !!(statusRes.data?.connected ?? statusRes.data?.status === 'CONNECTED' ?? statusRes.data?.isConnected);
+      const connected = !!(statusRes.data?.connected || statusRes.data?.status === 'CONNECTED' || statusRes.data?.isConnected);
       const phone = statusRes.data?.phone || statusRes.data?.number;
       const battery = statusRes.data?.battery;
       const provider = statusRes.data?.provider;
@@ -521,8 +521,8 @@ export class UnofficialWhatsAppService {
       if (toStore.hmacSecret) toStore.hmacSecret = encrypt(toStore.hmacSecret);
       await prisma.integration.upsert({
         where: { businessId_type: { businessId, type: 'unofficial_whatsapp' } },
-        update: { credentials: JSON.stringify({ ...toStore, lastStatus: cfg.lastStatus }), updatedAt: new Date() },
-        create: { businessId, type: 'unofficial_whatsapp', credentials: JSON.stringify({ ...toStore, lastStatus: cfg.lastStatus }) },
+        update: { credentials: JSON.stringify({ ...toStore, lastStatus: cfg.lastStatus }), updatedAt: new Date() } as any,
+        create: { businessId, type: 'unofficial_whatsapp', credentials: JSON.stringify({ ...toStore, lastStatus: cfg.lastStatus }) } as any,
       });
     } catch { /* best-effort */ }
   }

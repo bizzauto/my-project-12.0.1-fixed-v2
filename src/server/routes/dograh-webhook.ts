@@ -121,9 +121,9 @@ router.post('/:businessId', async (req: Request, res: Response) => {
             callLogId: callLog.id,
             dograhRunId: run_id,
             recordingUrl: recording_url,
-            costInfo,
+            costInfo: cost_info,
           },
-        },
+        } as any,
       });
     }
 
@@ -182,7 +182,7 @@ router.post('/:businessId', async (req: Request, res: Response) => {
                 platformMargin,
                 duration,
                 phone: callLog.calleeNumber,
-                workflowName,
+                workflowName: workflow_name,
               },
             },
           });

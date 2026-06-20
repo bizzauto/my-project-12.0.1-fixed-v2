@@ -43,9 +43,9 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/referrals/apply - Apply referral code during signup
-router.post('/apply', async (req: Request, res: Response) => {
+router.post('/apply', (async (req: Request, res: Response) => {
   try {
-    const { referralCode, newUserId } = req.body;
+    const { referralCode, newUserId } = (req as any).body;
 
     if (!referralCode || !newUserId) {
       return res.status(400).json({ success: false, error: 'Referral code and user ID required' });
@@ -92,7 +92,7 @@ router.post('/apply', async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}) as any);
 
 // POST /api/referrals/reward - Reward on subscription
 router.post('/reward', authenticate, async (req: AuthRequest, res: Response) => {
@@ -135,7 +135,7 @@ router.post('/reward', authenticate, async (req: AuthRequest, res: Response) => 
 });
 
 // GET /api/referrals/leaderboard - Top referrers
-router.get('/leaderboard', async (req: Request, res: Response) => {
+router.get('/leaderboard', (async (req: Request, res: Response) => {
   try {
     const topReferrers = await prisma.platformReferral.findMany({
       where: { isActive: true },
@@ -150,7 +150,7 @@ router.get('/leaderboard', async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}) as any);
 
 // POST /api/referrals/payout - Request payout
 router.post('/payout', authenticate, async (req: AuthRequest, res: Response) => {

@@ -34,8 +34,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Filter by specific date (match startTime within that day)
     if (date) {
-      const startOfDay = new Date(date);
-      const endOfDay = new Date(date);
+      const startOfDay = new Date(date as string);
+      const endOfDay = new Date(date as string);
       endOfDay.setDate(endOfDay.getDate() + 1);
       where.startTime = {
         gte: startOfDay,

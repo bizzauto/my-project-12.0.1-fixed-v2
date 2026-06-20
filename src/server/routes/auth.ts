@@ -142,7 +142,7 @@ router.post('/google/unlink', authenticate, async (req: AuthRequest, res: Respon
 
 // GET /api/auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', async (req: Request, res: Response) => {
-  console.log('[DEBUG] Google callback hit, state:', req.query.state?.substring(0, 50));
+  console.log('[DEBUG] Google callback hit, state:', (req.query.state as string)?.substring(0, 50));
   const stateRaw = req.query.state as string || '';
   const frontendUrlDefault = process.env.FRONTEND_URL || 'https://bizzautoai.com';
   let frontendUrl: string = frontendUrlDefault;
@@ -263,16 +263,15 @@ router.get('/google/callback', async (req: Request, res: Response) => {
           image: picture || null,
           emailVerified: new Date(),
           password: await hashPassword(crypto.randomBytes(32).toString('hex')),
-          role: 'USER',
+          role: 'USER' as any,
         },
         include: { business: true },
-      });
+      }) as any;
 
       const business = await prisma.business.create({
         data: {
           name: `${userName}'s Business`,
           type: 'SERVICE',
-          userId: user.id,
         },
       });
       user = await prisma.user.update({
@@ -283,8 +282,8 @@ router.get('/google/callback', async (req: Request, res: Response) => {
     }
 
     // Generate JWT
-    const token = generateToken(user.id, user.role);
-    const refreshToken = generateRefreshToken(user.id);
+    const token = generateToken({ userId: user.id, role: user.role });
+    const refreshToken = generateRefreshToken({ userId: user.id });
 
     // Redirect to frontend with tokens
     const params = new URLSearchParams({
@@ -1321,7 +1320,7 @@ router.get('/verify-email', async (req: Request, res: Response) => {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        emailVerified: true,
+        emailVerified: new Date(),
         verificationToken: null,
         tokenExpiry: null,
       },

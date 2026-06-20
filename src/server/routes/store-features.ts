@@ -911,7 +911,8 @@ notificationsRouter.post('/order-status', async (req: AuthRequest, res: Response
     // Try to send via available services
     if (channel === 'email' && order.contact?.email) {
       try {
-        const { sendEmail } = await import('../services/email.js');
+        const emailMod = await import('../services/email.service.js') as any;
+        const sendEmail = emailMod.sendEmail || emailMod.EmailService?.sendEmail;
         await sendEmail({
           to: order.contact.email,
           subject: `Order ${order.orderNumber} - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
@@ -925,7 +926,8 @@ notificationsRouter.post('/order-status', async (req: AuthRequest, res: Response
 
     if (channel === 'whatsapp' && order.contact?.phone) {
       try {
-        const { sendWhatsAppMessage } = await import('../services/whatsapp.js');
+        const waMod = await import('../services/whatsapp.service.js') as any;
+        const sendWhatsAppMessage = waMod.sendWhatsAppMessage || waMod.WhatsAppService?.sendTextMessage;
         await sendWhatsAppMessage({
           phone: order.contact.phone,
           message,
@@ -971,7 +973,8 @@ notificationsRouter.post('/stock-alert-notify', async (req: AuthRequest, res: Re
     // Try email
     if (alert.customerEmail) {
       try {
-        const { sendEmail } = await import('../services/email.js');
+        const emailMod = await import('../services/email.service.js') as any;
+        const sendEmail = emailMod.sendEmail || emailMod.EmailService?.sendEmail;
         await sendEmail({
           to: alert.customerEmail,
           subject: `${alert.product.name} is back in stock!`,
@@ -986,7 +989,8 @@ notificationsRouter.post('/stock-alert-notify', async (req: AuthRequest, res: Re
     // Try WhatsApp
     if (alert.customerPhone) {
       try {
-        const { sendWhatsAppMessage } = await import('../services/whatsapp.js');
+        const waMod = await import('../services/whatsapp.service.js') as any;
+        const sendWhatsAppMessage = waMod.sendWhatsAppMessage || waMod.WhatsAppService?.sendTextMessage;
         await sendWhatsAppMessage({
           phone: alert.customerPhone,
           message,

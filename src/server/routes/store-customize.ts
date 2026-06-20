@@ -835,7 +835,7 @@ searchRouter.get('/products/:businessId', async (req, res) => {
         skip,
         take: limitNum,
         include: {
-          _count: { select: { reviews: true, orderItems: true } },
+          _count: { select: { reviews: true } },
         },
       }),
       prisma.product.count({ where }),

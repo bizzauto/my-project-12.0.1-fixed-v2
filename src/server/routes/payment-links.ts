@@ -40,7 +40,7 @@ router.get('/s/:shortCode', async (req: Request, res: Response) => {
         paymentCount: true,
         businessId: true,
         business: {
-          select: { name: true, logo: true, phone: true, email: true },
+          select: { name: true, logo: true, phone: true, email: true } as any,
         },
       },
     });
@@ -486,8 +486,8 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
         business: {
           select: { id: true, name: true },
         },
-      },
-    });
+      } as any,
+    }) as any;
 
     if (!link) {
       return res.status(404).json({ success: false, error: 'Payment link not found' });

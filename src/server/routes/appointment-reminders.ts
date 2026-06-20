@@ -189,7 +189,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         message,
         scheduledAt: scheduledDate,
         reminderType: reminderType || 'before',
-      },
+      } as any,
       include: {
         contact: {
           select: {
@@ -363,7 +363,7 @@ router.post('/auto-schedule', authenticate, async (req: AuthRequest, res: Respon
             message: `Hi${appointment.contact?.name ? ' ' + appointment.contact.name : ''}, this is a reminder that your appointment is tomorrow at ${appointmentStart.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}. Please let us know if you need to reschedule.`,
             scheduledAt: oneDayBefore,
             reminderType: 'before',
-          },
+          } as any,
         });
         createdCount++;
       }
@@ -382,7 +382,7 @@ router.post('/auto-schedule', authenticate, async (req: AuthRequest, res: Respon
             message: `Hi${appointment.contact?.name ? ' ' + appointment.contact.name : ''}, your appointment starts in 1 hour at ${appointmentStart.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}. We look forward to seeing you!`,
             scheduledAt: oneHourBefore,
             reminderType: 'before',
-          },
+          } as any,
         });
         createdCount++;
       }

@@ -402,7 +402,7 @@ router.put('/settings', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, 
 // Get all automations for business
 router.get('/automations', async (req: AuthRequest, res: Response) => {
   try {
-    const { page = '1', limit = '20', type, isActive } = req.query;
+    const { page = '1', limit = '20', type, isActive } = req.query as { page?: string; limit?: string; type?: string; isActive?: string };
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const where: any = { businessId: req.user.businessId };
     if (type) where.type = type;

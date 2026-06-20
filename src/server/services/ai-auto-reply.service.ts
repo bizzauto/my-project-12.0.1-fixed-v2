@@ -76,10 +76,10 @@ export async function handleIncomingMessage(
       where: {
         businessId,
         isActive: true,
-        keywords: {
+        keyword: {
           path: '$',
           array_contains: messageText.toLowerCase(),
-        },
+        } as any,
       },
     });
 
@@ -182,7 +182,6 @@ async function generateAIResponse(
 ): Promise<string | null> {
   try {
     const { AIService } = await import('./ai.service.js');
-    const ai = new AIService(businessId);
 
     const business = await prisma.business.findUnique({ where: { id: businessId } });
     const tone = autopilot?.aiTone || 'professional';
@@ -214,7 +213,7 @@ async function generateAIResponse(
       { role: 'user' as const, content: messageText },
     ];
 
-    const response = await ai.generateText(messages, { maxTokens: 300 });
+    const response = await (AIService as any).generateText(messages, { maxTokens: 300 });
     return response;
   } catch (err: any) {
     console.error('[AutoReply] AI generation failed:', err.message);

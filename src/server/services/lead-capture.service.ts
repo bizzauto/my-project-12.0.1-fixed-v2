@@ -441,15 +441,15 @@ export class LeadCaptureService {
       });
 
       for (const rule of rules) {
-        if (rule.n8nWorkflowId) {
+        if ((rule as any).n8nWorkflowId) {
           try {
-            await axios.post(`${n8nUrl}/webhook/${rule.n8nWorkflowId}`, {
+            await axios.post(`${n8nUrl}/webhook/${(rule as any).n8nWorkflowId}`, {
               event: 'new_lead',
               businessId,
               lead: leadData,
               timestamp: new Date().toISOString(),
             }, { timeout: 10000 });
-            console.log(`[N8N] Triggered workflow ${rule.n8nWorkflowId} for lead`);
+            console.log(`[N8N] Triggered workflow ${(rule as any).n8nWorkflowId} for lead`);
           } catch (e: any) {
             console.error(`[N8N] Failed to trigger workflow:`, e.message);
           }

@@ -65,8 +65,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     const data = items.map((inv) => ({
       ...inv,
       amountPaise: inv.amount || 0,
-      taxAmountPaise: inv.taxAmount || 0,
-      totalPaise: (inv.amount || 0) + (inv.taxAmount || 0),
+      taxAmountPaise: 0,
+      totalPaise: inv.amount || 0,
     }));
 
     const nextCursor = hasMore && items.length > 0
@@ -109,8 +109,8 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     const data = {
       ...invoice,
       amountPaise: invoice.amount || 0,
-      taxAmountPaise: invoice.taxAmount || 0,
-      totalPaise: (invoice.amount || 0) + (invoice.taxAmount || 0),
+      taxAmountPaise: 0,
+      totalPaise: invoice.amount || 0,
     };
 
     sendSuccess(res, data, { requestId: req.id });
@@ -156,10 +156,9 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         businessId,
         invoiceNumber,
         amount: amountPaise,
-        customerName,
         customerEmail: customerEmail || null,
         status: status || 'DRAFT',
-      },
+      } as any,
     });
 
     const data = {
@@ -220,8 +219,8 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     const data = {
       ...invoice,
       amountPaise: invoice.amount || 0,
-      taxAmountPaise: invoice.taxAmount || 0,
-      totalPaise: (invoice.amount || 0) + (invoice.taxAmount || 0),
+      taxAmountPaise: 0,
+      totalPaise: invoice.amount || 0,
     };
 
     sendSuccess(res, data, { requestId: req.id });

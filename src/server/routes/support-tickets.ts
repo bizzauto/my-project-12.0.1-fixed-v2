@@ -240,17 +240,7 @@ router.get('/track/:ticketNumber', async (req: any, res: Response) => {
         replies: {
           where: { isInternal: false },
           orderBy: { createdAt: 'asc' },
-          select: { senderName: true, message: true, createdAt: true, senderType: true },
         },
-      },
-      select: {
-        ticketNumber: true,
-        subject: true,
-        status: true,
-        priority: true,
-        createdAt: true,
-        updatedAt: true,
-        replies: true,
       },
     });
 

@@ -93,7 +93,7 @@ router.post('/config', authenticate, requireRole('OWNER', 'ADMIN'), async (req: 
  */
 router.get('/templates', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { page = '1', limit = '50', category } = req.query;
+    const { page = '1', limit = '50', category } = req.query as { page?: string; limit?: string; category?: string };
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const where: any = { businessId: req.user.businessId };
     if (category) where.category = category;

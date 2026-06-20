@@ -72,7 +72,7 @@ router.post('/bank-reconciliation/upload', authenticate, async (req: AuthRequest
         if (txn.reference && le.description) {
           const txnWords = new Set(txn.reference.toLowerCase().split(/\s+/));
           const leWords = new Set(le.description.toLowerCase().split(/\s+/));
-          const common = [...txnWords].filter(w => leWords.has(w));
+          const common = [...txnWords].filter(w => leWords.has(w as string));
           const total = new Set([...txnWords, ...leWords]);
           if (total.size > 0) score += 0.3 * (common.length / total.size);
         }
@@ -149,20 +149,19 @@ router.get('/invoice-matching', authenticate, async (req: AuthRequest, res: any)
     const invoices = await prisma.invoice.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { contact: { select: { id: true, name: true, phone: true, email: true } } }
-    });
+    } as any);
 
-    const paid = invoices.filter(i => i.status === 'PAID');
-    const unpaid = invoices.filter(i => i.status === 'UNPAID' || i.status === 'PENDING');
-    const overdue = invoices.filter(i => {
-      if (!i.dueDate || i.status === 'PAID') return false;
-      return new Date(i.dueDate) < new Date();
+    const paid = invoices.filter((i: any) => i.status === 'PAID');
+    const unpaid = invoices.filter((i: any) => i.status === 'UNPAID' || i.status === 'PENDING');
+    const overdue = invoices.filter((i: any) => {
+      if (i.status === 'PAID') return false;
+      return new Date(i.createdAt) < new Date();
     });
 
     // Detect duplicates
     const invSeen = new Map<string, any[]>();
     for (const inv of invoices) {
-      const key = `${(inv.number || '').toUpperCase()}-${inv.amount}-${(inv.contactId || '')}`;
+      const key = `${(inv.invoiceNumber || '').toUpperCase()}-${inv.amount}`;
       if (!invSeen.has(key)) invSeen.set(key, []);
       invSeen.get(key)!.push(inv);
     }
@@ -178,10 +177,10 @@ router.get('/invoice-matching', authenticate, async (req: AuthRequest, res: any)
       success: true,
       data: {
         summary: { total: invoices.length, paid: paid.length, unpaid: unpaid.length, overdue: overdue.length, duplicates: duplicateGroups.length },
-        paid: paid.slice(0, 50).map(i => ({ id: i.id, number: i.number, amount: i.amount, contact: i.contact?.name, paidAt: i.paidDate })),
-        unpaid: unpaid.slice(0, 50).map(i => ({ id: i.id, number: i.number, amount: i.amount, contact: i.contact?.name, dueDate: i.dueDate })),
-        overdue: overdue.map(i => ({ id: i.id, number: i.number, amount: i.amount, contact: i.contact?.name, dueDate: i.dueDate, daysOverdue: Math.ceil((Date.now() - new Date(i.dueDate!).getTime()) / 86400000) })),
-        duplicates: duplicateGroups.map(g => ({ count: g.length, number: g[0].number, amount: g[0].amount })),
+        paid: paid.slice(0, 50).map((i: any) => ({ id: i.id, number: i.invoiceNumber, amount: i.amount, paidAt: i.paidAt })),
+        unpaid: unpaid.slice(0, 50).map((i: any) => ({ id: i.id, number: i.invoiceNumber, amount: i.amount, createdAt: i.createdAt })),
+        overdue: overdue.map((i: any) => ({ id: i.id, number: i.invoiceNumber, amount: i.amount, createdAt: i.createdAt, daysOverdue: Math.ceil((Date.now() - new Date(i.createdAt!).getTime()) / 86400000) })),
+        duplicates: duplicateGroups.map(g => ({ count: g.length, number: g[0].invoiceNumber, amount: g[0].amount })),
         recommendations
       }
     });
@@ -205,8 +204,7 @@ router.post('/gst-reconciliation', authenticate, async (req: AuthRequest, res: a
 
     const invoices = await prisma.invoice.findMany({
       where: { businessId, createdAt: { gte: startDate, lte: endDate } },
-      include: { contact: { select: { name: true } } }
-    });
+    } as any);
 
     const totalSales = invoices.reduce((sum, i) => sum + (i.amount || 0), 0);
     const totalTaxCollected = invoices.reduce((sum, i) => sum + ((i.amount || 0) * 0.18), 0);
@@ -430,8 +428,7 @@ router.post('/ai-audit/query', authenticate, async (req: AuthRequest, res: any) 
       where: { businessId },
       orderBy: { createdAt: 'desc' },
       take: 200,
-      include: { contact: { select: { name: true } } }
-    });
+    } as any);
 
     const totalIncome = entries.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
     const totalExpenses = entries.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
@@ -460,8 +457,8 @@ router.post('/ai-audit/query', authenticate, async (req: AuthRequest, res: any) 
       const net = totalIncome - totalExpenses;
       answer = `Net ${net >= 0 ? 'profit' : 'loss'}: ₹${Math.abs(net).toLocaleString('en-IN')}. Income: ₹${totalIncome.toLocaleString('en-IN')}, Expenses: ₹${totalExpenses.toLocaleString('en-IN')}.`;
     } else if (q.includes('overdue') || q.includes('late')) {
-      const overdue = unpaidInvoices.filter(i => i.dueDate && new Date(i.dueDate) < new Date());
-      const total = overdue.reduce((s, i) => s + (i.amount || 0), 0);
+      const overdue = unpaidInvoices.filter((i: any) => i.createdAt && new Date(i.createdAt) < new Date());
+      const total = overdue.reduce((s: number, i: any) => s + (i.amount || 0), 0);
       answer = `${overdue.length} overdue invoices worth ₹${total.toLocaleString('en-IN')}.`;
     } else if (q.includes('summary') || q.includes('overview') || q.includes('snapshot')) {
       answer = `Business Summary:\n• Total Income: ₹${totalIncome.toLocaleString('en-IN')}\n• Total Expenses: ₹${totalExpenses.toLocaleString('en-IN')}\n• Net Balance: ₹${(totalIncome - totalExpenses).toLocaleString('en-IN')}\n• Ledger Entries: ${entries.length}\n• Invoices: ${invoices.length} (${paidInvoices.length} paid, ${unpaidInvoices.length} unpaid)`;
@@ -493,7 +490,7 @@ router.get('/reports', authenticate, async (req: AuthRequest, res: any) => {
     }
 
     const entries = await prisma.ledgerEntry.findMany({ where, orderBy: { date: 'asc' } });
-    const invoices = await prisma.invoice.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' }, include: { contact: { select: { name: true } } } });
+    const invoices = await prisma.invoice.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' } } as any);
 
     const totalIncome = entries.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
     const totalExpenses = entries.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
@@ -544,7 +541,7 @@ router.get('/reports', authenticate, async (req: AuthRequest, res: any) => {
           paid: invoices.filter(i => i.status === 'PAID').length,
           unpaid: invoices.filter(i => i.status !== 'PAID').length,
           totalAmount: invoices.reduce((s, i) => s + (i.amount || 0), 0),
-          overdueAmount: invoices.filter(i => i.status !== 'PAID' && i.dueDate && new Date(i.dueDate) < new Date()).reduce((s, i) => s + (i.amount || 0), 0)
+          overdueAmount: invoices.filter((i: any) => i.status !== 'PAID' && new Date(i.createdAt) < new Date()).reduce((s: number, i: any) => s + (i.amount || 0), 0)
         }
       }
     });

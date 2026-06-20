@@ -118,8 +118,10 @@ bundlesRouter.post('/:id/order', authenticate, async (req: AuthRequest, res) => 
       subtotal += itemTotal;
       return {
         productId: item.productId,
+        name: item.product.name,
         quantity: item.quantity,
         price: item.product.price,
+        total: itemTotal,
       };
     });
 
@@ -136,6 +138,8 @@ bundlesRouter.post('/:id/order', authenticate, async (req: AuthRequest, res) => 
       data: {
         contactId: req.user!.id,
         businessId,
+        orderNumber: `ORD-${Date.now().toString(36).toUpperCase()}`,
+        subtotal,
         total,
         discountAmount: discount,
         status: 'pending',
@@ -487,6 +491,7 @@ addressesRouter.get('/', authenticate, async (req: AuthRequest, res) => {
 addressesRouter.post('/', authenticate, async (req: AuthRequest, res) => {
   try {
     const contactId = req.user!.id;
+    const businessId = req.user!.businessId;
     const { label, name, phone, email, address, city, state, pincode, isDefault } = req.body;
 
     if (isDefault) {
@@ -497,7 +502,7 @@ addressesRouter.post('/', authenticate, async (req: AuthRequest, res) => {
     }
 
     const newAddress = await prisma.customerAddress.create({
-      data: { label, name, phone, email, address, city, state, pincode, isDefault, contactId },
+      data: { label, name, phone, email, address, city, state, pincode, isDefault, contactId, businessId },
     });
     res.status(201).json(newAddress);
   } catch (error) {
@@ -788,10 +793,9 @@ invoicesRouter.get('/:orderId/pdf', authenticate, async (req: AuthRequest, res) 
       where: { id: orderId },
       include: {
         items: { include: { product: true } },
-        business: true,
         contact: true,
       },
-    });
+    }) as any;
 
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
@@ -799,18 +803,18 @@ invoicesRouter.get('/:orderId/pdf', authenticate, async (req: AuthRequest, res) 
       (sum: number, item: any) => sum + item.price * item.quantity,
       0
     );
-    const taxRate = order.business?.taxRate || 0;
+    const taxRate = 0;
     const taxAmount = (subtotal * taxRate) / 100;
 
     const invoice = {
       invoiceNumber: `INV-${order.id.slice(0, 8).toUpperCase()}`,
       date: order.createdAt,
       business: {
-        name: order.business?.name || '',
-        address: order.business?.address || '',
-        phone: order.business?.phone || '',
-        email: order.business?.email || '',
-        taxId: order.business?.taxId || '',
+        name: '',
+        address: '',
+        phone: '',
+        email: '',
+        taxId: '',
       },
       customer: {
         name:         order.contact?.name || '',
