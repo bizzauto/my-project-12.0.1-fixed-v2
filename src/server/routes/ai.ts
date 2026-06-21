@@ -1,7 +1,7 @@
 import { prisma } from '../index.js';
 import { authenticate } from '../middleware/auth.js';
 import axios from 'axios';
-import express from 'express';
+import express, { Request, Response } from 'express';
 const router = express.Router();
 
 // AI Router - Cost-optimized AI request handling
@@ -73,7 +73,7 @@ router.post('/generate', authenticate, async (req: any, res: any) => {
 });
 
 // Generate social media caption
-router.post('/caption', authenticate, async (req: any, res: any) => {
+router.post('/caption', authenticate, async (req: Request, res: Response) => {
   try {
     const { topic, businessType, platform, language = 'en' } = req.body;
 
@@ -94,7 +94,7 @@ router.post('/caption', authenticate, async (req: any, res: any) => {
 });
 
 // Generate hashtags
-router.post('/hashtags', authenticate, async (req: any, res: any) => {
+router.post('/hashtags', authenticate, async (req: Request, res: Response) => {
   try {
     const { topic, platform } = req.body;
 
@@ -115,7 +115,7 @@ router.post('/hashtags', authenticate, async (req: any, res: any) => {
 });
 
 // Generate review reply
-router.post('/review-reply', authenticate, async (req: any, res: any) => {
+router.post('/review-reply', authenticate, async (req: Request, res: Response) => {
   try {
     const { reviewText, rating, businessType, businessName } = req.body;
 
@@ -135,8 +135,48 @@ router.post('/review-reply', authenticate, async (req: any, res: any) => {
   }
 });
 
+// Generate smart reply suggestions
+router.post('/smart-replies', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { conversation, tone = 'professional', context } = req.body;
+
+    const prompt = `Generate 3-5 smart reply suggestions for this customer message: "${conversation}". The tone should be ${tone}. Consider the context: ${context}. Each reply should be concise, helpful, and appropriate for customer service. Return as JSON array.`;
+
+    const response = await callAIProvider(
+      { provider: 'openrouter', model: 'meta-llama/llama-3.1-8b-instruct:free' },
+      prompt
+    );
+
+    res.json({
+      success: true,
+      data: { replies: response.text },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to generate smart replies', details: error.message });
+  }
+});
+
+// Generate smart reply suggestions
+router.post('/smart-replies', authenticate, async (req: any, res: any) => {
+  try {
+    const { conversation, tone = 'professional', context } = req.body;
+
+    const prompt = `Generate 3-5 smart reply suggestions for this customer message: "${conversation}". The tone should be ${tone}. Consider the context: ${context}. Each reply should be concise, helpful, and appropriate for customer service. Return as JSON array.`;
+
+    const response = await callAIProvider(
+      { provider: 'openrouter', model: 'meta-llama/llama-3.1-8b-instruct:free' },
+      prompt
+    );
+
+    res.json({
+      success: true,
+      data: { replies: response.text },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to generate smart replies', details: error.message });
+  }
 // Generate content calendar
-router.post('/content-calendar', authenticate, async (req: any, res: any) => {
+router.post('/content-calendar', authenticate, async (req: Request, res: Response) => {
   try {
     const { businessType, city, month, year } = req.body;
 
@@ -156,7 +196,125 @@ router.post('/content-calendar', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Helper functions
+// Data backup and recovery
+router.post('/backup', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { type = 'full', include = ['contacts', 'leads', 'appointments'] } = req.body;
+    const businessId = (req as any).user.businessId;
+
+    const backupData: any = {
+      businessId,
+      timestamp: new Date().toISOString(),
+      type,
+      data: {},
+    };
+
+    if (include.includes('contacts')) {
+      const contacts = await prisma.contact.findMany({ where: { businessId } });
+      backupData.data.contacts = contacts;
+    }
+
+    if (include.includes('leads')) {
+      const leads = await prisma.lead.findMany({ where: { businessId } });
+      backupData.data.leads = leads;
+    }
+
+    if (include.includes('appointments')) {
+      const appointments = await prisma.appointment.findMany({ where: { businessId } });
+      backupData.data.appointments = appointments;
+    }
+
+    res.json({
+      success: true,
+      data: { backup: backupData },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to create backup', details: error.message });
+  }
+});
+
+// Restore from backup
+router.post('/restore', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { backupId } = req.body;
+
+    if (!backupId) {
+      return res.status(400).json({ success: false, error: 'Backup ID is required' });
+    }
+
+    const backup = await prisma.auditLog.findUnique({ where: { id: backupId } });
+    if (!backup) {
+      return res.status(404).json({ success: false, error: 'Backup not found' });
+    }
+
+    res.json({
+      success: true,
+      data: { backup },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to restore backup', details: error.message });
+  }
+});
+
+// Data backup and recovery
+router.post('/backup', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { type = 'full', include = ['contacts', 'leads', 'appointments'] } = req.body;
+    const businessId = (req as any).user.businessId;
+
+    const backupData: any = {
+      businessId,
+      timestamp: new Date().toISOString(),
+      type,
+      data: {},
+    };
+
+    if (include.includes('contacts')) {
+      const contacts = await prisma.contact.findMany({ where: { businessId } });
+      backupData.data.contacts = contacts;
+    }
+
+    if (include.includes('leads')) {
+      const leads = await prisma.lead.findMany({ where: { businessId } });
+      backupData.data.leads = leads;
+    }
+
+    if (include.includes('appointments')) {
+      const appointments = await prisma.appointment.findMany({ where: { businessId } });
+      backupData.data.appointments = appointments;
+    }
+
+    res.json({
+      success: true,
+      data: { backup: backupData },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to create backup', details: error.message });
+  }
+});
+
+// Restore from backup
+router.post('/restore', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { backupId } = req.body;
+
+    if (!backupId) {
+      return res.status(400).json({ success: false, error: 'Backup ID is required' });
+    }
+
+    const backup = await prisma.auditLog.findUnique({ where: { id: backupId } });
+    if (!backup) {
+      return res.status(404).json({ success: false, error: 'Backup not found' });
+    }
+
+    res.json({
+      success: true,
+      data: { backup },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to restore backup', details: error.message });
+  }
+});
 function getOptimalModel(type: string) {
   const models: any = {
     simple: { provider: 'grok', model: 'grok-3-mini' },
