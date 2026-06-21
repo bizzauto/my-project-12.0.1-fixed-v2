@@ -29,6 +29,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm ci --omit=dev --no-audit --no-fund && npx prisma generate && \
+    chown -R appuser:appgroup node_modules/.prisma && \
     npm cache clean --force && rm -rf /root/.npm
 
 COPY --from=builder /app/dist ./dist
@@ -45,7 +46,7 @@ EXPOSE 3000
 
 USER appuser
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:3000/health/live || exit 1
 
 CMD ["./start.sh"]
