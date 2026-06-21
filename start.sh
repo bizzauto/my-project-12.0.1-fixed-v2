@@ -31,7 +31,14 @@ fi
 
 echo "Redis URL present: $([ -n \"$REDIS_URL\" ] && echo 'YES' || echo 'NO')"
 echo "Running Prisma generate + db push..."
-npx prisma generate 2>&1 || echo "Warning: Prisma generate failed, continuing..."
+# Prisma generate is already done during Docker build (RUN step)
+# Only retry if .prisma/client is missing (e.g. volume mount overwrote node_modules)
+if [ ! -f node_modules/.prisma/client/index.js ]; then
+  echo "Prisma client missing, regenerating..."
+  npx prisma generate 2>&1 || echo "Warning: Prisma generate failed, continuing..."
+else
+  echo "Prisma client already generated, skipping."
+fi
 timeout 60 npx prisma db push --accept-data-loss --skip-generate 2>&1 || echo "Warning: Prisma DB push failed or timed out, continuing..."
 
 echo "Starting server..."
