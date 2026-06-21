@@ -82,8 +82,11 @@ export const authenticate = async (
       });
     }
 
-    // Generate CSRF token for the session
-    const csrfToken = await CSRFService.generateToken(user.id);
+    // Only generate CSRF token if not exists or expired (max once per session)
+    let csrfToken = await CSRFService.getToken(user.id);
+    if (!csrfToken) {
+      csrfToken = await CSRFService.generateToken(user.id);
+    }
     res.setHeader('X-CSRF-Token', csrfToken);
 
     req.user = {
