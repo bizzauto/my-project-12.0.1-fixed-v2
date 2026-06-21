@@ -427,42 +427,60 @@ export class EvolutionApiService {
     try {
       const config = await this.getConfig(businessId);
 
-      const response = await axios.get(
-        `${config.baseUrl}/instance/connectionState/${config.instanceName}`,
-        { headers: { apikey: config.apiKey } }
-      );
+      // Try to check actual connection state from Evolution API
+      try {
+        const response = await axios.get(
+          `${config.baseUrl}/instance/connectionState/${config.instanceName}`,
+          { headers: { apikey: config.apiKey }, timeout: 10000 }
+        );
 
-      const state = response.data?.instance?.state || 'close';
+        const state = response.data?.instance?.state || 'close';
 
-      if (state === 'open') {
-        let phone = '';
-        let profileName = '';
-        let profilePicUrl = '';
+        if (state === 'open') {
+          let phone = '';
+          let profileName = '';
+          let profilePicUrl = '';
 
-        try {
-          const fetchRes = await axios.get(
-            `${config.baseUrl}/instance/fetchInstances?instanceName=${config.instanceName}`,
-            { headers: { apikey: config.apiKey } }
-          );
-          const instanceData = Array.isArray(fetchRes.data) ? fetchRes.data[0] : fetchRes.data;
-          phone = instanceData?.instance?.phone || instanceData?.phone || '';
-          profileName = instanceData?.instance?.profileName || instanceData?.profileName || profileName;
-        } catch {}
+          try {
+            const fetchRes = await axios.get(
+              `${config.baseUrl}/instance/fetchInstances?instanceName=${config.instanceName}`,
+              { headers: { apikey: config.apiKey }, timeout: 10000 }
+            );
+            const instanceData = Array.isArray(fetchRes.data) ? fetchRes.data[0] : fetchRes.data;
+            phone = instanceData?.instance?.phone || instanceData?.phone || '';
+            profileName = instanceData?.instance?.profileName || instanceData?.profileName || profileName;
+          } catch {}
 
-        try {
-          const profileRes = await axios.post(
-            `${config.baseUrl}/chat/fetchProfilePictureUrl/${config.instanceName}`,
-            { number: '' },
-            { headers: { apikey: config.apiKey } }
-          );
-          profilePicUrl = profileRes.data?.profilePictureUrl || '';
-        } catch {}
+          try {
+            const profileRes = await axios.post(
+              `${config.baseUrl}/chat/fetchProfilePictureUrl/${config.instanceName}`,
+              { number: '' },
+              { headers: { apikey: config.apiKey }, timeout: 10000 }
+            );
+            profilePicUrl = profileRes.data?.profilePictureUrl || '';
+          } catch {}
 
-        await this.updateStatus(businessId, 'connected');
-        return { status: 'connected', phone, profileName, profilePicUrl };
-      } else if (state === 'connecting' || state === 'pairing' || state === 'syncing') {
-        return { status: 'scanning' };
-      } else {
+          await this.updateStatus(businessId, 'connected');
+          return { status: 'connected', phone, profileName, profilePicUrl };
+        } else if (state === 'connecting' || state === 'pairing' || state === 'syncing') {
+          return { status: 'scanning' };
+        } else {
+          return { status: 'disconnected' };
+        }
+      } catch (apiError: any) {
+        // Evolution API unreachable or instance not found — fall back to DB cached status
+        console.log(`[Evolution] Status check failed for ${config.instanceName}: ${apiError?.response?.status || apiError.message}`);
+
+        // Read cached status from Integration config
+        const integration = await prisma.integration.findFirst({
+          where: { businessId, type: 'evolution_api' },
+        });
+        if (integration) {
+          const cachedConfig = integration.config as any;
+          const cachedStatus = cachedConfig?.status || 'disconnected';
+          return { status: cachedStatus as any };
+        }
+
         return { status: 'disconnected' };
       }
     } catch {

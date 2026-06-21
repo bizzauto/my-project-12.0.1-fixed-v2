@@ -1,8 +1,22 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { prisma } from '../index.js';
 import { WhatsAppService } from '../services/whatsapp.service.js';
+import { EvolutionApiService } from '../services/evolution.service.js';
 import { FollowUpEngineService } from '../services/followup-engine.service.js';
 import { createRedisConnection } from '../utils/redis-connection.js';
+
+/**
+ * Smart send: detects which WhatsApp channel is configured and routes accordingly.
+ */
+async function smartSendText(businessId: string, to: string, message: string): Promise<any> {
+  const evoIntegration = await prisma.integration.findFirst({
+    where: { businessId, type: 'evolution_api', isActive: true },
+  });
+  if (evoIntegration) {
+    return await EvolutionApiService.sendText(businessId, to, message);
+  }
+  return await WhatsAppService.sendTextMessage(businessId, to, message);
+}
 
 const redisConnection = createRedisConnection();
 
@@ -44,9 +58,7 @@ const outreachWorker = redisConnection ? new Worker(
       });
       if (!outreachLog) throw new Error('Outreach log not found');
 
-      const result = await WhatsAppService.sendTextMessage(businessId, contact.phone, outreachLog.message, {
-        messageId: contactId,
-      });
+      const result = await smartSendText(businessId, contact.phone, outreachLog.message);
 
       await prisma.outreachLog.update({
         where: { id: outreachLog.id },
@@ -81,9 +93,7 @@ const outreachWorker = redisConnection ? new Worker(
         try {
           if (!log.contact?.phone) { errors++; continue; }
 
-          const result = await WhatsAppService.sendTextMessage(businessId, log.contact.phone, log.message, {
-            messageId: log.contactId,
-          });
+          const result = await smartSendText(businessId, log.contact.phone, log.message);
 
           await prisma.outreachLog.update({
             where: { id: log.id },

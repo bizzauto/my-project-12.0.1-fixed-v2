@@ -1,12 +1,32 @@
 import { prisma } from '../index.js';
 import { AIService } from './ai.service.js';
 import { WhatsAppService } from './whatsapp.service.js';
+import { EvolutionApiService } from './evolution.service.js';
 
 interface OutreachParams {
   businessId: string;
   campaignId: string;
   contactId: string;
   messageType?: string;
+}
+
+/**
+ * Smart send: detects which WhatsApp channel is configured and routes accordingly.
+ * Evolution API (QR-based) vs Meta Official API.
+ */
+async function smartSendText(businessId: string, to: string, message: string, opts?: { messageId?: string }): Promise<any> {
+  // Check if Evolution API is configured and active
+  const evoIntegration = await prisma.integration.findFirst({
+    where: { businessId, type: 'evolution_api', isActive: true },
+  });
+
+  if (evoIntegration) {
+    // Use Evolution API (WhatsApp Web-based)
+    return await EvolutionApiService.sendText(businessId, to, message);
+  }
+
+  // Fall back to Meta Official API
+  return await WhatsAppService.sendTextMessage(businessId, to, message, opts);
 }
 
 // Variation seeds — each message gets a different persona so WhatsApp can't detect templates
@@ -205,10 +225,8 @@ ${business?.name || 'Team'}`;
       });
     }
 
-    // Send via WhatsApp
-    const result = await WhatsAppService.sendTextMessage(businessId, contact.phone, message, {
-      messageId: contactId,
-    });
+    // Send via WhatsApp (auto-detects Evolution vs Meta)
+    const result = await smartSendText(businessId, contact.phone, message);
 
     // Update outreach log
     await prisma.outreachLog.update({
