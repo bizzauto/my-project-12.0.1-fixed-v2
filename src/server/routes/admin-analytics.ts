@@ -91,10 +91,9 @@ router.get('/analytics', authenticate, requireRole('SUPER_ADMIN'), async (req: A
   }
 });
 
-// In-memory feature flag overrides (persist in DB in production)
-const featureFlagOverrides: Map<string, boolean> = new Map();
+// ==================== FEATURE FLAGS (DB-backed) ====================
 
-// GET /api/admin/feature-flags — Feature flags (env-based with overrides)
+// GET /api/admin/feature-flags — Feature flags (env + DB overrides)
 router.get('/feature-flags', authenticate, requireRole('SUPER_ADMIN'), async (_req: AuthRequest, res: any) => {
   try {
     const defaults: Record<string, boolean> = {
@@ -110,11 +109,17 @@ router.get('/feature-flags', authenticate, requireRole('SUPER_ADMIN'), async (_r
       betaFeatures: false,
     };
 
+    // Fetch all persisted overrides from DB
+    const dbFlags = await prisma.featureFlag.findMany();
+    const dbOverrideMap = new Map(dbFlags.map(f => [f.key, f.enabled]));
+
     const flags: Record<string, { enabled: boolean; source: string }> = {};
     for (const [key, defaultValue] of Object.entries(defaults)) {
       const envKey = `FF_${key.replace(/([A-Z])/g, '_$1').toUpperCase()}`;
-      if (featureFlagOverrides.has(key)) {
-        flags[key] = { enabled: featureFlagOverrides.get(key)!, source: 'override' };
+
+      if (dbOverrideMap.has(key)) {
+        // DB override takes highest priority
+        flags[key] = { enabled: dbOverrideMap.get(key)!, source: 'override' };
       } else if (process.env[envKey] !== undefined) {
         flags[key] = { enabled: process.env[envKey] !== 'false', source: 'env' };
       } else {
@@ -128,7 +133,7 @@ router.get('/feature-flags', authenticate, requireRole('SUPER_ADMIN'), async (_r
   }
 });
 
-// PUT /api/admin/feature-flags — Toggle feature flags
+// PUT /api/admin/feature-flags — Toggle feature flags (persisted to DB)
 router.put('/feature-flags', authenticate, requireRole('SUPER_ADMIN'), async (req: AuthRequest, res: any) => {
   try {
     const updates: Record<string, boolean> = req.body;
@@ -136,13 +141,21 @@ router.put('/feature-flags', authenticate, requireRole('SUPER_ADMIN'), async (re
       return res.status(400).json({ success: false, error: 'Request body must be an object of flag key-value pairs' });
     }
 
+    const updatedKeys: Record<string, boolean> = {};
+
     for (const [key, value] of Object.entries(updates)) {
       if (typeof value === 'boolean') {
-        featureFlagOverrides.set(key, value);
+        // Upsert into DB: create if not exists, update if exists
+        await prisma.featureFlag.upsert({
+          where: { key },
+          create: { key, enabled: value },
+          update: { enabled: value },
+        });
+        updatedKeys[key] = value;
       }
     }
 
-    res.json({ success: true, message: 'Feature flags updated', data: Object.fromEntries(featureFlagOverrides) });
+    res.json({ success: true, message: 'Feature flags updated', data: updatedKeys });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
