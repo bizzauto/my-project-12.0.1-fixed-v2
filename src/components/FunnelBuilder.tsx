@@ -142,7 +142,7 @@ export default function FunnelBuilder() {
       if (data.success) {
         fetchFunnels();
       } else {
-        setError(data.error || 'Failed to delete funnel');诊所
+        setError(data.error || 'Failed to delete funnel');
       }
     } catch {
       setError('Network error deleting funnel');

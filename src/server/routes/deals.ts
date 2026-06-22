@@ -128,12 +128,15 @@ router.get('/stats', authenticate, cacheResponse(30), async (req: AuthRequest, r
           { dealStage: { not: null } },
         ],
       },
-      select: { dealValue: true, dealStage: true, stage: true },
+      select: { dealValue: true, dealStage: true, stage: true, createdAt: true, updatedAt: true },
     });
 
     const totalDealValue = contacts.reduce((sum, c) => sum + (c.dealValue || 0), 0);
     const wonDeals = contacts
       .filter((c) => c.dealStage === 'Closed Won' || c.dealStage === 'Won' || c.stage === 'Won')
+      .reduce((sum, c) => sum + (c.dealValue || 0), 0);
+    const lostDeals = contacts
+      .filter((c) => c.dealStage === 'Closed Lost' || c.dealStage === 'Lost' || c.stage === 'Lost')
       .reduce((sum, c) => sum + (c.dealValue || 0), 0);
     const activeDeals = contacts.filter(
       (c) => c.dealStage && !['Closed Won', 'Closed Lost', 'Won', 'Lost'].includes(c.dealStage)
@@ -150,15 +153,65 @@ router.get('/stats', authenticate, cacheResponse(30), async (req: AuthRequest, r
       });
     }
 
-    const pipeline = Array.from(pipelineMap.entries()).map(([name, data]) => ({
-      name,
-      count: data.count,
-      value: data.value,
-    }));
+    // Weighted pipeline value (dealValue × probability %)
+    let weightedPipelineValue = 0;
+    const pipeline = Array.from(pipelineMap.entries()).map(([name, data]) => {
+      const prob = getProbability(name) / 100;
+      const weighted = data.value * prob;
+      weightedPipelineValue += weighted;
+      return {
+        name,
+        count: data.count,
+        value: data.value,
+        probability: getProbability(name),
+        weightedValue: Math.round(weighted),
+      };
+    });
+
+    // Conversion rates (stage-by-stage)
+    const totalContacts = contacts.length || 1;
+    const wonCount = contacts.filter(c => ['Won', 'Closed Won'].includes(c.dealStage || c.stage || '')).length;
+    const lostCount = contacts.filter(c => ['Lost', 'Closed Lost'].includes(c.dealStage || c.stage || '')).length;
+    const winRate = totalContacts > 0 ? Math.round((wonCount / totalContacts) * 100) : 0;
+    const lossRate = totalContacts > 0 ? Math.round((lostCount / totalContacts) * 100) : 0;
+
+    // Forecast data
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    const monthDeals = contacts.filter(c => new Date(c.createdAt) >= monthStart);
+    const quarterDeals = contacts.filter(c => new Date(c.createdAt) >= quarterStart);
+    const monthlyForecast = Math.round(weightedPipelineValue * 0.4); // Conservative 40% close rate
+    const quarterlyForecast = Math.round(weightedPipelineValue * 0.65);
+
+    // Average deal age (in days)
+    let totalAgeDays = 0;
+    let ageCount = 0;
+    for (const c of contacts) {
+      if (c.createdAt) {
+        const days = Math.round((now.getTime() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+        totalAgeDays += Math.max(0, days);
+        ageCount++;
+      }
+    }
+    const avgDealAge = ageCount > 0 ? Math.round(totalAgeDays / ageCount) : 0;
 
     res.json({
       success: true,
-      data: { totalDealValue, wonDeals, activeDeals, totalDeals: contacts.length, pipeline },
+      data: {
+        totalDealValue,
+        wonDeals,
+        lostDeals,
+        activeDeals,
+        totalDeals: contacts.length,
+        weightedPipelineValue,
+        winRate,
+        lossRate,
+        avgDealAge,
+        monthlyForecast,
+        quarterlyForecast,
+        pipeline,
+      },
     });
   } catch (error: any) {
     console.error('Get deal stats error:', error);
@@ -260,16 +313,15 @@ router.put('/:id', authenticate, validate(updateDealSchema), async (req: AuthReq
 });
 
 function getProbability(stage: string | null | undefined): number {
-  switch (stage) {
-    case 'New Lead': return 10;
-    case 'Contacted': return 25;
-    case 'Qualified': return 50;
-    case 'Proposal': return 65;
-    case 'Negotiation': return 80;
-    case 'Won': case 'Closed Won': return 100;
-    case 'Lost': case 'Closed Lost': return 0;
-    default: return 20;
-  }
+  const normalized = (stage || '').toLowerCase().trim();
+  if (normalized.includes('new') || normalized.includes('lead inbox')) return 10;
+  if (normalized.includes('contact')) return 25;
+  if (normalized.includes('qualif')) return 50;
+  if (normalized.includes('proposal')) return 65;
+  if (normalized.includes('negotiat')) return 80;
+  if (normalized.includes('won') || normalized === 'closed won') return 100;
+  if (normalized.includes('lost') || normalized === 'closed lost') return 0;
+  return 20;
 }
 
 function getExpectedClose(stage: string | null | undefined): string {
