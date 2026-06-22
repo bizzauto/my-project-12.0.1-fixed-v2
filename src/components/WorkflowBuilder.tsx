@@ -31,10 +31,14 @@ import {
   Loader2, GripVertical, X, GitBranch, Timer, Brain, Sparkles,
   MessageCircle, Hash, Globe, Webhook, Workflow, Power, PowerOff,
   TestTube, Edit3, Eye, Copy, AlertCircle, Info, ChevronLeft,
+  Wand2, BarChart3, TrendingUp, Calendar,
+  ShoppingCart, CreditCard, Users, Activity, Target,
   type LucideIcon,
 } from 'lucide-react';
 import { useToast } from './Toast';
-import apiClient from '../lib/api';
+import { workflowsAPI } from '../lib/api';
+import WorkflowListView from './WorkflowListView';
+import AIGenerationModal from './AIGenerationModal';
 
 // ============================================================
 // TYPES
@@ -46,7 +50,10 @@ type TriggerType =
   | 'lead_created'
   | 'form_submitted'
   | 'tag_added'
-  | 'deal_stage_changed';
+  | 'deal_stage_changed'
+  | 'appointment_booked'
+  | 'order_placed'
+  | 'payment_received';
 type ActionType =
   | 'send_whatsapp'
   | 'send_email'
@@ -54,9 +61,17 @@ type ActionType =
   | 'add_tag'
   | 'remove_tag'
   | 'update_contact'
-  | 'webhook';
+  | 'webhook'
+  | 'notify_team'
+  | 'add_activity'
+  | 'create_deal';
 type ConditionType = 'if_else' | 'wait_delay';
-type AINodeType = 'ai_reply' | 'ai_score_lead';
+type AINodeType =
+  | 'ai_reply'
+  | 'ai_score_lead'
+  | 'ai_content'
+  | 'ai_sentiment'
+  | 'ai_analyze';
 type WorkflowNodeType = TriggerType | ActionType | ConditionType | AINodeType;
 
 interface WorkflowNodeData extends Record<string, unknown> {
@@ -91,6 +106,9 @@ const NODE_TEMPLATES: NodeTemplate[] = [
   { type: 'form_submitted', label: 'Form Submitted', category: 'trigger', icon: FileText, color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30', description: 'When a form is submitted' },
   { type: 'tag_added', label: 'Tag Added', category: 'trigger', icon: Tag, color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30', description: 'When a tag is added to a contact' },
   { type: 'deal_stage_changed', label: 'Deal Stage Changed', category: 'trigger', icon: ArrowRight, color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30', description: 'When a deal stage changes' },
+  { type: 'appointment_booked', label: 'Appointment Booked', category: 'trigger', icon: Calendar, color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30', description: 'When an appointment is booked' },
+  { type: 'order_placed', label: 'Order Placed', category: 'trigger', icon: ShoppingCart, color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30', description: 'When a new order is placed' },
+  { type: 'payment_received', label: 'Payment Received', category: 'trigger', icon: CreditCard, color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30', description: 'When a payment is received' },
 
   // Actions
   { type: 'send_whatsapp', label: 'Send WhatsApp', category: 'action', icon: MessageCircle, color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', description: 'Send a WhatsApp message' },
@@ -100,6 +118,9 @@ const NODE_TEMPLATES: NodeTemplate[] = [
   { type: 'remove_tag', label: 'Remove Tag', category: 'action', icon: Tag, color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', description: 'Remove a tag from contact' },
   { type: 'update_contact', label: 'Update Contact', category: 'action', icon: Edit3, color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', description: 'Update contact fields' },
   { type: 'webhook', label: 'Webhook', category: 'action', icon: Webhook, color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', description: 'Call an external webhook' },
+  { type: 'notify_team', label: 'Notify Team', category: 'action', icon: Users, color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', description: 'Send team notification' },
+  { type: 'add_activity', label: 'Add Activity', category: 'action', icon: Activity, color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', description: 'Log contact activity' },
+  { type: 'create_deal', label: 'Create Deal', category: 'action', icon: Target, color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', description: 'Create a new deal' },
 
   // Conditions
   { type: 'if_else', label: 'If / Else', category: 'condition', icon: GitBranch, color: 'text-amber-400', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30', description: 'Branch based on conditions' },
@@ -108,6 +129,9 @@ const NODE_TEMPLATES: NodeTemplate[] = [
   // AI
   { type: 'ai_reply', label: 'AI Reply', category: 'ai', icon: Brain, color: 'text-purple-400', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', description: 'Generate AI response' },
   { type: 'ai_score_lead', label: 'AI Score Lead', category: 'ai', icon: Sparkles, color: 'text-purple-400', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', description: 'Score lead with AI' },
+  { type: 'ai_content', label: 'AI Content', category: 'ai', icon: Wand2, color: 'text-purple-400', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', description: 'Generate content with AI' },
+  { type: 'ai_sentiment', label: 'AI Sentiment', category: 'ai', icon: BarChart3, color: 'text-purple-400', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', description: 'Analyze message sentiment' },
+  { type: 'ai_analyze', label: 'AI Analyze', category: 'ai', icon: TrendingUp, color: 'text-purple-400', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', description: 'Analyze data with AI' },
 ];
 
 const CATEGORY_META: Record<NodeCategory, { label: string; color: string; icon: LucideIcon }> = {
@@ -163,11 +187,35 @@ function WorkflowNodeComponent({ data, selected }: NodeProps<WorkflowNode>) {
         <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
       )}
 
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!w-3 !h-3 !bg-gray-600 !border-2 !border-gray-400 hover:!bg-blue-500 !-bottom-1.5"
-      />
+      {/* Condition node: true/false branch handles */}
+      {data.nodeType === 'if_else' ? (
+        <>
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="true"
+            className="!w-3 !h-3 !bg-emerald-500 !border-2 !border-emerald-400 hover:!bg-emerald-400 !-bottom-1.5 !left-[30%]"
+            title="True branch"
+          />
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="false"
+            className="!w-3 !h-3 !bg-red-500 !border-2 !border-red-400 hover:!bg-red-400 !-bottom-1.5 !left-[70%]"
+            title="False branch"
+          />
+          <div className="flex justify-between mt-1.5 text-[10px]">
+            <span className="text-emerald-400 font-medium">✓ True</span>
+            <span className="text-red-400 font-medium">✗ False</span>
+          </div>
+        </>
+      ) : (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!w-3 !h-3 !bg-gray-600 !border-2 !border-gray-400 hover:!bg-blue-500 !-bottom-1.5"
+        />
+      )}
     </div>
   );
 }
@@ -854,6 +902,321 @@ function renderConfigFields(
         </>
       );
 
+    case 'notify_team':
+      return (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Channel</label>
+            <select
+              value={(cfg.channel as string) || 'in_app'}
+              onChange={(e) => updateConfig('channel', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="in_app">In-App Notification</option>
+              <option value="email">Email</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="slack">Slack Webhook</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Message</label>
+            <textarea
+              value={(cfg.message as string) || ''}
+              onChange={(e) => updateConfig('message', e.target.value)}
+              placeholder="Team notification message"
+              rows={3}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+        </>
+      );
+
+    case 'add_activity':
+      return (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Activity Type</label>
+            <select
+              value={(cfg.activityType as string) || 'note'}
+              onChange={(e) => updateConfig('activityType', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="note">Note</option>
+              <option value="call">Phone Call</option>
+              <option value="email">Email</option>
+              <option value="meeting">Meeting</option>
+              <option value="task">Task</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Description</label>
+            <textarea
+              value={(cfg.description as string) || ''}
+              onChange={(e) => updateConfig('description', e.target.value)}
+              placeholder="Activity details"
+              rows={3}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+        </>
+      );
+
+    case 'create_deal':
+      return (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Deal Name</label>
+            <input
+              type="text"
+              value={(cfg.dealName as string) || ''}
+              onChange={(e) => updateConfig('dealName', e.target.value)}
+              placeholder="e.g. New Business Opportunity"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Pipeline Stage</label>
+            <select
+              value={(cfg.stage as string) || 'lead'}
+              onChange={(e) => updateConfig('stage', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="lead">Lead</option>
+              <option value="qualified">Qualified</option>
+              <option value="proposal">Proposal</option>
+              <option value="negotiation">Negotiation</option>
+              <option value="closed_won">Closed Won</option>
+              <option value="closed_lost">Closed Lost</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Value (₹)</label>
+            <input
+              type="number"
+              value={(cfg.value as number) || 0}
+              onChange={(e) => updateConfig('value', parseFloat(e.target.value) || 0)}
+              min={0}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </>
+      );
+
+    case 'ai_content':
+      return (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Content Type</label>
+            <select
+              value={(cfg.contentType as string) || 'email'}
+              onChange={(e) => updateConfig('contentType', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="email">Email Body</option>
+              <option value="whatsapp">WhatsApp Message</option>
+              <option value="sms">SMS Text</option>
+              <option value="social_post">Social Media Post</option>
+              <option value="offer">Offer/Promotion</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Topic / Context</label>
+            <textarea
+              value={(cfg.topic as string) || ''}
+              onChange={(e) => updateConfig('topic', e.target.value)}
+              placeholder="Describe what content to generate... e.g. Festive season offer for Diwali"
+              rows={3}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Tone</label>
+            <select
+              value={(cfg.tone as string) || 'professional'}
+              onChange={(e) => updateConfig('tone', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="professional">Professional</option>
+              <option value="friendly">Friendly</option>
+              <option value="formal">Formal</option>
+              <option value="casual">Casual</option>
+              <option value="urgent">Urgent</option>
+              <option value="promotional">Promotional</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={(cfg.saveAsTemplate as boolean) || false}
+              onChange={(e) => updateConfig('saveAsTemplate', e.target.checked)}
+              className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
+            />
+            <label className="text-xs text-gray-400">Save as reusable template</label>
+          </div>
+        </>
+      );
+
+    case 'ai_sentiment':
+      return (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Input Source</label>
+            <select
+              value={(cfg.inputSource as string) || 'last_message'}
+              onChange={(e) => updateConfig('inputSource', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="last_message">Last Message</option>
+              <option value="conversation">Full Conversation</option>
+              <option value="custom_field">Custom Field</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">On Detection of Negative Sentiment</label>
+            <select
+              value={(cfg.onNegative as string) || 'notify'}
+              onChange={(e) => updateConfig('onNegative', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="notify">Notify Team</option>
+              <option value="escalate">Escalate to Manager</option>
+              <option value="offer_discount">Offer Discount</option>
+              <option value="apologize">Send Apology</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={(cfg.tagContact as boolean) || false}
+              onChange={(e) => updateConfig('tagContact', e.target.checked)}
+              className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
+            />
+            <label className="text-xs text-gray-400">Auto-tag contact with sentiment</label>
+          </div>
+        </>
+      );
+
+    case 'ai_analyze':
+      return (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Analysis Type</label>
+            <select
+              value={(cfg.analysisType as string) || 'lead_quality'}
+              onChange={(e) => updateConfig('analysisType', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="lead_quality">Lead Quality Assessment</option>
+              <option value="objection">Objection Detection</option>
+              <option value="intent">Purchase Intent Analysis</option>
+              <option value="summary">Conversation Summary</option>
+              <option value="extract">Data Extraction</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Data to Analyze</label>
+            <textarea
+              value={(cfg.dataToAnalyze as string) || ''}
+              onChange={(e) => updateConfig('dataToAnalyze', e.target.value)}
+              placeholder="What data should be analyzed? e.g. {{conversation.transcript}}"
+              rows={3}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Output Action</label>
+            <select
+              value={(cfg.outputAction as string) || 'store'}
+              onChange={(e) => updateConfig('outputAction', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="store">Store in custom field</option>
+              <option value="tag">Add tag to contact</option>
+              <option value="note">Add as note/activity</option>
+              <option value="notify">Notify team</option>
+            </select>
+          </div>
+        </>
+      );
+
+    case 'appointment_booked':
+      return (
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">Service Type</label>
+          <select
+            value={(cfg.serviceType as string) || 'all'}
+            onChange={(e) => updateConfig('serviceType', e.target.value)}
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Services</option>
+            <option value="consultation">Consultation</option>
+            <option value="service">Service Visit</option>
+            <option value="meeting">Meeting</option>
+          </select>
+        </div>
+      );
+
+    case 'order_placed':
+      return (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Product Type</label>
+            <select
+              value={(cfg.productType as string) || 'all'}
+              onChange={(e) => updateConfig('productType', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Products</option>
+              <option value="digital">Digital Products</option>
+              <option value="physical">Physical Products</option>
+              <option value="service">Services</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Min Order Value (₹)</label>
+            <input
+              type="number"
+              value={(cfg.minValue as number) || 0}
+              onChange={(e) => updateConfig('minValue', parseFloat(e.target.value) || 0)}
+              min={0}
+              placeholder="0 = any value"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </>
+      );
+
+    case 'payment_received':
+      return (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Payment Method</label>
+            <select
+              value={(cfg.paymentMethod as string) || 'all'}
+              onChange={(e) => updateConfig('paymentMethod', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Methods</option>
+              <option value="razorpay">Razorpay</option>
+              <option value="cash">Cash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="upi">UPI</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Min Amount (₹)</label>
+            <input
+              type="number"
+              value={(cfg.minAmount as number) || 0}
+              onChange={(e) => updateConfig('minAmount', parseFloat(e.target.value) || 0)}
+              min={0}
+              placeholder="0 = any amount"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </>
+      );
+
     default:
       return (
         <div className="text-xs text-gray-500 italic">
@@ -883,6 +1246,7 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAIModal, setShowAIModal] = useState(false);
 
   const selectedNode = useMemo(
     () => (selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) ?? null : null),
@@ -915,8 +1279,8 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
   useEffect(() => {
     if (!workflowId) return;
     setLoading(true);
-    apiClient
-      .get(`/automation/rules/${workflowId}`)
+    workflowsAPI
+      .get(workflowId)
       .then((res) => {
         const data = res.data?.data || res.data;
         setWorkflowName(data.name || 'Untitled Workflow');
@@ -963,7 +1327,9 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
             animated: true,
             style: { stroke: '#6B7280', strokeWidth: 2 },
             markerEnd: { type: MarkerType.ArrowClosed, color: '#6B7280', width: 16, height: 16 },
-            label: sourceNode.data.category === 'condition' ? (targetNode.data.category === 'condition' ? '' : 'True') : undefined,
+            label: sourceNode.data.nodeType === 'if_else'
+              ? (connection.sourceHandle === 'true' ? 'True' : 'False')
+              : undefined,
           },
           eds
         )
@@ -1043,22 +1409,28 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         name: workflowName,
         nodes: nodes.map((n) => ({ ...n })),
         edges: edges.map((e) => ({ ...e })),
       };
+      if (!workflowId) {
+        // Find trigger type from nodes
+        const triggerNode = nodes.find(n => n.data.category === 'trigger');
+        payload.triggerType = triggerNode?.data?.nodeType || 'message_received';
+        payload.triggerConfig = triggerNode?.data?.config || {};
+      }
       if (workflowId) {
-        await apiClient.put(`/automation/rules/${workflowId}`, payload);
+        await workflowsAPI.update(workflowId, payload);
+        toastSuccess('Workflow saved');
       } else {
-        const res = await apiClient.post('/automation/rules', payload);
+        const res = await workflowsAPI.create(payload);
         toastSuccess('Workflow created');
         const newId = res.data?.data?.id || res.data?.id;
         if (newId) {
           window.history.replaceState(null, '', `/automation/workflow/${newId}`);
         }
       }
-      toastSuccess('Workflow saved');
     } catch {
       toastError('Failed to save workflow');
     } finally {
@@ -1069,7 +1441,7 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
   const handleToggleActive = useCallback(async () => {
     if (!workflowId) return;
     try {
-      await apiClient.patch(`/automation/rules/${workflowId}/toggle`, { isActive: !isActive });
+      await workflowsAPI.toggle(workflowId);
       setIsActive(!isActive);
       toastSuccess(`Workflow ${!isActive ? 'activated' : 'deactivated'}`);
     } catch {
@@ -1084,7 +1456,7 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
     }
     setRunning(true);
     try {
-      await apiClient.post(`/automation/rules/${workflowId}/trigger`, {
+      await workflowsAPI.run(workflowId, {
         testMode: true,
         testData: { contactId: 'test-001', message: 'Test trigger' },
       });
@@ -1095,6 +1467,16 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
       setRunning(false);
     }
   }, [workflowId, toastSuccess, toastError, toastInfo]);
+
+  const handleOpenAIModal = useCallback(() => {
+    setShowAIModal(true);
+  }, []);
+
+  const handleWorkflowGenerated = useCallback((newId?: string) => {
+    setShowAIModal(false);
+    if (!newId) return;
+    window.location.href = `/automation/workflow/${newId}`;
+  }, []);
 
   const nodeTypes: NodeTypes = useMemo(() => ({ workflowNode: WorkflowNodeComponent }), []);
 
@@ -1128,7 +1510,14 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
             {isActive ? 'Active' : 'Inactive'}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">            <button
+              onClick={handleOpenAIModal}
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-purple-300 hover:text-white bg-purple-700/30 hover:bg-purple-700/50 rounded-lg transition-colors border border-purple-500/30"
+              title="Generate workflow with AI"
+            >
+              <Wand2 size={14} />
+              <span className="hidden sm:inline">AI</span>
+            </button>
           <button
             onClick={handleRunTest}
             disabled={running}
@@ -1277,13 +1666,22 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
               className="!bg-gray-800 !border-gray-700"
               position="bottom-right"
             />
-            {nodes.length === 0 && (
+            {nodes.length === 0 && !loading && (
               <Panel position="top-center">
-                <div className="flex flex-col items-center gap-3 text-gray-500 pointer-events-none">
+                <div className="flex flex-col items-center gap-4 text-gray-500 pointer-events-none">
                   <Workflow size={48} className="opacity-30" />
                   <div className="text-center">
                     <p className="text-sm font-medium text-gray-400">Drag nodes from the sidebar to start building</p>
                     <p className="text-xs text-gray-600 mt-1">Connect nodes to define your automation flow</p>
+                  </div>
+                  <div className="flex gap-2 pointer-events-auto">
+                    <button
+                      onClick={handleOpenAIModal}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors shadow-lg shadow-purple-500/20"
+                    >
+                      <Wand2 size={16} />
+                      Generate with AI
+                    </button>
                   </div>
                 </div>
               </Panel>
@@ -1348,15 +1746,27 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
           )}
         </div>
       </div>
+
+      {/* AI Generation Modal */}
+      {showAIModal && (
+        <AIGenerationModal
+          onClose={() => setShowAIModal(false)}
+          onWorkflowGenerated={handleWorkflowGenerated}
+        />
+      )}
     </div>
   );
 }
 
 // ============================================================
-// WRAPPER WITH PROVIDER
+// WRAPPER WITH PROVIDER - Shows list view when no workflowId
 // ============================================================
 
 export default function WorkflowBuilder({ workflowId }: { workflowId?: string }) {
+  if (!workflowId || workflowId === 'new') {
+    return <WorkflowListView />;
+  }
+
   return (
     <ReactFlowProvider>
       <WorkflowBuilderInner workflowId={workflowId} />

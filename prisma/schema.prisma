@@ -1711,6 +1711,27 @@ model FunnelPage {
 
   @@unique([funnelId, slug])
   @@index([funnelId])
+  views FunnelPageView[]
+}
+
+model FunnelPageView {
+  id         String   @id @default(cuid())
+  pageId     String
+  funnelId   String
+  businessId String
+  visitorId  String?
+  ipAddress  String?
+  userAgent  String?
+  referer    String?
+  createdAt  DateTime @default(now())
+
+  page   FunnelPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+  @@index([funnelId])
+  @@index([businessId])
+  @@index([createdAt])
+  @@index([funnelId, createdAt])
 }
 
 model FunnelTemplate {
@@ -2764,6 +2785,32 @@ model CustomRole {
 
   @@unique([businessId, name])
   @@index([businessId])
+}
+
+// File Upload Tracking
+model Upload {
+  id          String   @id @default(cuid())
+  businessId  String
+  userId      String?
+  originalName String
+  fileName    String
+  mimeType    String
+  size        Int
+  path        String
+  url         String
+  category    String   @default("general") // avatar, product, document, poster, social, general
+  entityType  String?  // contact, product, post, document, etc.
+  entityId    String?
+  width       Int?
+  height      Int?
+  thumbnailUrl String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+  @@index([businessId, category])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }
 
 enum Role {

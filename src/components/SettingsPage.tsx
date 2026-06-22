@@ -1,14 +1,16 @@
 ﻿import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/authStore';
 import { useToast } from '../components/Toast';
-import { businessAPI, authAPI } from '../lib/api';
+import { businessAPI, authAPI, settingsAPI } from '../lib/api';
 import TwoFactorSetupModal from './TwoFactorSetupModal';
-import { Save, Building, Phone, Mail, MapPin, Globe, Clock, Palette, Image, Shield, Lock, Loader2 } from 'lucide-react';
+import { Save, Building, Phone, Mail, MapPin, Globe, Clock, Palette, Image, Shield, Lock, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function SettingsPage() {
   const { business, user } = useAuthStore();
+  const navigate = useNavigate();
   const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [show2FAModal, setShow2FAModal] = useState(false);
@@ -20,6 +22,8 @@ export default function SettingsPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [whiteLabelActive, setWhiteLabelActive] = useState<boolean | null>(null);
+  const [loadingWhiteLabel, setLoadingWhiteLabel] = useState(true);
 
   const [formData, setFormData] = useState({
     name: business?.name || '',
@@ -55,7 +59,21 @@ export default function SettingsPage() {
     };
 
     fetch2FAStatus();
+    fetchWhiteLabelStatus();
   }, []);
+
+  const fetchWhiteLabelStatus = async () => {
+    try {
+      const res = await settingsAPI.getWhiteLabel();
+      if (res.data?.success && res.data?.data) {
+        setWhiteLabelActive(res.data.data.isActive === true);
+      }
+    } catch {
+      // silently fail — status indicator is non-critical
+    } finally {
+      setLoadingWhiteLabel(false);
+    }
+  };
 
   const handle2FASetupComplete = () => {
     setTwoFactorStatus({ enabled: true, setupPending: false });
@@ -319,10 +337,45 @@ export default function SettingsPage() {
 
         {/* Branding & White-label */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 sm:p-5 md:p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-            <Palette className="text-blue-600" size={20} />
-            Branding & White-label
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Palette className="text-blue-600" size={20} />
+                Branding & White-label
+              </h3>
+              {loadingWhiteLabel ? (
+                <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+              ) : (
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium transition-all ${
+                    whiteLabelActive
+                      ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      whiteLabelActive ? 'bg-indigo-500' : 'bg-gray-400'
+                    }`}
+                  />
+                  {whiteLabelActive ? 'Active' : 'Inactive'}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/settings/white-label')}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all text-sm font-medium shadow-lg shadow-indigo-500/25"
+            >
+              <ExternalLink size={14} />
+              Open Full White-Label Settings
+              <ArrowRight size={14} />
+            </button>
+          </div>
+
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Quick branding fields below. For full customization (custom domain, CSS, favicon, and more), open the dedicated White-Label settings page.
+          </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
             <div>

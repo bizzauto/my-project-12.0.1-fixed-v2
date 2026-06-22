@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Eye, Trash2, Copy, Layout, Loader2, Edit2, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Eye, Trash2, Copy, Layout, Loader2, Edit2, Search, Sparkles } from 'lucide-react';
+import FunnelTemplatePicker from './FunnelTemplatePicker';
 
 interface Funnel {
   id: string;
@@ -41,6 +42,7 @@ export default function FunnelBuilder() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
 
   const fetchFunnels = useCallback(async () => {
     try {
@@ -207,13 +209,22 @@ export default function FunnelBuilder() {
             </button>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Funnels</h1>
           </div>
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all"
-          >
-            <Plus size={18} />
-            New Funnel
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsTemplatePickerOpen(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all"
+            >
+              <Sparkles size={18} />
+              Templates
+            </button>
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all"
+            >
+              <Plus size={18} />
+              New Funnel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -247,13 +258,22 @@ export default function FunnelBuilder() {
             <Layout size={48} className="mx-auto text-gray-300 mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No funnels yet</h3>
             <p className="text-gray-500 mb-4">Create your first funnel to get started</p>
-            <button
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl font-medium"
-            >
-              <Plus size={18} />
-              Create Funnel
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => setIsTemplatePickerOpen(true)}
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all"
+              >
+                <Sparkles size={18} />
+                From Template
+              </button>
+              <button
+                onClick={() => setIsCreateOpen(true)}
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all"
+              >
+                <Plus size={18} />
+                Start Blank
+              </button>
+            </div>
           </div>
         )}
 
@@ -392,6 +412,12 @@ export default function FunnelBuilder() {
           </div>
         </div>
       )}
+
+      {/* Template Picker Modal */}
+      <FunnelTemplatePicker
+        isOpen={isTemplatePickerOpen}
+        onClose={() => setIsTemplatePickerOpen(false)}
+      />
 
       {/* Edit Modal Overlay */}
       {isEditOpen && editFunnel && (

@@ -109,6 +109,8 @@ const EmailLeadImporter = lazy(() => import('./components/EmailLeadImporter'));
 const EmailMarketingPage = lazy(() => import('./components/EmailMarketingPage'));
 const WorkflowBuilder = lazy(() => import('./components/WorkflowBuilder'));
 const FunnelBuilder = lazy(() => import('./components/FunnelBuilder'));
+const FunnelEditorPage = lazy(() => import('./components/FunnelEditorPage'));
+const FunnelPreviewPage = lazy(() => import('./components/FunnelPreviewPage'));
 const SurveyBuilder = lazy(() => import('./components/SurveyBuilder'));
 const CourseBuilder = lazy(() => import('./components/CourseBuilder'));
 const TriggerLinks = lazy(() => import('./components/TriggerLinks'));
@@ -155,6 +157,7 @@ const VCardMakerPage = lazy(() => import('./components/VCardMakerPage'));
 const WebsiteBuilderProductPage = lazy(() => import('./components/WebsiteBuilderProductPage'));
 const ResellerDashboardPage = lazy(() => import('./components/ResellerDashboardPage'));
 const ResellerAuthPage = lazy(() => import('./components/ResellerAuthPage'));
+const WhiteLabelSettingsPage = lazy(() => import('./components/WhiteLabelSettingsPage'));
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -650,6 +653,24 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/funnels/:id"
+        element={
+          <ProtectedRoute>
+            <ModeAwareAuthLayout>
+              <FunnelEditorPage />
+            </ModeAwareAuthLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/funnels/:id/preview"
+        element={
+          <ProtectedRoute>
+            <FunnelPreviewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/conversations"
         element={
           <ProtectedRoute>
@@ -809,6 +830,18 @@ function AppRoutes() {
       <Route path="/google-reviews-qr" element={<ProtectedRoute><ModeAwareAuthLayout><GoogleReviewsQRPage /></ModeAwareAuthLayout></ProtectedRoute>} />
       <Route path="/vcard-maker" element={<ProtectedRoute><ModeAwareAuthLayout><VCardMakerPage /></ModeAwareAuthLayout></ProtectedRoute>} />
       <Route path="/website-builder-product" element={<ProtectedRoute><ModeAwareAuthLayout><WebsiteBuilderProductPage /></ModeAwareAuthLayout></ProtectedRoute>} />
+
+      {/* White-Label Settings */}
+      <Route
+        path="/settings/white-label"
+        element={
+          <ProtectedRoute>
+            <ModeAwareAuthLayout>
+              <WhiteLabelSettingsPage />
+            </ModeAwareAuthLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Reseller Hub */}
       <Route path="/reseller-hub" element={<ProtectedRoute><ModeAwareAuthLayout><ResellerDashboardPage /></ModeAwareAuthLayout></ProtectedRoute>} />

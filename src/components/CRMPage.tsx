@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/authStore';
 import { contactsAPI, businessAPI, appointmentsAPI, ledgerAPI, dealsAPI, pipelinesAPI, crmInvoicesAPI, goalsAPI } from '../lib/api';
 import { useToast } from './Toast';
+import PipelineViewEnhanced from './PipelineViewEnhanced';
 
 // ============================================================
 // TYPES
@@ -182,16 +183,6 @@ const STAGE_COLORS: Record<string, string> = {
   'Lost': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
 
-const PIPELINE_STAGES: { id: string; name: string; color: string }[] = [
-  { id: 'lead', name: 'Lead Inbox', color: '#3B82F6' },
-  { id: 'contacted', name: 'Contacted', color: '#F59E0B' },
-  { id: 'qualified', name: 'Qualified', color: '#8B5CF6' },
-  { id: 'proposal', name: 'Proposal', color: '#F97316' },
-  { id: 'negotiation', name: 'Negotiation', color: '#EC4899' },
-  { id: 'closed_won', name: 'Closed Won', color: '#10B981' },
-  { id: 'closed_lost', name: 'Closed Lost', color: '#EF4444' },
-];
-
 // ============================================================
 // DEMO DATA
 // ============================================================
@@ -315,8 +306,6 @@ export default function CRMPage() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showGoalModal, setShowGoalModal] = useState(false);
-  const [draggedDeal, setDraggedDeal] = useState<string | null>(null);
-  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [showDealModal, setShowDealModal] = useState(false);
   const [contactViewMode, setContactViewMode] = useState<'table' | 'grid'>('table');
   const [pipelineId, setPipelineId] = useState('default');
@@ -413,51 +402,28 @@ export default function CRMPage() {
 
   const { totalDealValue, wonDeals, totalRevenue, totalExpenses, todayAppointments } = crmStats;
 
-  const pipelineDeals = useMemo(() => PIPELINE_STAGES.map(stage => ({
-    ...stage,
-    deals: deals.filter(d => d.stage === stage.name || d.stage === stage.id.replace('_', ' ').replace(/(?:^|\s)\S/g, L => L.toUpperCase())),
-    total: deals.filter(d => d.stage === stage.name || d.stage === stage.id.replace('_', ' ').replace(/(?:^|\s)\S/g, L => L.toUpperCase())).reduce((s, d) => s + d.value, 0),
-  })), [deals]);
-
-  // Add Contact
-  // Drag and Drop handlers for Pipeline
-  const handleDragStart = (e: React.DragEvent, dealId: string) => {
-    setDraggedDeal(dealId);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', dealId);
+  // Stage ID to stage name mapping for PipelineViewEnhanced
+  const stageIdToName: Record<string, string> = {
+    'lead': 'New Lead',
+    'contacted': 'Contacted',
+    'qualified': 'Qualified',
+    'proposal': 'Proposal',
+    'negotiation': 'Negotiation',
+    'closed_won': 'Won',
+    'closed_lost': 'Lost',
   };
 
-  const handleDragOver = (e: React.DragEvent, stageId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverStage(stageId);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverStage(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetStageId: string) => {
-    e.preventDefault();
-    const dealId = e.dataTransfer.getData('text/plain');
-    if (dealId && draggedDeal) {
-      // Optimistic update
-      setDeals((prev) => prev.map((d) =>
-        d.id === dealId ? { ...d, stage: targetStageId } : d
-      ));
-      // Persist to API
-      dealsAPI.updateStage(dealId, { stage: targetStageId }).catch(() => {
-        // Revert on failure
-        showToast('Failed to update deal stage', 'error');
-      });
-    }
-    setDraggedDeal(null);
-    setDragOverStage(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedDeal(null);
-    setDragOverStage(null);
+  const handleDealStageChange = (dealId: string, newStageId: string) => {
+    const stageName = stageIdToName[newStageId] || newStageId;
+    // Optimistic update
+    setDeals((prev) => prev.map((d) =>
+      d.id === dealId ? { ...d, stage: stageName } : d
+    ));
+    // Persist to API
+    dealsAPI.updateStage(dealId, { stage: stageName }).catch(() => {
+      // Revert on failure - reload deals
+      showToast('Failed to update deal stage', 'error');
+    });
   };
 
   const handleAddContact = async (contactData: any) => {
@@ -935,65 +901,7 @@ export default function CRMPage() {
 
       {/* ================== PIPELINE VIEW ================== */}
       {viewMode === 'pipeline' && (
-        <div className="overflow-x-auto">
-          <div className="flex gap-4 min-w-max" style={{ minHeight: '400px' }}>
-            {pipelineDeals.map(stage => (
-              <div key={stage.id} className="w-72 flex-shrink-0">
-                <div className="bg-gray-100 dark:bg-gray-800 rounded-t-xl px-4 py-3 border-b-2" style={{ borderBottomColor: stage.color }}>
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{stage.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-gray-500">{stage.deals.length}</span>
-                      <span className="text-xs text-gray-400">?{stage.total.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  className={`bg-gray-50 dark:bg-gray-800/50 rounded-b-xl p-3 space-y-3 min-h-[200px] transition-colors ${
-                    dragOverStage === stage.id ? 'bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-400 ring-inset' : ''
-                  }`}
-                  onDragOver={(e) => handleDragOver(e, stage.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, stage.id)}
-                >
-                  {stage.deals.map(deal => (
-                    <div
-                      key={deal.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, deal.id)}
-                      onDragEnd={handleDragEnd}
-                      className={`bg-white dark:bg-gray-700 rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-600 cursor-grab active:cursor-grabbing hover:shadow-md transition-all ${
-                        draggedDeal === deal.id ? 'opacity-50 scale-95' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-gray-900 dark:text-white truncate flex-1">{deal.title}</span>
-                        <span className="text-xs font-bold text-green-600 ml-2">?{deal.value.toLocaleString()}</span>
-                      </div>
-                      <p className="text-xs text-gray-500 mb-2">{deal.contactName}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400">
-                          Close: {new Date(deal.expectedClose).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                            <div className="h-full bg-green-500 rounded-full" style={{ width: `${deal.probability}%` }} />
-                          </div>
-                          <span className="text-[10px] text-gray-500">{deal.probability}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {stage.deals.length === 0 && (
-                    <div className="flex items-center justify-center h-20 text-xs text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg">
-                      Drop deals here
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <PipelineViewEnhanced deals={deals} onDealStageChange={handleDealStageChange} />
       )}
 
       {/* ================== DEALS VIEW ================== */}

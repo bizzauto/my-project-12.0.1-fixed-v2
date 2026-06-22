@@ -136,6 +136,7 @@ import surveyRoutes from './routes/surveys.js';
 import ssoRoutes from './routes/sso.js';
 import landingPagesRoutes from './routes/landing-pages.js';
 import customRolesRoutes from './routes/custom-roles.js';
+import uploadRoutes from './routes/upload.js';
 
 dotenv.config();
 
@@ -235,7 +236,7 @@ app.use('/api', requestCounting);
 app.use('/api/ai', aiApiRateLimiter);
 
 // NEW: Upload Rate Limiter
-app.use('/upload', uploadRateLimiter);
+app.use('/api/upload', uploadRateLimiter);
 
 // Audit log middleware — automatically logs state-changing API requests
 app.use('/api', auditMiddleware);
@@ -383,6 +384,7 @@ app.use('/api/surveys', surveyRoutes);
 app.use('/api/sso', ssoRoutes);
 app.use('/api/landing-pages', landingPagesRoutes);
 app.use('/api/custom-roles', customRolesRoutes);
+app.use('/api/upload', uploadRoutes);
 app.use('/api/store-features', storeFeaturesRoutes);
 app.use('/api/store-advanced', storeAdvancedRoutes);
 app.use('/api/store-customize', storeCustomizeRoutes);

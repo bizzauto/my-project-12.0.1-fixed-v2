@@ -162,6 +162,9 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: A
 // Preview funnel as HTML
 router.get('/:id/preview', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    const { format } = req.query;
+    const isRawHtml = format === 'html';
+
     const funnel = await prisma.funnel.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
       include: { pages: { orderBy: { order: 'asc' } } },
@@ -185,23 +188,13 @@ router.get('/:id/preview', authenticate, async (req: AuthRequest, res: Response)
       `;
     }).join('\n');
 
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${funnel.name}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    .funnel-page { padding: 2rem; border-bottom: 1px solid #eee; }
-    .funnel-page h2 { margin-bottom: 1rem; }
-  </style>
-</head>
-<body>
-  ${pagesHtml || '<p>No pages in this funnel</p>'}
-</body>
-</html>`;
+    const html = `<!DOCTYPE html>\r\n<html lang="en">\r\n<head>\r\n  <meta charset="UTF-8">\r\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\r\n  <title>${funnel.name}</title>\r\n  <style>\r\n    * { margin: 0; padding: 0; box-sizing: border-box; }\r\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }\r\n    .funnel-page { padding: 2rem; border-bottom: 1px solid #eee; }\r\n    .funnel-page h2 { margin-bottom: 1rem; }\r\n  </style>\r\n</head>\r\n<body>\r\n  ${pagesHtml || '<p>No pages in this funnel</p>'}\r\n</body>\r\n</html>`;
+
+    // If ?format=html, return raw HTML directly
+    if (isRawHtml) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.send(html);
+    }
 
     res.json({ success: true, data: { html, funnel: { id: funnel.id, name: funnel.name, pages: funnel.pages.length } } });
   } catch (error: any) {
@@ -362,6 +355,140 @@ router.patch('/pages/:pageId/publish', authenticate, requireRole('OWNER', 'ADMIN
   } catch (error: any) {
     console.error('Toggle page publish error:', error);
     res.status(500).json({ success: false, error: 'Failed to toggle publish status', details: error.message });
+  }
+});
+
+// ==================== ANALYTICS & TRACKING ====================
+
+// Track a page view
+router.post('/pages/:pageId/view', async (req: AuthRequest | any, res: Response) => {
+  try {
+    const { pageId } = req.params;
+    const { visitorId } = req.body;
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
+    const userAgent = req.headers['user-agent'] || null;
+    const referer = req.headers['referer'] || null;
+
+    const page = await prisma.funnelPage.findUnique({ where: { id: pageId } });
+    if (!page) {
+      return res.status(404).json({ success: false, error: 'Page not found' });
+    }
+
+    const view = await prisma.funnelPageView.create({
+      data: {
+        pageId,
+        funnelId: page.funnelId,
+        businessId: page.businessId,
+        visitorId: visitorId || null,
+        ipAddress: typeof ipAddress === 'string' ? ipAddress : Array.isArray(ipAddress) ? ipAddress[0] : null,
+        userAgent: userAgent as string | null,
+        referer: referer as string | null,
+      },
+    });
+
+    res.json({ success: true, data: view });
+  } catch (error: any) {
+    console.error('Track page view error:', error);
+    res.status(500).json({ success: false, error: 'Failed to track page view', details: error.message });
+  }
+});
+
+// Get funnel analytics
+router.get('/:id/analytics', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const funnel = await prisma.funnel.findFirst({
+      where: { id, businessId: req.user.businessId },
+      include: { pages: { orderBy: { order: 'asc' } } },
+    });
+
+    if (!funnel) {
+      return res.status(404).json({ success: false, error: 'Funnel not found' });
+    }
+
+    // Get total views per page
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const pageViews = await prisma.funnelPageView.groupBy({
+      by: ['pageId'],
+      where: { funnelId: id, businessId: req.user.businessId, createdAt: { gte: thirtyDaysAgo } },
+      _count: { id: true },
+    });
+
+    // Get unique visitors per page (30 days)
+    const uniqueVisitors = await prisma.funnelPageView.groupBy({
+      by: ['pageId', 'visitorId'],
+      where: { funnelId: id, businessId: req.user.businessId, createdAt: { gte: thirtyDaysAgo }, visitorId: { not: null } },
+      _count: { id: true },
+    });
+
+    // Get all-time total views
+    const totalViewsAllTime = await prisma.funnelPageView.count({
+      where: { funnelId: id, businessId: req.user.businessId },
+    });
+
+    // Get views today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const viewsToday = await prisma.funnelPageView.count({
+      where: { funnelId: id, businessId: req.user.businessId, createdAt: { gte: todayStart } },
+    });
+
+    // Build per-page analytics
+    const pagesAnalytics = funnel.pages.map((page, index) => {
+      const views = pageViews.find(pv => pv.pageId === page.id)?._count?.id || 0;
+      const uniqueVisitorCount = new Set(
+        uniqueVisitors
+          .filter(uv => uv.pageId === page.id && uv.visitorId)
+          .map(uv => uv.visitorId)
+      ).size;
+
+      // Conversion from previous page
+      let conversionFromPrevious: number | null = null;
+      if (index > 0) {
+        const prevViews = pageViews.find(pv => pv.pageId === funnel.pages[index - 1].id)?._count?.id || 0;
+        if (prevViews > 0) {
+          conversionFromPrevious = Math.round((views / prevViews) * 100);
+        }
+      }
+
+      return {
+        pageId: page.id,
+        pageName: page.name,
+        pageType: page.type,
+        slug: page.slug,
+        order: page.order,
+        views,
+        uniqueVisitors: uniqueVisitorCount,
+        conversionFromPrevious,
+        isPublished: page.isPublished,
+      };
+    });
+
+    // Overall analytics
+    const firstPageViews = pagesAnalytics[0]?.views || 0;
+    const lastPageViews = pagesAnalytics[pagesAnalytics.length - 1]?.views || 0;
+    const overallConversionRate = firstPageViews > 0
+      ? Math.round((lastPageViews / firstPageViews) * 100)
+      : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalViews: totalViewsAllTime,
+        viewsToday,
+        views30Days: pageViews.reduce((sum, pv) => sum + (pv._count?.id || 0), 0),
+        overallConversionRate,
+        pages: pagesAnalytics,
+        funnelId: id,
+        funnelName: funnel.name,
+      },
+    });
+  } catch (error: any) {
+    console.error('Get funnel analytics error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch analytics', details: error.message });
   }
 });
 

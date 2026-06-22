@@ -698,6 +698,34 @@ export const pipelinesAPI = {
   delete: (id: string) => apiClient.delete(`/pipelines/${id}`),
 };
 
+// ==================== FILE UPLOAD ====================
+export const uploadAPI = {
+  upload: (file: File, category?: string, entityType?: string, entityId?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (category) formData.append('category', category);
+    if (entityType) formData.append('entityType', entityType);
+    if (entityId) formData.append('entityId', entityId);
+    return apiClient.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadMultiple: (files: File[], category?: string, entityType?: string, entityId?: string) => {
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    if (category) formData.append('category', category);
+    if (entityType) formData.append('entityType', entityType);
+    if (entityId) formData.append('entityId', entityId);
+    return apiClient.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+  },
+  list: (params?: Record<string, any>) => apiClient.get('/upload', { params }),
+  delete: (id: string) => apiClient.delete(`/upload/${id}`),
+  getStats: () => apiClient.get('/upload/stats'),
+};
+
 // ==================== CRM INVOICES ====================
 export const crmInvoicesAPI = {
   list: (params?: Record<string, any>) => apiClient.get('/crm-invoices', { params }),
@@ -743,4 +771,74 @@ export const outreachAPI = {
     apiClient.post('/outreach/reply', data),
 };
 
+// ==================== WHITE-LABEL SETTINGS ====================
+export const settingsAPI = {
+  getWhiteLabel: () => apiClient.get('/settings'),
+  updateWhiteLabel: (data: {
+    brandName?: string;
+    logoUrl?: string;
+    faviconUrl?: string;
+    primaryColor?: string;
+    customCss?: string;
+    customDomain?: string;
+    isActive?: boolean;
+  }) => apiClient.put('/settings', data),
+};
+
+// ==================== WORKFLOWS (Visual Builder) ====================
+export const workflowsAPI = {
+  list: (params?: Record<string, any>) => apiClient.get('/workflows', { params }),
+  get: (id: string) => apiClient.get(`/workflows/${id}`),
+  create: (data: {
+    name: string;
+    description?: string;
+    triggerType: string;
+    triggerConfig?: Record<string, any>;
+    nodes?: any[];
+    edges?: any[];
+  }) => apiClient.post('/workflows', data),
+  update: (id: string, data: Record<string, any>) => apiClient.put(`/workflows/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/workflows/${id}`),
+  toggle: (id: string) => apiClient.patch(`/workflows/${id}/toggle`),
+  run: (id: string, triggerData?: Record<string, any>) => apiClient.post(`/workflows/${id}/run`, { triggerData }),
+  getRuns: (id: string, params?: Record<string, any>) => apiClient.get(`/workflows/${id}/runs`, { params }),
+  getExecution: (executionId: string) => apiClient.get(`/workflows/executions/${executionId}`),
+  getDeployTemplates: () => apiClient.get('/automation/deploy-templates'),
+  deployTemplate: (data: { templateId: string; name?: string; config?: Record<string, any> }) =>
+    apiClient.post('/automation/deploy-template', data),
+  generateWithAI: (data: { prompt: string }) => apiClient.post('/ai/generate', { type: 'workflow', prompt: data.prompt }),
+};
+
+// ==================== FUNNEL BUILDER ====================
+export const funnelAPI = {
+  list: (params?: Record<string, any>) => apiClient.get('/funnels', { params }),
+  get: (id: string) => apiClient.get(`/funnels/${id}`),
+  create: (data: { name: string; description?: string; domain?: string; isActive?: boolean }) =>
+    apiClient.post('/funnels', data),
+  update: (id: string, data: Record<string, any>) => apiClient.put(`/funnels/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/funnels/${id}`),
+  preview: (id: string) => apiClient.get(`/funnels/${id}/preview`),
+  getTemplates: () => apiClient.get('/funnels/templates'),
+  cloneTemplate: (templateId: string, data?: { name?: string }) =>
+    apiClient.post(`/funnels/templates/${templateId}/clone`, data || {}),
+
+  // Analytics & Tracking
+  getAnalytics: (id: string) => apiClient.get(`/funnels/${id}/analytics`),
+  trackPageView: (pageId: string, data?: { visitorId?: string }) =>
+    apiClient.post(`/funnels/pages/${pageId}/view`, data || {}),
+
+  // Funnel Pages
+  addPage: (funnelId: string, data: {
+    name: string; slug: string; type?: string;
+    content?: any; html?: string;
+    seoTitle?: string; seoDescription?: string; seoImage?: string;
+    customCss?: string; customJs?: string; conversionScript?: string;
+    isPublished?: boolean;
+  }) => apiClient.post(`/funnels/${funnelId}/pages`, data),
+  updatePage: (pageId: string, data: Record<string, any>) => apiClient.put(`/funnels/pages/${pageId}`, data),
+  deletePage: (pageId: string) => apiClient.delete(`/funnels/pages/${pageId}`),
+  togglePagePublish: (pageId: string) => apiClient.patch(`/funnels/pages/${pageId}/publish`),
+};
+
 export default apiClient;
+
