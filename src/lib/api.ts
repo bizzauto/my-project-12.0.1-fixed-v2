@@ -840,5 +840,59 @@ export const funnelAPI = {
   togglePagePublish: (pageId: string) => apiClient.patch(`/funnels/pages/${pageId}/publish`),
 };
 
+// ==================== SUPER ADMIN API ====================
+export const superAdminAPI = {
+  // Stats & Analytics
+  getStats: () => apiClient.get('/super-admin/stats'),
+  getGrowth: () => apiClient.get('/super-admin/growth'),
+
+  // Businesses
+  listBusinesses: (params?: Record<string, any>) => apiClient.get('/super-admin/businesses', { params }),
+  getBusiness: (id: string) => apiClient.get(`/super-admin/businesses/${id}`),
+  updateBusinessPlan: (id: string, data: { plan: string; expiresAt?: string }) =>
+    apiClient.put(`/super-admin/businesses/${id}/plan`, data),
+  toggleBusinessStatus: (id: string, isActive: boolean) =>
+    apiClient.put(`/super-admin/businesses/${id}/status`, { isActive }),
+
+  // Users
+  listUsers: (params?: Record<string, any>) => apiClient.get('/super-admin/users', { params }),
+  changeUserRole: (userId: string, role: string) => apiClient.put(`/super-admin/users/${userId}/role`, { role }),
+  toggleUserStatus: (userId: string, isActive: boolean) =>
+    apiClient.put(`/super-admin/users/${userId}/status`, { isActive }),
+  deleteUser: (userId: string) => apiClient.delete(`/super-admin/users/${userId}`),
+
+  // Subscriptions
+  listSubscriptions: (params?: Record<string, any>) => apiClient.get('/super-admin/subscriptions', { params }),
+
+  // Poster Backgrounds
+  listBackgrounds: (params?: Record<string, any>) => apiClient.get('/super-admin/backgrounds', { params }),
+  createBackground: (data: Record<string, any>) => apiClient.post('/super-admin/backgrounds', data),
+  updateBackground: (id: string, data: Record<string, any>) => apiClient.put(`/super-admin/backgrounds/${id}`, data),
+  deleteBackground: (id: string) => apiClient.delete(`/super-admin/backgrounds/${id}`),
+
+  // Settings
+  getSettings: () => apiClient.get('/super-admin/settings'),
+};
+
+// ==================== ADMIN INFRASTRUCTURE API ====================
+export const adminInfrastructureAPI = {
+  getStatus: () => apiClient.get('/admin/infrastructure/status'),
+  getCircuitBreaker: () => apiClient.get('/admin/infrastructure/circuit-breaker'),
+  getCircuitBreakerService: (service: string) => apiClient.get(`/admin/infrastructure/circuit-breaker/${service}`),
+  resetCircuitBreaker: (service: string) => apiClient.post(`/admin/infrastructure/circuit-breaker/${service}/reset`),
+  getWebhookQueue: () => apiClient.get('/admin/infrastructure/webhook-queue'),
+  retryWebhook: (jobId: string) => apiClient.post(`/admin/infrastructure/webhook-queue/${jobId}/retry`),
+  getAuditPrune: () => apiClient.get('/admin/infrastructure/audit-prune'),
+  runAuditPrune: (retentionDays?: number) =>
+    apiClient.post('/admin/infrastructure/audit-prune/run', null, { params: retentionDays ? { retentionDays } : {} }),
+};
+
+// ==================== ADMIN ANALYTICS API ====================
+export const adminAnalyticsAPI = {
+  getAnalytics: () => apiClient.get('/admin/analytics/analytics'),
+  getFeatureFlags: () => apiClient.get('/admin/analytics/feature-flags'),
+  getAuditLog: (params?: Record<string, any>) => apiClient.get('/admin/analytics/audit-log', { params }),
+};
+
 export default apiClient;
 

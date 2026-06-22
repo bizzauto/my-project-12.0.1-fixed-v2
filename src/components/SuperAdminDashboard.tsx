@@ -1,15 +1,21 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Building2, Users, MessageSquare, TrendingUp,
-  ArrowUpRight, ArrowDownRight, Eye, Shield, DollarSign, RefreshCw,
-  Image, Plus, Trash2, ExternalLink, Clock, Calendar
+  ArrowUpRight, ArrowDownRight, Shield, DollarSign, RefreshCw,
+  Image, Plus, Trash2, ExternalLink, Clock, Calendar, Server,
+  FileText, CreditCard, ChevronLeft, ChevronRight, Search,
+  LayoutDashboard
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer
 } from 'recharts';
-import apiClient from '../lib/api';
+import { useNavigate } from 'react-router-dom';
+import { superAdminAPI } from '../lib/api';
+import InfrastructureHealthTab from './InfrastructureHealthTab';
+import AuditLogTab from './AuditLogTab';
+import SubscriptionsTab from './SubscriptionsTab';
 
 // ============================================================
 // TYPES
@@ -23,6 +29,7 @@ interface PlatformStats {
   totalRevenue: number;
   activeSubscriptions: number;
   planBreakdown: Record<string, number>;
+  recentBusinesses?: any[];
 }
 
 interface GrowthDataPoint {
@@ -47,37 +54,13 @@ interface BusinessRecord {
   contacts: number;
   messages: number;
   createdAt: string;
+  _count?: { users: number; contacts: number; campaigns: number };
+  subscriptions?: any[];
 }
 
 // ============================================================
-// API CLIENT
+// CONSTANTS
 // ============================================================
-
-const superAdminAPI = {
-  getStats: () => apiClient.get('/super-admin/stats'),
-  getGrowth: () => apiClient.get('/super-admin/growth'),
-  getBusinesses: (params?: any) => apiClient.get('/super-admin/businesses', { params }),
-};
-
-// ============================================================
-// FALLBACK MOCK DATA (used when API is unavailable)
-// ============================================================
-
-const FALLBACK_STATS: PlatformStats = {
-  totalBusinesses: 0,
-  totalUsers: 0,
-  totalContacts: 0,
-  totalMessages: 0,
-  totalRevenue: 0,
-  activeSubscriptions: 0,
-  planBreakdown: { FREE: 0, STARTER: 0, GROWTH: 0, PRO: 0, AGENCY: 0 },
-};
-
-const FALLBACK_GROWTH: GrowthDataPoint[] = [];
-
-const FALLBACK_PLANS: PlanDataPoint[] = [];
-
-const FALLBACK_BUSINESSES: BusinessRecord[] = [];
 
 const PLAN_COLORS: Record<string, string> = {
   FREE: '#6B7280',
@@ -86,6 +69,18 @@ const PLAN_COLORS: Record<string, string> = {
   PRO: '#F59E0B',
   AGENCY: '#8B5CF6',
 };
+
+const TABS = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'infrastructure', label: 'Infrastructure', icon: Server },
+  { id: 'audit-log', label: 'Audit Log', icon: FileText },
+  { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
+  { id: 'users', label: 'Users', icon: Users },
+  { id: 'businesses', label: 'Businesses', icon: Building2 },
+  { id: 'backgrounds', label: 'Backgrounds', icon: Image },
+] as const;
+
+type TabId = typeof TABS[number]['id'];
 
 // ============================================================
 // SUB-COMPONENTS
@@ -115,15 +110,267 @@ const StatCard: React.FC<{
 );
 
 // ============================================================
+// USERS SUB-TAB (Inline business management table)
+// ============================================================
+
+function UsersSubTab() {
+  const navigate = useNavigate();
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState('');
+  const limit = 20;
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, any> = { page, limit };
+      if (search.trim()) params.search = search.trim();
+      const res = await superAdminAPI.listUsers(params);
+      if (res.data?.success) {
+        setUsers(res.data.data.users);
+        setTotalPages(res.data.data.pagination.totalPages);
+      }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }, [page, limit, search]);
+
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    fetchUsers();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <form onSubmit={handleSearch} className="relative max-w-sm flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search users..." className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-purple-500" />
+        </form>
+        <button onClick={() => navigate('/admin/users')}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors">
+          <Users size={16} /> Full User Management
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-xs text-gray-500 uppercase border-b border-gray-200 bg-gray-50">
+                <th className="px-4 py-3">User</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Business</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Joined</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr><td colSpan={5} className="px-4 py-12 text-center"><RefreshCw size={24} className="animate-spin text-purple-500 mx-auto" /></td></tr>
+              ) : users.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-12 text-center text-gray-400">No users found</td></tr>
+              ) : (
+                users.map((u: any) => (
+                  <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+                          {(u.name || u.email).charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{u.name || 'No name'}</p>
+                          <p className="text-xs text-gray-500">{u.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        u.role === 'SUPER_ADMIN' ? 'bg-red-100 text-red-700' :
+                        u.role === 'OWNER' ? 'bg-purple-100 text-purple-700' :
+                        u.role === 'ADMIN' ? 'bg-blue-100 text-blue-700' :
+                        u.role === 'MEMBER' ? 'bg-green-100 text-green-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>{u.role}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{u.business?.name || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 text-xs ${u.isActive ? 'text-green-600' : 'text-red-500'}`}>
+                        {u.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{new Date(u.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
+            <span className="text-xs text-gray-500">Page {page} of {totalPages}</span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                className="p-1.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 rounded-lg hover:bg-gray-100">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="px-3 py-1 text-sm font-medium text-gray-700">{page}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                className="p-1.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 rounded-lg hover:bg-gray-100">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// BUSINESSES SUB-TAB (Inline table)
+// ============================================================
+
+function BusinessesSubTab() {
+  const [businesses, setBusinesses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
+  const limit = 20;
+
+  const fetchBusinesses = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, any> = { page, limit };
+      if (search.trim()) params.search = search.trim();
+      if (planFilter) params.plan = planFilter;
+      const res = await superAdminAPI.listBusinesses(params);
+      if (res.data?.success) {
+        const data = res.data.data;
+        setBusinesses(data.businesses || []);
+        setTotalPages(data.pagination?.totalPages || 1);
+        setTotal(data.pagination?.total || 0);
+      }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }, [page, limit, search, planFilter]);
+
+  useEffect(() => { fetchBusinesses(); }, [fetchBusinesses]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    fetchBusinesses();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <form onSubmit={handleSearch} className="flex-1 relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search businesses..." className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-purple-500" />
+        </form>
+        <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-purple-500">
+          <option value="">All Plans</option>
+          <option value="FREE">Free</option>
+          <option value="STARTER">Starter</option>
+          <option value="GROWTH">Growth</option>
+          <option value="PRO">Pro</option>
+          <option value="AGENCY">Agency</option>
+        </select>
+        <span className="text-sm text-gray-400 self-center">{total} total</span>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-xs text-gray-500 uppercase border-b border-gray-200 bg-gray-50">
+                <th className="px-4 py-3">Business</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Plan</th>
+                <th className="px-4 py-3">Users</th>
+                <th className="px-4 py-3">Contacts</th>
+                <th className="px-4 py-3">Campaigns</th>
+                <th className="px-4 py-3">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr><td colSpan={7} className="px-4 py-12 text-center"><RefreshCw size={24} className="animate-spin text-purple-500 mx-auto" /></td></tr>
+              ) : businesses.length === 0 ? (
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No businesses found</td></tr>
+              ) : (
+                businesses.map((biz: any) => (
+                  <tr key={biz.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-xs">
+                          {biz.name?.charAt(0) || '?'}
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{biz.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 capitalize">{biz.type || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        biz.plan === 'FREE' ? 'bg-gray-100 text-gray-700' :
+                        biz.plan === 'STARTER' ? 'bg-blue-100 text-blue-700' :
+                        biz.plan === 'GROWTH' ? 'bg-green-100 text-green-700' :
+                        biz.plan === 'PRO' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-purple-100 text-purple-700'
+                      }`}>{biz.plan}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{biz._count?.users || biz.users || 0}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{biz._count?.contacts || biz.contacts || 0}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{biz._count?.campaigns || 0}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{new Date(biz.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
+            <span className="text-xs text-gray-500">Page {page} of {totalPages}</span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                className="p-1.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 rounded-lg hover:bg-gray-100">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="px-3 py-1 text-sm font-medium text-gray-700">{page}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                className="p-1.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 rounded-lg hover:bg-gray-100">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN COMPONENT
 // ============================================================
 
 const SuperAdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'backgrounds'>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [growthData, setGrowthData] = useState<GrowthDataPoint[]>([]);
   const [planData, setPlanData] = useState<PlanDataPoint[]>([]);
-  const [businesses, setBusinesses] = useState<BusinessRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,37 +387,28 @@ const SuperAdminDashboard: React.FC = () => {
     setError(null);
 
     try {
-      const [statsRes, growthRes, businessesRes] = await Promise.allSettled([
+      const [statsRes, growthRes] = await Promise.allSettled([
         superAdminAPI.getStats(),
         superAdminAPI.getGrowth(),
-        superAdminAPI.getBusinesses({ limit: 10 }),
       ]);
 
       // Stats
-      if (statsRes.status === 'fulfilled' && statsRes.value?.data) {
-        setStats(statsRes.value.data);
+      if (statsRes.status === 'fulfilled' && statsRes.value?.data?.success) {
+        setStats(statsRes.value.data.data);
       } else {
-        setStats(FALLBACK_STATS);
+        setStats(null);
       }
 
       // Growth
-      if (growthRes.status === 'fulfilled' && growthRes.value?.data) {
-        setGrowthData(growthRes.value.data);
+      if (growthRes.status === 'fulfilled' && growthRes.value?.data?.success) {
+        setGrowthData(growthRes.value.data.data || []);
       } else {
-        setGrowthData(FALLBACK_GROWTH);
-      }
-
-      // Businesses
-      if (businessesRes.status === 'fulfilled' && businessesRes.value?.data) {
-        setBusinesses(Array.isArray(businessesRes.value.data) ? businessesRes.value.data : businessesRes.value.data?.businesses || []);
-      } else {
-        setBusinesses(FALLBACK_BUSINESSES);
+        setGrowthData([]);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch dashboard data');
-      setStats(FALLBACK_STATS);
-      setGrowthData(FALLBACK_GROWTH);
-      setBusinesses(FALLBACK_BUSINESSES);
+      setStats(null);
+      setGrowthData([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -192,17 +430,19 @@ const SuperAdminDashboard: React.FC = () => {
           color: PLAN_COLORS[name] || '#6B7280',
         }));
       setPlanData(plans);
+    } else {
+      setPlanData([]);
     }
   }, [stats]);
 
   const formatCurrency = (val: number) =>
-    val > 0 ? '\u20B9' + val.toLocaleString('en-IN') : '\u20B90';
+    val > 0 ? '₹' + val.toLocaleString('en-IN') : '₹0';
 
   // Background handlers
   const fetchBackgrounds = useCallback(async () => {
     setBgLoading(true);
     try {
-      const res = await apiClient.get('/super-admin/backgrounds');
+      const res = await superAdminAPI.listBackgrounds();
       if (res.data?.success) setBackgrounds(res.data.data || []);
     } catch { setBackgrounds([]); }
     finally { setBgLoading(false); }
@@ -211,7 +451,7 @@ const SuperAdminDashboard: React.FC = () => {
   const handleAddBg = async () => {
     if (!bgForm.name.trim() || !bgForm.imageUrl.trim()) return;
     try {
-      await apiClient.post('/super-admin/backgrounds', bgForm);
+      await superAdminAPI.createBackground(bgForm);
       setShowAddBg(false);
       setBgForm({ name: '', imageUrl: '', thumbnailUrl: '', category: 'general', scheduleType: 'manual', expiresAt: '' });
       fetchBackgrounds();
@@ -221,20 +461,20 @@ const SuperAdminDashboard: React.FC = () => {
   const handleDeleteBg = async (id: string) => {
     if (!confirm('Delete this background?')) return;
     try {
-      await apiClient.delete(`/super-admin/backgrounds/${id}`);
+      await superAdminAPI.deleteBackground(id);
       fetchBackgrounds();
     } catch { alert('Failed to delete'); }
   };
 
   const handleToggleBg = async (bg: any) => {
     try {
-      await apiClient.put(`/super-admin/backgrounds/${bg.id}`, { isActive: !bg.isActive });
+      await superAdminAPI.updateBackground(bg.id, { isActive: !bg.isActive });
       fetchBackgrounds();
     } catch { alert('Failed to update'); }
   };
 
   // Loading state
-  if (loading) {
+  if (loading && activeTab === 'dashboard') {
     return (
       <div className="p-4 sm:p-6 md:p-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
@@ -248,306 +488,231 @@ const SuperAdminDashboard: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-5 md:p-6 lg:p-8">
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-2 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
-        <button onClick={() => setActiveTab('dashboard')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-          📊 Dashboard
-        </button>
-        <button onClick={() => { setActiveTab('backgrounds'); fetchBackgrounds(); }}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'backgrounds' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-          🖼 Poster Backgrounds
-        </button>
-      </div>
-
-      {activeTab === 'dashboard' && (
-      <div>
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Shield className="text-purple-600" size={32} />
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Super Admin Dashboard</h1>
-            </div>
-            <p className="text-gray-600">Platform-wide overview and management</p>
-          </div>
-          <button
-            onClick={() => fetchData(true)}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 disabled:opacity-50 font-medium text-sm transition-colors"
-          >
-            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Shield className="text-purple-600" size={28} />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Super Admin</h1>
         </div>
+        <p className="text-gray-500 text-sm">Platform-wide management console</p>
       </div>
 
-      {/* Error banner */}
-      {error && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
-          <Shield size={20} className="text-yellow-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-800">Backend Not Connected</p>
-            <p className="text-xs text-yellow-600 mt-1">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!stats && !loading && (
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <Shield size={64} className="mx-auto text-gray-300 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">No Data Available</h2>
-            <p className="text-gray-500 mb-4">Connect the backend to see platform statistics.</p>
-            <button
-              onClick={() => fetchData(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium mx-auto"
-            >
-              <RefreshCw size={16} />
-              Retry
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-1 mb-6 bg-gray-100 rounded-xl p-1 overflow-x-auto">
+        {TABS.map(tab => {
+          const Icon = tab.icon;
+          return (
+            <button key={tab.id} onClick={() => {
+              setActiveTab(tab.id);
+              if (tab.id === 'backgrounds') fetchBackgrounds();
+            }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                activeTab === tab.id
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              <Icon size={16} />
+              {tab.label}
             </button>
-          </div>
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-      {stats && (
-        <>
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-8">
-            <StatCard
-              title="Total Businesses"
-              value={stats.totalBusinesses > 0 ? stats.totalBusinesses.toString() : '0'}
-              icon={<Building2 size={24} />}
-              color="bg-blue-50 text-blue-600"
-              change={stats.totalBusinesses > 0 ? '+12%' : undefined}
-              positive={stats.totalBusinesses > 0}
-            />
-            <StatCard
-              title="Total Users"
-              value={stats.totalUsers > 0 ? stats.totalUsers.toLocaleString() : '0'}
-              icon={<Users size={24} />}
-              color="bg-green-50 text-green-600"
-              change={stats.totalUsers > 0 ? '+8%' : undefined}
-              positive={stats.totalUsers > 0}
-            />
-            <StatCard
-              title="Total Messages"
-              value={stats.totalMessages > 0 ? (stats.totalMessages / 1000).toFixed(0) + 'K' : '0'}
-              icon={<MessageSquare size={24} />}
-              color="bg-purple-50 text-purple-600"
-              change={stats.totalMessages > 0 ? '+15%' : undefined}
-              positive={stats.totalMessages > 0}
-            />
-            <StatCard
-              title="Monthly Revenue"
-              value={formatCurrency(stats.totalRevenue)}
-              icon={<DollarSign size={24} />}
-              color="bg-yellow-50 text-yellow-600"
-              change={stats.totalRevenue > 0 ? '+22%' : undefined}
-              positive={stats.totalRevenue > 0}
-            />
-          </div>
-
-          {/* Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mb-8">
-            {/* Growth Trend */}
-            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <TrendingUp size={20} className="text-blue-600" />
-                Growth Trend {growthData.length > 0 ? '(Last 7 Months)' : '(No Data)'}
-              </h3>
-              {growthData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={growthData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="businesses" stroke="#3B82F6" strokeWidth={2} name="Businesses" />
-                    <Line type="monotone" dataKey="users" stroke="#10B981" strokeWidth={2} name="Users" />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400">
-                  <p>Growth data will appear when the backend is connected.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Revenue Chart */}
-            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <DollarSign size={20} className="text-green-600" />
-                Monthly Revenue {growthData.length > 0 ? '(\u20B9)' : '(No Data)'}
-              </h3>
-              {growthData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={growthData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                    <Bar dataKey="revenue" fill="#10B981" name="Revenue" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400">
-                  <p>Revenue data will appear when the backend is connected.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 mb-8">
-            {/* Plan Distribution */}
-            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Plan Distribution</h3>
-              {planData.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={planData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value }) => `${name}: ${value}`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {planData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="mt-4 space-y-2">
-                    {planData.map((plan) => (
-                      <div key={plan.name} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: plan.color }} />
-                          <span className="text-gray-600">{plan.name}</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">{plan.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="h-[250px] flex items-center justify-center text-gray-400">
-                  <p>Plan data will appear when connected.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Stats */}
-            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100 lg:col-span-2">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Health</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-600 mb-1">Active Subscriptions</p>
-                  <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.activeSubscriptions > 0 ? stats.activeSubscriptions : '0'}</p>
-                </div>
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-600 mb-1">Total Contacts</p>
-                  <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats.totalContacts > 0 ? (stats.totalContacts / 1000).toFixed(1) + 'K' : '0'}</p>
-                </div>
-                <div className="p-4 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-purple-600 mb-1">Avg Revenue/Business</p>
-                  <p className="text-xl sm:text-2xl font-bold text-purple-700">
-                    {stats.activeSubscriptions > 0 && stats.totalRevenue > 0
-                      ? formatCurrency(Math.round(stats.totalRevenue / stats.activeSubscriptions))
-                      : '\u20B90'}
-                  </p>
-                </div>
-                <div className="p-4 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-yellow-600 mb-1">Users per Business</p>
-                  <p className="text-xl sm:text-2xl font-bold text-yellow-700">
-                    {stats.totalBusinesses > 0 && stats.totalUsers > 0
-                      ? (stats.totalUsers / stats.totalBusinesses).toFixed(1)
-                      : '0'}
-                  </p>
-                </div>
+      {/* Tab Content */}
+      {activeTab === 'dashboard' && (
+        <div>
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Platform Overview</h2>
+                <p className="text-gray-500 text-sm mt-1">Key metrics across all businesses</p>
               </div>
-            </div>
-          </div>
-
-          {/* Recent Businesses */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100">
-            <div className="p-4 sm:p-5 md:p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Recent Businesses</h3>
-              <button className="text-blue-600 text-sm font-medium hover:underline flex items-center gap-1">
-                View All <Eye size={16} />
+              <button onClick={() => fetchData(true)} disabled={refreshing}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 disabled:opacity-50 font-medium text-sm transition-colors">
+                <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+                {refreshing ? 'Refreshing...' : 'Refresh'}
               </button>
             </div>
-            {businesses.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 sm:px-5 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Business</th>
-                      <th className="px-4 sm:px-5 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th className="px-4 sm:px-5 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                      <th className="px-4 sm:px-5 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
-                      <th className="px-4 sm:px-5 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacts</th>
-                      <th className="px-4 sm:px-5 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Messages</th>
-                      <th className="px-4 sm:px-5 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {businesses.map((biz) => (
-                      <tr key={biz.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 sm:px-5 md:px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                              {biz.name.charAt(0)}
-                            </div>
-                            <span className="font-medium text-gray-900">{biz.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 sm:px-5 md:px-6 py-4 text-sm text-gray-600 capitalize">{biz.type}</td>
-                        <td className="px-4 sm:px-5 md:px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            biz.plan === 'FREE' ? 'bg-gray-100 text-gray-700' :
-                            biz.plan === 'STARTER' ? 'bg-blue-100 text-blue-700' :
-                            biz.plan === 'GROWTH' ? 'bg-green-100 text-green-700' :
-                            biz.plan === 'PRO' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-purple-100 text-purple-700'
-                          }`}>
-                            {biz.plan}
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-5 md:px-6 py-4 text-sm text-gray-600">{biz.users}</td>
-                        <td className="px-4 sm:px-5 md:px-6 py-4 text-sm text-gray-600">{biz.contacts}</td>
-                        <td className="px-4 sm:px-5 md:px-6 py-4 text-sm text-gray-600">{biz.messages.toLocaleString()}</td>
-                        <td className="px-4 sm:px-5 md:px-6 py-4 text-sm text-gray-500">{biz.createdAt}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-12 text-center text-gray-400">
-                <Building2 size={40} className="mx-auto mb-3 text-gray-300" />
-                <p>No businesses to display. Data will appear when the backend is connected.</p>
-              </div>
-            )}
           </div>
-        </>
-      )}
-      </div>
+
+          {/* Error banner */}
+          {error && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+              <Shield size={20} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-yellow-800">Backend Not Connected</p>
+                <p className="text-xs text-yellow-600 mt-1">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!stats && !loading && (
+            <div className="flex items-center justify-center min-h-[40vh]">
+              <div className="text-center">
+                <Shield size={64} className="mx-auto text-gray-300 mb-4" />
+                <h2 className="text-xl font-semibold text-gray-700 mb-2">No Data Available</h2>
+                <p className="text-gray-500 mb-4">Connect the backend to see platform statistics.</p>
+                <button onClick={() => fetchData(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium mx-auto">
+                  <RefreshCw size={16} /> Retry
+                </button>
+              </div>
+            </div>
+          )}
+
+          {stats && (
+            <>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-8">
+                <StatCard title="Total Businesses" value={stats.totalBusinesses > 0 ? stats.totalBusinesses.toString() : '0'}
+                  icon={<Building2 size={24} />} color="bg-blue-50 text-blue-600"
+                  change={stats.totalBusinesses > 0 ? '+12%' : undefined} positive />
+                <StatCard title="Total Users" value={stats.totalUsers > 0 ? stats.totalUsers.toLocaleString() : '0'}
+                  icon={<Users size={24} />} color="bg-green-50 text-green-600"
+                  change={stats.totalUsers > 0 ? '+8%' : undefined} positive />
+                <StatCard title="Total Messages" value={stats.totalMessages > 0 ? (stats.totalMessages / 1000).toFixed(0) + 'K' : '0'}
+                  icon={<MessageSquare size={24} />} color="bg-purple-50 text-purple-600"
+                  change={stats.totalMessages > 0 ? '+15%' : undefined} positive />
+                <StatCard title="Monthly Revenue" value={formatCurrency(stats.totalRevenue)}
+                  icon={<DollarSign size={24} />} color="bg-yellow-50 text-yellow-600"
+                  change={stats.totalRevenue > 0 ? '+22%' : undefined} positive />
+              </div>
+
+              {/* Charts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mb-8">
+                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <TrendingUp size={20} className="text-blue-600" />
+                    Growth Trend {growthData.length > 0 ? '(Last 7 Months)' : '(No Data)'}
+                  </h3>
+                  {growthData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={growthData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="businesses" stroke="#3B82F6" strokeWidth={2} name="Businesses" />
+                        <Line type="monotone" dataKey="users" stroke="#10B981" strokeWidth={2} name="Users" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-gray-400">
+                      <p>Growth data will appear when the backend is connected.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <DollarSign size={20} className="text-green-600" />
+                    Monthly Revenue {growthData.length > 0 ? '(₹)' : '(No Data)'}
+                  </h3>
+                  {growthData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={growthData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                        <Bar dataKey="revenue" fill="#10B981" name="Revenue" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-gray-400">
+                      <p>Revenue data will appear when the backend is connected.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 mb-8">
+                {/* Plan Distribution */}
+                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Plan Distribution</h3>
+                  {planData.length > 0 ? (
+                    <>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie data={planData} cx="50%" cy="50%" labelLine={false}
+                            label={({ name, value }) => `${name}: ${value}`} outerRadius={80} dataKey="value">
+                            {planData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="mt-4 space-y-2">
+                        {planData.map((plan) => (
+                          <div key={plan.name} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: plan.color }} />
+                              <span className="text-gray-600">{plan.name}</span>
+                            </div>
+                            <span className="font-semibold text-gray-900">{plan.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="h-[250px] flex items-center justify-center text-gray-400">
+                      <p>Plan data will appear when connected.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Stats */}
+                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100 lg:col-span-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Health</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <p className="text-sm text-green-600 mb-1">Active Subscriptions</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.activeSubscriptions > 0 ? stats.activeSubscriptions : '0'}</p>
+                    </div>
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <p className="text-sm text-blue-600 mb-1">Total Contacts</p>
+                      <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats.totalContacts > 0 ? (stats.totalContacts / 1000).toFixed(1) + 'K' : '0'}</p>
+                    </div>
+                    <div className="p-4 bg-purple-50 rounded-lg">
+                      <p className="text-sm text-purple-600 mb-1">Avg Revenue/Business</p>
+                      <p className="text-xl sm:text-2xl font-bold text-purple-700">
+                        {stats.activeSubscriptions > 0 && stats.totalRevenue > 0
+                          ? formatCurrency(Math.round(stats.totalRevenue / stats.activeSubscriptions))
+                          : '₹0'}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-yellow-50 rounded-lg">
+                      <p className="text-sm text-yellow-600 mb-1">Users per Business</p>
+                      <p className="text-xl sm:text-2xl font-bold text-yellow-700">
+                        {stats.totalBusinesses > 0 && stats.totalUsers > 0
+                          ? (stats.totalUsers / stats.totalBusinesses).toFixed(1)
+                          : '0'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
+      {activeTab === 'infrastructure' && <InfrastructureHealthTab />}
+      {activeTab === 'audit-log' && <AuditLogTab />}
+      {activeTab === 'subscriptions' && <SubscriptionsTab />}
+      {activeTab === 'users' && <UsersSubTab />}
+      {activeTab === 'businesses' && <BusinessesSubTab />}
+
+      {/* Backgrounds Tab */}
       {activeTab === 'backgrounds' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">🖼 Poster Backgrounds</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Poster Backgrounds</h2>
               <p className="text-gray-500 text-sm mt-1">Upload background images that users can use in Creative Studio</p>
             </div>
             <button onClick={() => setShowAddBg(true)}
@@ -568,14 +733,12 @@ const SuperAdminDashboard: React.FC = () => {
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Name *</label>
                     <input type="text" value={bgForm.name} onChange={(e) => setBgForm(f => ({ ...f, name: e.target.value }))}
-                      placeholder="e.g. Diwali 2026 Background"
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm" />
+                      placeholder="e.g. Diwali 2026 Background" className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm" />
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Image URL *</label>
                     <input type="url" value={bgForm.imageUrl} onChange={(e) => setBgForm(f => ({ ...f, imageUrl: e.target.value, thumbnailUrl: e.target.value }))}
-                      placeholder="https://example.com/background.jpg"
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm" />
+                      placeholder="https://example.com/background.jpg" className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm" />
                   </div>
                   {bgForm.imageUrl && (
                     <div className="rounded-xl overflow-hidden border border-gray-200 h-32">
@@ -632,7 +795,7 @@ const SuperAdminDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {backgrounds.map(bg => (
+              {backgrounds.map((bg: any) => (
                 <div key={bg.id} className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
                   <div className="aspect-video bg-gray-100 relative overflow-hidden">
                     <img src={bg.imageUrl} alt={bg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

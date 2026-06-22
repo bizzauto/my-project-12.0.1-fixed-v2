@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Users, Shield, Search, ChevronDown, Loader2, Check, X, Edit3, Mail, Calendar, UserCheck, UserX } from 'lucide-react';
+import { Users, Search, Loader2, Check, X, Edit3, UserCheck, UserX } from 'lucide-react';
 import { useToast } from './Toast';
 import { useAuthStore } from '../lib/authStore';
+import { superAdminAPI } from '../lib/api';
 
 interface User {
   id: string;
@@ -11,6 +12,7 @@ interface User {
   isActive: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  business?: { id: string; name: string; type: string; plan: string } | null;
 }
 
 const ROLES = [
@@ -36,8 +38,8 @@ export default function UserManagementPage() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/auth/users');
-      const data = await res.json();
+      const res = await superAdminAPI.listUsers({ limit: 100 });
+      const data = res.data;
       if (data.success) setUsers(data.data.users);
     } catch { toast.error('Failed to load users'); }
     finally { setLoading(false); }
@@ -46,12 +48,8 @@ export default function UserManagementPage() {
   const changeRole = async (userId: string, role: string) => {
     try {
       setSaving(true);
-      const res = await fetch('/api/auth/role', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, role }),
-      });
-      const data = await res.json();
+      const res = await superAdminAPI.changeUserRole(userId, role);
+      const data = res.data;
       if (data.success) {
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
         setEditingRole(null);

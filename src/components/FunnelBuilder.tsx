@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Eye, Trash2, Copy, Layout, Loader2, Edit2, Search, Sparkles } from 'lucide-react';
 import FunnelTemplatePicker from './FunnelTemplatePicker';
+import { funnelAPI } from '../lib/api';
 
 interface Funnel {
   id: string;
@@ -48,15 +49,12 @@ export default function FunnelBuilder() {
     try {
       setLoading(true);
       setError(null);
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('limit', '20');
-      if (search) params.set('search', search);
-
-      const res = await fetch(`/api/funnels?${params.toString()}`, {
-        credentials: 'include',
+      const res = await funnelAPI.list({
+        page: String(page),
+        limit: '20',
+        ...(search ? { search } : {}),
       });
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         setFunnels(data.data.funnels);
         setPagination(data.data.pagination);
@@ -81,13 +79,8 @@ export default function FunnelBuilder() {
     }
     try {
       setCreating(true);
-      const res = await fetch('/api/funnels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(newFunnel),
-      });
-      const data = await res.json();
+      const res = await funnelAPI.create(newFunnel);
+      const data = res.data;
       if (data.success) {
         setIsCreateOpen(false);
         setNewFunnel({ name: '', description: '', domain: '', isActive: true });
@@ -106,18 +99,13 @@ export default function FunnelBuilder() {
     if (!editFunnel) return;
     try {
       setUpdating(true);
-      const res = await fetch(`/api/funnels/${editFunnel.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: editFunnel.name,
-          description: editFunnel.description,
-          domain: editFunnel.domain,
-          isActive: editFunnel.isActive,
-        }),
+      const res = await funnelAPI.update(editFunnel.id, {
+        name: editFunnel.name,
+        description: editFunnel.description,
+        domain: editFunnel.domain,
+        isActive: editFunnel.isActive,
       });
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         setIsEditOpen(false);
         setEditFunnel(null);
@@ -136,11 +124,8 @@ export default function FunnelBuilder() {
     if (!confirm('Are you sure you want to delete this funnel? This action cannot be undone.')) return;
     try {
       setDeletingId(id);
-      const res = await fetch(`/api/funnels/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      const data = await res.json();
+      const res = await funnelAPI.delete(id);
+      const data = res.data;
       if (data.success) {
         fetchFunnels();
       } else {
@@ -156,18 +141,13 @@ export default function FunnelBuilder() {
   const handleDuplicateFunnel = async (funnel: Funnel) => {
     try {
       setDuplicatingId(funnel.id);
-      const res = await fetch('/api/funnels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: `${funnel.name} (Copy)`,
-          description: funnel.description,
-          domain: funnel.domain,
-          isActive: false,
-        }),
+      const res = await funnelAPI.create({
+        name: `${funnel.name} (Copy)`,
+        description: funnel.description,
+        domain: funnel.domain,
+        isActive: false,
       });
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         fetchFunnels();
       } else {
@@ -182,13 +162,8 @@ export default function FunnelBuilder() {
 
   const handleToggleStatus = async (funnel: Funnel) => {
     try {
-      const res = await fetch(`/api/funnels/${funnel.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ isActive: !funnel.isActive }),
-      });
-      const data = await res.json();
+      const res = await funnelAPI.update(funnel.id, { isActive: !funnel.isActive });
+      const data = res.data;
       if (data.success) {
         fetchFunnels();
       } else {
