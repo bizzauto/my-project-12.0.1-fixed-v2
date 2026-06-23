@@ -14,6 +14,9 @@ export interface AuthRequest extends Request {
  * N8N_API_KEY-based authentication for service-to-service calls.
  * n8n workflows send x-n8n-api-key header to authenticate with the App API.
  * Falls through to normal JWT auth if no API key is present.
+ *
+ * SECURITY: businessId from x-business-id header is HMAC-signed to prevent
+ * tenant breakout. The n8n API key is used as the HMAC key.
  */
 async function authenticateViaN8nApiKey(req: AuthRequest): Promise<boolean> {
   const apiKey = req.headers['x-n8n-api-key'] as string | undefined;
@@ -26,13 +29,31 @@ async function authenticateViaN8nApiKey(req: AuthRequest): Promise<boolean> {
     return false;
   }
 
+  // Validate HMAC-signed businessId to prevent tenant breakout
+  const rawBusinessId = req.headers['x-business-id'] as string | undefined;
+  const signature = req.headers['x-business-signature'] as string | undefined;
+
+  if (!rawBusinessId || !signature) {
+    console.warn('[n8nAuth] Missing x-business-id or x-business-signature header');
+    return false; // Let the calling authenticate middleware handle the 401
+  }
+
+  // Verify HMAC signature: HMAC-SHA256(apiKey, businessId) === signature
+  const expectedSignature = crypto
+    .createHmac('sha256', configuredKey)
+    .update(rawBusinessId)
+    .digest('hex');
+
+  if (!crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signature))) {
+    console.warn('[n8nAuth] Invalid business signature — possible tenant breakout attempt');
+    return false; // Let the calling authenticate middleware handle the 403
+  }
+
   // Create a system-level user context for n8n automation
-  // n8n workflows operate at the system level - individual businessId scoping
-  // is handled by the specific route logic (e.g., using :businessId param)
   req.user = {
     id: 'n8n-automation',
     email: 'n8n@system',
-    businessId: req.headers['x-business-id'] as string || 'system',
+    businessId: rawBusinessId,
     role: 'ADMIN',
     isServiceAccount: true,
   };

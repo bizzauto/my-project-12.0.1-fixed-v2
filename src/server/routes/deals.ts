@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
-import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { cacheResponse } from '../middleware/cache.js';
 import { validate } from '../middleware/validate.js';
 import { updateDealStageSchema, updateDealSchema } from '../validations/crm-schemas.js';
@@ -219,8 +219,8 @@ router.get('/stats', authenticate, cacheResponse(30), async (req: AuthRequest, r
   }
 });
 
-// PUT /api/deals/:id/stage - Update deal stage (for drag-and-drop)
-router.put('/:id/stage', authenticate, validate(updateDealStageSchema), async (req: AuthRequest, res: any) => {
+// PUT /api/deals/:id/stage - Update deal stage (for drag-and-drop) — OWNER/ADMIN only
+router.put('/:id/stage', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateDealStageSchema), async (req: AuthRequest, res: any) => {
   try {
     const { id } = req.params;
     const { stage, stageId, pipelineId } = req.body;
@@ -279,8 +279,8 @@ router.put('/:id/stage', authenticate, validate(updateDealStageSchema), async (r
   }
 });
 
-// PUT /api/deals/:id - Update deal value/details
-router.put('/:id', authenticate, validate(updateDealSchema), async (req: AuthRequest, res: any) => {
+// PUT /api/deals/:id - Update deal value/details — OWNER/ADMIN only
+router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateDealSchema), async (req: AuthRequest, res: any) => {
   try {
     const { id } = req.params;
     const { dealValue, dealStage, stage, stageId, pipelineId } = req.body;

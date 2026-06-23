@@ -94,25 +94,42 @@ export const webhookDeliveryQueue = redisAvailable ? new Queue(QUEUE_NAME, {
 // ==================== DELIVERY FUNCTIONS ====================
 
 /**
- * Enqueue a webhook for delivery.
+ * Enqueue a webhook for delivery with idempotency.
+ * Uses an idempotency key (idempotencyKey or X-Idempotency-Key header)
+ * to prevent duplicate deliveries of the same webhook event.
  */
 export async function enqueueDelivery(
   webhookId: string,
   businessId: string,
   event: string,
   payload: Record<string, unknown>,
-  options?: { delay?: number }
+  options?: { delay?: number; idempotencyKey?: string }
 ): Promise<Job<WebhookDeliveryPayload> | null> {
   if (!webhookDeliveryQueue) {
     console.warn('[WebhookRetry] Redis not available — cannot enqueue delivery');
     return null;
   }
+
+  // Idempotency: generate key from webhookId + event + payload hash
+  const idempotencyKey = options?.idempotencyKey ||
+    `wh_idem_${webhookId}_${event}_${crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex').substring(0, 16)}`;
+
+  // Check if this exact webhook has already been delivered (using idempotency key)
+  const existing = await webhookDeliveryQueue.getJob(idempotencyKey).catch(() => null);
+  if (existing) {
+    const state = await existing.getState().catch(() => 'unknown');
+    if (state === 'completed') {
+      console.log(`[WebhookRetry] Duplicate webhook ${idempotencyKey} skipped (already completed)`);
+      return existing;
+    }
+  }
+
   return webhookDeliveryQueue.add(
     'deliver',
     { webhookId, businessId, event, payload, attempt: 0 },
     {
       delay: options?.delay || 0,
-      jobId: `wh_${webhookId}_${Date.now()}`,
+      jobId: idempotencyKey,
     }
   );
 }
@@ -141,6 +158,63 @@ function buildSignedPayload(
 }
 
 /**
+ * SSRF-safe URL validator — blocks internal IPs and known-bad patterns.
+ */
+function isSafeWebhookUrl(url: string): { safe: boolean; reason?: string } {
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow HTTP/HTTPS
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { safe: false, reason: 'Only HTTP/HTTPS URLs allowed' };
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block internal/reserved IPs and hostnames
+    const blockedPatterns = [
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0',
+      '::1',
+      '[::1]',
+      '10.',       // RFC 1918
+      '172.16.',   // RFC 1918
+      '172.17.',
+      '172.18.',
+      '172.19.',
+      '172.20.',
+      '172.21.',
+      '172.22.',
+      '172.23.',
+      '172.24.',
+      '172.25.',
+      '172.26.',
+      '172.27.',
+      '172.28.',
+      '172.29.',
+      '172.30.',
+      '172.31.',
+      '192.168.',
+      '169.254.',  // Link-local
+      '127.',
+      'metadata',  // GCP/AWS metadata endpoints
+      '169.254.169.254',
+    ];
+
+    for (const pattern of blockedPatterns) {
+      if (hostname.startsWith(pattern) || hostname.includes(pattern)) {
+        return { safe: false, reason: `Blocked internal/host address: ${hostname}` };
+      }
+    }
+
+    return { safe: true };
+  } catch {
+    return { safe: false, reason: 'Invalid URL' };
+  }
+}
+
+/**
  * Deliver a single webhook via HTTP POST.
  */
 async function deliverWebhook(
@@ -148,6 +222,13 @@ async function deliverWebhook(
   event: string,
   payload: Record<string, unknown>
 ): Promise<{ statusCode: number; body: string }> {
+  // SSRF protection: validate URL before making request
+  const urlCheck = isSafeWebhookUrl(webhook.url);
+  if (!urlCheck.safe) {
+    console.error(`[WebhookRetry] SSRF blocked: ${webhook.url} — ${urlCheck.reason}`);
+    throw new Error(`SSRF blocked: ${urlCheck.reason}`);
+  }
+
   const { body, signature, timestamp } = buildSignedPayload(payload, webhook.secret, event);
 
   const response = await axios.post(webhook.url, body, {
@@ -161,6 +242,15 @@ async function deliverWebhook(
     },
     timeout: DELIVERY_TIMEOUT_MS,
     validateStatus: (status) => status >= 200 && status < 300,
+    // SSRF protection: prevent redirects to internal URLs
+    maxRedirects: 5,
+    // Prevent axios from following redirects to blocked URLs
+    beforeRedirect: (options, _responseDetails) => {
+      const redirectCheck = isSafeWebhookUrl(options.href || '');
+      if (!redirectCheck.safe) {
+        throw new Error(`SSRF blocked redirect: ${redirectCheck.reason}`);
+      }
+    },
   });
 
   return {

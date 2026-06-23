@@ -286,8 +286,11 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       data: { usageCount: { increment: 1 } },
     });
 
-    // Deduct AI credit
-    await AIService.incrementCredit(businessId);
+    // Deduct AI credit atomically
+    const creditUsed = await AIService.useCredit(businessId);
+    if (!creditUsed) {
+      console.warn(`[Posters] Credit deduction failed for business ${businessId} after generation`);
+    }
 
     // Store generated poster in WingsStore for persistence
     const stored = await prisma.wingsStore.create({
@@ -378,7 +381,11 @@ router.get('/:id/download', authenticate, async (req: AuthRequest, res: Response
       businessId,
     });
 
-    await AIService.incrementCredit(businessId);
+    // Deduct AI credit atomically
+    const creditUsed = await AIService.useCredit(businessId);
+    if (!creditUsed) {
+      console.warn(`[Posters] Credit deduction failed for business ${businessId} after download`);
+    }
 
     res.json({
       success: true,

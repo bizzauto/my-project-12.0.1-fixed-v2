@@ -97,6 +97,14 @@ function connectToRedis(url: string) {
     console.log('[Redis] Connected successfully');
   });
 
+  client.on('reconnecting', () => {
+    console.log('[Redis] Reconnecting...');
+  });
+
+  client.on('reconnected', () => {
+    console.log('[Redis] Reconnected successfully — queues are operational again');
+  });
+
   client.connect().catch((err: any) => {
     if (handleNoAuth('on connect')(err)) return;
     console.error(`[Redis] Connect failed: ${err.message}`);

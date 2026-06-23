@@ -408,7 +408,8 @@ export class WhatsAppService {
   }
 
   /**
-   * Process queued messages
+   * Process queued messages with parallel batch processing.
+   * Uses Promise.allSettled with controlled concurrency to avoid rate limits.
    */
   static async processQueue(limit = 100): Promise<number> {
     const queuedMessages = await prisma.message.findMany({
@@ -417,72 +418,100 @@ export class WhatsAppService {
       take: limit,
     });
 
+    if (queuedMessages.length === 0) return 0;
+
+    const CONCURRENCY = 5; // Process 5 messages in parallel
     let processed = 0;
 
-    for (const msg of queuedMessages) {
-      try {
-        if (msg.type === 'text') {
-          await this.sendTextMessage(
-            msg.businessId,
-            (msg.metadata as any)?.to || '',
-            msg.content || '',
-            {
-              messageId: msg.contactId || undefined,
-              useProxy: (msg.metadata as any)?.useProxy || false,
+    // Process in batches of CONCURRENCY
+    for (let i = 0; i < queuedMessages.length; i += CONCURRENCY) {
+      const batch = queuedMessages.slice(i, i + CONCURRENCY);
+
+      const results = await Promise.allSettled(
+        batch.map(async (msg) => {
+          try {
+            if (msg.type === 'text') {
+              await this.sendTextMessage(
+                msg.businessId,
+                (msg.metadata as any)?.to || '',
+                msg.content || '',
+                {
+                  messageId: msg.contactId || undefined,
+                  useProxy: (msg.metadata as any)?.useProxy || false,
+                }
+              );
+            } else if (msg.type === 'template') {
+              await this.sendTemplate(
+                msg.businessId,
+                (msg.metadata as any)?.to || '',
+                msg.templateName || '',
+                msg.templateLanguage || 'en',
+                msg.templateVars as any[] || [],
+                {
+                  useProxy: (msg.metadata as any)?.useProxy || false,
+                }
+              );
             }
-          );
-        } else if (msg.type === 'template') {
-          await this.sendTemplate(
-            msg.businessId,
-            (msg.metadata as any)?.to || '',
-            msg.templateName || '',
-            msg.templateLanguage || 'en',
-            msg.templateVars as any[] || [],
-            {
-              useProxy: (msg.metadata as any)?.useProxy || false,
-            }
-          );
-        }
 
-        await prisma.message.update({
-          where: { id: msg.id },
-          data: { status: 'sent', statusTimestamp: new Date() },
-        });
+            await prisma.message.update({
+              where: { id: msg.id },
+              data: { status: 'sent', statusTimestamp: new Date() },
+            });
+            return { success: true, msg };
+          } catch (error: any) {
+            return { success: false, msg, error };
+          }
+        })
+      );
 
-        processed++;
-      } catch (error: any) {
-        const metadata = (msg.metadata as any) || {};
-        const retryCount = metadata.retryCount || 0;
-
-        if (retryCount < 3) {
-          // Retry
-          await prisma.message.update({
-            where: { id: msg.id },
-            data: {
-              metadata: {
-                ...metadata,
-                retryCount: retryCount + 1,
-                lastError: error.message,
-                lastRetryAt: new Date().toISOString(),
-              },
-            },
-          });
+      // Handle results — mark successes and retries/failures
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.success) {
+          processed++;
         } else {
-          // Mark as failed
-          await prisma.message.update({
-            where: { id: msg.id },
-            data: {
-              status: 'failed',
-              error: error.message,
-              metadata: {
-                ...metadata,
-                retryCount,
-                lastError: error.message,
-                failedAt: new Date().toISOString(),
-              },
-            },
-          });
+          const msg = result.status === 'fulfilled' ? result.value.msg : null;
+          const error = result.status === 'fulfilled' ? result.value.error : result.reason;
+
+          if (msg) {
+            const metadata = (msg.metadata as any) || {};
+            const retryCount = metadata.retryCount || 0;
+
+            if (retryCount < 3) {
+              // Retry — update metadata with incremented retry count
+              await prisma.message.update({
+                where: { id: msg.id },
+                data: {
+                  metadata: {
+                    ...metadata,
+                    retryCount: retryCount + 1,
+                    lastError: error.message,
+                    lastRetryAt: new Date().toISOString(),
+                  },
+                },
+              });
+            } else {
+              // Mark as failed
+              await prisma.message.update({
+                where: { id: msg.id },
+                data: {
+                  status: 'failed',
+                  error: error.message,
+                  metadata: {
+                    ...metadata,
+                    retryCount,
+                    lastError: error.message,
+                    failedAt: new Date().toISOString(),
+                  },
+                },
+              });
+            }
+          }
         }
+      }
+
+      // Small delay between batches to avoid rate limits
+      if (i + CONCURRENCY < queuedMessages.length) {
+        await new Promise((r) => setTimeout(r, 500));
       }
     }
 
@@ -490,15 +519,46 @@ export class WhatsAppService {
   }
 
   /**
-   * Generate QR code for WhatsApp Web login
+   * Generate QR code for WhatsApp Web login via Evolution API.
+   * Falls back to a descriptive error if Evolution API is not configured.
    */
   static async generateQRCode(businessId: string): Promise<string> {
-    // This would integrate with a WhatsApp Web API service
-    // For official API, we use OAuth flow instead
-    // Implementation depends on your WhatsApp provider
-
-    // For now, return placeholder
-    return 'qr-code-placeholder';
+    try {
+      // Try Evolution API for QR generation
+      const { EvolutionApiService } = await import('./evolution.service.js');
+      const result = await EvolutionApiService.connectInstance(businessId);
+      
+      // Return base64 QR image if available, otherwise raw code string
+      if (result.qrCodeBase64) {
+        return result.qrCodeBase64;
+      }
+      return result.qrCode;
+    } catch (error: any) {
+      console.error('[WhatsApp] QR generation via Evolution API failed:', error.message);
+      
+      // Check if Evolution API is configured at all
+      try {
+        const { EvolutionApiService } = await import('./evolution.service.js');
+        const config = await EvolutionApiService.getPublicConfig(businessId);
+        if (!config.configured) {
+          throw new Error(
+            'WhatsApp QR code setup requires Evolution API configuration. ' +
+            'Please configure EVOLUTION_API_URL and EVOLUTION_API_KEY in your .env file ' +
+            'or set up Evolution API integration in Settings > Integrations > WhatsApp.'
+          );
+        }
+      } catch (configErr: any) {
+        // If getPublicConfig itself fails, re-throw the original error
+        if (configErr.message?.includes('Evolution API')) {
+          throw configErr;
+        }
+      }
+      
+      throw new Error(
+        `Failed to generate WhatsApp QR code: ${error.message}. ` +
+        'Ensure Evolution API is running and accessible.'
+      );
+    }
   }
 
   /**

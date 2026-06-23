@@ -339,28 +339,57 @@ export class AIService {
   }
 
   /**
-   * Check AI credit availability
+   * ATOMIC credit check + deduction.
+   * Uses Prisma $transaction to prevent race conditions.
+   * Returns true if credits were available and deducted, false otherwise.
    */
-  static async checkCredits(businessId: string): Promise<boolean> {
-    const business = await prisma.business.findUnique({
-      where: { id: businessId },
-      select: { aiCreditsUsed: true, aiCreditsLimit: true, aiCreditsPurchased: true },
-    });
+  static async useCredit(businessId: string, amount: number = 1): Promise<boolean> {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const business = await tx.business.findUnique({
+          where: { id: businessId },
+          select: { aiCreditsUsed: true, aiCreditsLimit: true, aiCreditsPurchased: true },
+        });
 
-    if (!business) return false;
+        if (!business) return false;
 
-    const totalCredits = business.aiCreditsLimit + business.aiCreditsPurchased;
-    return business.aiCreditsUsed < totalCredits;
+        const totalCredits = business.aiCreditsLimit + business.aiCreditsPurchased;
+        if (business.aiCreditsUsed + amount > totalCredits) {
+          return false; // Not enough credits
+        }
+
+        await tx.business.update({
+          where: { id: businessId },
+          data: { aiCreditsUsed: { increment: amount } },
+        });
+
+        return true;
+      });
+    } catch (error) {
+      console.error('[AI] Atomic credit deduction failed:', error);
+      return false;
+    }
   }
 
   /**
-   * Increment AI credit usage
+   * Check AI credit availability (read-only, non-atomic)
+   * Prefer useCredit() for write operations to avoid race conditions.
    */
-  static async incrementCredit(businessId: string): Promise<void> {
-    await prisma.business.update({
-      where: { id: businessId },
-      data: { aiCreditsUsed: { increment: 1 } },
-    });
+  static async checkCredits(businessId: string): Promise<boolean> {
+    try {
+      const business = await prisma.business.findUnique({
+        where: { id: businessId },
+        select: { aiCreditsUsed: true, aiCreditsLimit: true, aiCreditsPurchased: true },
+      });
+
+      if (!business) return false;
+
+      const totalCredits = business.aiCreditsLimit + business.aiCreditsPurchased;
+      return business.aiCreditsUsed < totalCredits;
+    } catch (error) {
+      console.error('[AI] Credit check failed:', error);
+      return false;
+    }
   }
 }
 

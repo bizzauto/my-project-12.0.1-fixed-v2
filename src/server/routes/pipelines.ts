@@ -18,38 +18,41 @@ router.get('/', authenticate, async (req: AuthRequest, res: any) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Map to include deal counts per stage
-    const result = await Promise.all(
-      pipelines.map(async (p) => {
-        const stageStats = await Promise.all(
-          p.stages.map(async (s) => {
-            const count = await prisma.contact.count({
-              where: { businessId, stageId: s.id },
-            });
-            const valueAgg = await prisma.contact.aggregate({
-              where: { businessId, stageId: s.id },
-              _sum: { dealValue: true },
-            });
-            return {
-              id: s.id,
-              name: s.name,
-              order: s.order,
-              color: s.color,
-              dealCount: count,
-              dealValue: valueAgg._sum.dealValue || 0,
-            };
-          })
-        );
+    // Optimized: single query for stage-level aggregates instead of N+1
+    const stageIds = pipelines.flatMap(p => p.stages.map(s => s.id));
+    
+    // Fetch all stage aggregates in one query
+    const stageAggs = stageIds.length > 0 ? await prisma.contact.groupBy({
+      by: ['stageId'],
+      where: { businessId, stageId: { in: stageIds } },
+      _count: { stageId: true },
+      _sum: { dealValue: true },
+    }) : [];
+    
+    const aggMap = new Map(stageAggs.map(a => [a.stageId, {
+      dealCount: a._count.stageId,
+      dealValue: a._sum.dealValue || 0,
+    }]));
+
+    // Map pipeline data using the pre-computed aggregates
+    const result = pipelines.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      isDefault: p.isDefault,
+      stages: p.stages.map((s) => {
+        const agg = aggMap.get(s.id) || { dealCount: 0, dealValue: 0 };
         return {
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          isDefault: p.isDefault,
-          stages: stageStats,
-          contactCount: p._count.contacts,
+          id: s.id,
+          name: s.name,
+          order: s.order,
+          color: s.color,
+          dealCount: agg.dealCount,
+          dealValue: agg.dealValue,
         };
-      })
-    );
+      }),
+      contactCount: p._count.contacts,
+    }));
 
     res.json({ success: true, data: { pipelines: result } });
   } catch (error: any) {

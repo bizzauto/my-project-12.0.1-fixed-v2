@@ -571,7 +571,11 @@ process.on('SIGTERM', async () => {
   }
   logger.on('finish', () => process.exit(0));
   logger.end();
-  setTimeout(() => process.exit(0), 5000); // Force exit after 5s
+  // Give up to 30s for in-flight transactions to complete before force-exit
+  setTimeout(() => {
+    console.warn('[Shutdown] Force exit after 30s timeout');
+    process.exit(0);
+  }, 30000); // Increased from 5000ms to 30000ms
 });
 
 process.on('SIGINT', async () => {
@@ -586,7 +590,11 @@ process.on('SIGINT', async () => {
   }
   logger.on('finish', () => process.exit(0));
   logger.end();
-  setTimeout(() => process.exit(0), 5000);
+  // Give up to 30s for in-flight transactions to complete before force-exit
+  setTimeout(() => {
+    console.warn('[Shutdown] Force exit after 30s timeout');
+    process.exit(0);
+  }, 30000); // Increased from 5000ms to 30000ms
 });
 
 process.on('uncaughtException', async (error) => {

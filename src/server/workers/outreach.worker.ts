@@ -89,34 +89,52 @@ const outreachWorker = redisConnection ? new Worker(
       let sent = 0;
       let errors = 0;
 
-      for (const log of pendingLogs) {
-        try {
-          if (!log.contact?.phone) { errors++; continue; }
+      // Process messages with controlled concurrency to avoid WhatsApp rate limits
+      const CONCURRENCY_LIMIT = 3;
 
-          const result = await smartSendText(businessId, log.contact.phone, log.message);
+      async function processBatch(logs: typeof pendingLogs) {
+        const results = await Promise.allSettled(
+          logs.map(async (log) => {
+            if (!log.contact?.phone) return;
+            const result = await smartSendText(businessId, log.contact.phone, log.message);
+            await prisma.outreachLog.update({
+              where: { id: log.id },
+              data: {
+                status: 'sent',
+                sentAt: new Date(),
+                whatsappMsgId: result?.messages?.[0]?.id || result?.messageId || null,
+              },
+            });
+            return true;
+          })
+        );
 
-          await prisma.outreachLog.update({
-            where: { id: log.id },
-            data: {
-              status: 'sent',
-              sentAt: new Date(),
-              whatsappMsgId: result?.messages?.[0]?.id || result?.messageId || null,
-            },
-          });
+        for (const r of results) {
+          if (r.status === 'fulfilled' && r.value) sent++;
+          else {
+            errors++;
+            const failedLog = pendingLogs[results.indexOf(r)];
+            if (failedLog) {
+              await prisma.outreachLog.update({
+                where: { id: failedLog.id },
+                data: { status: 'failed' },
+              }).catch(() => {});
+            }
+          }
+        }
+      }
 
-          sent++;
+      // Process in batches with CONCURRENCY_LIMIT parallelism per batch
+      for (let i = 0; i < pendingLogs.length; i += CONCURRENCY_LIMIT) {
+        const batch = pendingLogs.slice(i, i + CONCURRENCY_LIMIT);
+        await processBatch(batch);
 
-          // Random delay 2-4 seconds to avoid WhatsApp spam detection
+        // Delay between batches to avoid spam detection
+        if (i + CONCURRENCY_LIMIT < pendingLogs.length) {
           const minDelay = 2000;
           const maxDelay = 4000;
           const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
           await new Promise((r) => setTimeout(r, randomDelay));
-        } catch {
-          errors++;
-          await prisma.outreachLog.update({
-            where: { id: log.id },
-            data: { status: 'failed' },
-          });
         }
       }
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { checkContactLimit } from '../middleware/planLimits.js';
 import { createContactSchema, updateContactSchema, importContactsSchema } from '../validations/schemas.js';
@@ -118,8 +118,8 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Create contact (with plan limit check)
-router.post('/', authenticate, checkContactLimit, validate(createContactSchema), async (req: any, res: any) => {
+// Create contact (with plan limit check) — OWNER/ADMIN only
+router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), checkContactLimit, validate(createContactSchema), async (req: any, res: any) => {
   try {
     const { name, phone, email, tags, customFields, pipelineId, stageId } = req.body;
 
@@ -186,8 +186,8 @@ router.post('/', authenticate, checkContactLimit, validate(createContactSchema),
   }
 });
 
-// Update contact
-router.put('/:id', authenticate, validate(updateContactSchema), async (req: any, res: any) => {
+// Update contact — OWNER/ADMIN only
+router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateContactSchema), async (req: any, res: any) => {
   try {
     const { name, email, tags, customFields, pipelineId, stageId } = req.body;
 
@@ -231,8 +231,8 @@ router.put('/:id', authenticate, validate(updateContactSchema), async (req: any,
   }
 });
 
-// Delete contact
-router.delete('/:id', authenticate, async (req: any, res: any) => {
+// Delete contact — OWNER/ADMIN only
+router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
   try {
     const contact = await prisma.contact.findFirst({
       where: {
@@ -272,51 +272,70 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Import contacts from CSV
-router.post('/import', authenticate, checkContactLimit, validate(importContactsSchema), async (req: any, res: any) => {
+// Import contacts from CSV — OWNER/ADMIN only
+// Uses batch processing (500 per batch) with Prisma createMany for performance
+router.post('/import', authenticate, requireRole('OWNER', 'ADMIN'), checkContactLimit, validate(importContactsSchema), async (req: any, res: any) => {
   try {
-    const { contacts } = req.body;
+    const { contacts: rawContacts } = req.body;
+    const businessId = req.user.businessId;
+    const BATCH_SIZE = 500;
+
+    // Pre-validate: skip rows without phone
+    const contacts = (rawContacts || []).filter((c: any) => c?.phone);
+
+    if (contacts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid contacts found in import (phone is required)',
+      });
+    }
+
+    // Fetch existing phone numbers in bulk to avoid O(n) per-row queries
+    const existingPhones = await prisma.contact.findMany({
+      where: {
+        businessId,
+        phone: { in: contacts.map((c: any) => c.phone) },
+      },
+      select: { phone: true },
+    });
+    const existingPhoneSet = new Set(existingPhones.map((c) => c.phone));
 
     const created: any[] = [];
     const failed: any[] = [];
 
-    for (const contactData of contacts) {
-      try {
-        if (!contactData.phone) continue;
+    // Split into batches for bulk insert
+    for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
+      const batch = contacts.slice(i, i + BATCH_SIZE);
+      const toCreate: any[] = [];
 
-        const existing = await prisma.contact.findFirst({
-          where: {
-            businessId: req.user.businessId,
-            phone: contactData.phone,
-          },
-        });
-
-        if (existing) {
+      for (const contactData of batch) {
+        if (existingPhoneSet.has(contactData.phone)) {
           failed.push({ ...contactData, error: 'Already exists' });
           continue;
         }
-
-        const contact = await prisma.contact.create({
-          data: {
-            businessId: req.user.businessId,
-            name: contactData.name,
-            phone: contactData.phone,
-            email: contactData.email,
-            tags: contactData.tags || [],
-            whatsappOptIn: true,
-          },
+        existingPhoneSet.add(contactData.phone); // Prevent intra-batch duplicates
+        toCreate.push({
+          businessId,
+          name: contactData.name || null,
+          phone: contactData.phone,
+          email: contactData.email || null,
+          tags: contactData.tags || [],
+          whatsappOptIn: true,
         });
+      }
 
-        created.push(contact);
-      } catch (error: any) {
-        failed.push({ ...contactData, error: error.message });
+      if (toCreate.length > 0) {
+        await prisma.$transaction(async (tx) => {
+          await tx.contact.createMany({ data: toCreate, skipDuplicates: true });
+        });
+        created.push(...toCreate);
       }
     }
 
     // Update business stats
     if (created.length > 0) {
       await prisma.business.update({
-        where: { id: req.user.businessId },
+        where: { id: businessId },
         data: { totalContacts: { increment: created.length } },
       });
     }

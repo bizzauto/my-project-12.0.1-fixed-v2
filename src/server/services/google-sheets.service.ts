@@ -1,12 +1,68 @@
 import { google } from 'googleapis';
 import { prisma } from '../db.js';
 import { encrypt, decrypt } from '../utils/auth.js';
+import { createRedisConnection } from '../utils/redis-connection.js';
 
 /**
  * Google Sheets Integration Service
  * Sync contacts, leads, and custom data
+ * 
+ * CONCURRENCY SAFETY: Uses Redis-based distributed lock (SETNX) to prevent
+ * concurrent syncs from corrupting data. Falls back to in-memory lock if
+ * Redis is unavailable.
  */
 export class GoogleSheetsService {
+  // In-memory lock fallback when Redis is unavailable
+  private static inMemoryLocks = new Map<string, number>();
+  private static LOCK_TTL_MS = 120_000; // 2 minutes — Google Sheets API calls can be slow for large datasets
+
+  /**
+   * Try to acquire a distributed lock for this business.
+   * Uses Redis SETNX when available, falls back to in-memory Map.
+   */
+  private static async acquireLock(businessId: string, lockName: string): Promise<boolean> {
+    const lockKey = `google_sheets:lock:${businessId}:${lockName}`;
+    const now = Date.now();
+
+    // Try Redis first
+    const redis = createRedisConnection();
+    if (redis) {
+      try {
+        const result = await redis.set(lockKey, now.toString(), 'PX', GoogleSheetsService.LOCK_TTL_MS, 'NX');
+        if (result === 'OK') return true;
+        // Check if lock expired
+        const lockTime = await redis.get(lockKey);
+        if (lockTime && (now - parseInt(lockTime)) > GoogleSheetsService.LOCK_TTL_MS) {
+          // Lock expired — steal it
+          await redis.set(lockKey, now.toString(), 'PX', GoogleSheetsService.LOCK_TTL_MS);
+          return true;
+        }
+        return false;
+      } catch {
+        // Redis failed, fall through to in-memory
+      } finally {
+        try { await redis.quit(); } catch {}
+      }
+    }
+
+    // Fallback: in-memory lock
+    const existingLock = GoogleSheetsService.inMemoryLocks.get(lockKey);
+    if (existingLock && (now - existingLock) < GoogleSheetsService.LOCK_TTL_MS) {
+      return false; // Lock is still held
+    }
+    GoogleSheetsService.inMemoryLocks.set(lockKey, now);
+    return true;
+  }
+
+  /**
+   * Release a distributed lock.
+   */
+  private static async releaseLock(businessId: string, lockName: string): Promise<void> {
+    const lockKey = `google_sheets:lock:${businessId}:${lockName}`;
+    GoogleSheetsService.inMemoryLocks.delete(lockKey);
+    // Redis lock auto-expires via PX, no explicit release needed
+  }
+
   /**
    * Get authenticated Google client
    */
@@ -42,6 +98,7 @@ export class GoogleSheetsService {
 
   /**
    * Sync contacts to Google Sheets
+   * Uses distributed lock to prevent concurrent sync corruption
    */
   static async syncContacts(
     businessId: string,
@@ -55,91 +112,101 @@ export class GoogleSheetsService {
       };
     } = {}
   ): Promise<{ synced: number; spreadsheetUrl: string }> {
-    const { oauth2Client, spreadsheetId: configSpreadsheetId } =
-      await this.getGoogleClient(businessId);
-
-    const spreadsheetId = options.spreadsheetId || configSpreadsheetId;
-
-    if (!spreadsheetId) {
-      throw new Error('Spreadsheet ID not provided');
+    // Acquire distributed lock to prevent concurrent sync
+    const lockAcquired = await GoogleSheetsService.acquireLock(businessId, 'syncContacts');
+    if (!lockAcquired) {
+      throw new Error('Another sync is already in progress for this business. Please wait for it to complete.');
     }
 
-    const sheetName = options.sheetName || 'Contacts';
+    try {
+      const { oauth2Client, spreadsheetId: configSpreadsheetId } =
+        await this.getGoogleClient(businessId);
 
-    // Fetch contacts
-    const contacts = await prisma.contact.findMany({
-      where: {
-        businessId,
-        ...(options.filter?.tags && {
-          tags: { hasSome: options.filter.tags },
-        }),
-        ...(options.filter?.pipelineId && {
-          pipelineId: options.filter.pipelineId,
-        }),
-        ...(options.filter?.stageId && {
-          stageId: options.filter.stageId,
-        }),
-      },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        email: true,
-        company: true,
-        designation: true,
-        source: true,
-        tags: true,
-        dealValue: true,
-        createdAt: true,
-        lastActivity: true,
-      },
-    });
+      const spreadsheetId = options.spreadsheetId || configSpreadsheetId;
 
-    // Prepare data
-    const headers = [
-      'ID',
-      'Name',
-      'Phone',
-      'Email',
-      'Company',
-      'Designation',
-      'Source',
-      'Tags',
-      'Deal Value',
-      'Created At',
-      'Last Activity',
-    ];
+      if (!spreadsheetId) {
+        throw new Error('Spreadsheet ID not provided');
+      }
 
-    const rows = contacts.map((c) => [
-      c.id,
-      c.name || '',
-      c.phone,
-      c.email || '',
-      c.company || '',
-      c.designation || '',
-      c.source || '',
-      (c.tags || []).join(', '),
-      c.dealValue?.toString() || '',
-      c.createdAt.toISOString(),
-      c.lastActivity?.toISOString() || '',
-    ]);
+      const sheetName = options.sheetName || 'Contacts';
 
-    const values = [headers, ...rows];
+      // Fetch contacts
+      const contacts = await prisma.contact.findMany({
+        where: {
+          businessId,
+          ...(options.filter?.tags && {
+            tags: { hasSome: options.filter.tags },
+          }),
+          ...(options.filter?.pipelineId && {
+            pipelineId: options.filter.pipelineId,
+          }),
+          ...(options.filter?.stageId && {
+            stageId: options.filter.stageId,
+          }),
+        },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          email: true,
+          company: true,
+          designation: true,
+          source: true,
+          tags: true,
+          dealValue: true,
+          createdAt: true,
+          lastActivity: true,
+        },
+      });
 
-    // Update sheet
-    const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+      // Prepare data
+      const headers = [
+        'ID',
+        'Name',
+        'Phone',
+        'Email',
+        'Company',
+        'Designation',
+        'Source',
+        'Tags',
+        'Deal Value',
+        'Created At',
+        'Last Activity',
+      ];
 
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${sheetName}!A:K`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values },
-    });
+      const rows = contacts.map((c) => [
+        c.id,
+        c.name || '',
+        c.phone,
+        c.email || '',
+        c.company || '',
+        c.designation || '',
+        c.source || '',
+        (c.tags || []).join(', '),
+        c.dealValue?.toString() || '',
+        c.createdAt.toISOString(),
+        c.lastActivity?.toISOString() || '',
+      ]);
 
-    return {
-      synced: contacts.length,
-      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
-    };
+      const values = [headers, ...rows];
+
+      // Update sheet
+      const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${sheetName}!A:K`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values },
+      });
+
+      return {
+        synced: contacts.length,
+        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
+      };
+    } finally {
+      await GoogleSheetsService.releaseLock(businessId, 'syncContacts');
+    }
   }
 
   /**

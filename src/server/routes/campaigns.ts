@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createCampaignSchema, updateCampaignSchema, scheduleCampaignSchema } from '../validations/crm-schemas.js';
 
@@ -93,8 +93,8 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Create campaign
-router.post('/', authenticate, validate(createCampaignSchema), async (req: any, res: any) => {
+// Create campaign — OWNER/ADMIN only
+router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), validate(createCampaignSchema), async (req: any, res: any) => {
   try {
     const {
       name,
@@ -145,8 +145,8 @@ router.post('/', authenticate, validate(createCampaignSchema), async (req: any, 
   }
 });
 
-// Update campaign
-router.put('/:id', authenticate, validate(updateCampaignSchema), async (req: any, res: any) => {
+// Update campaign — OWNER/ADMIN only
+router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateCampaignSchema), async (req: any, res: any) => {
   try {
     const campaign = await prisma.campaign.findFirst({
       where: {
@@ -197,8 +197,8 @@ router.put('/:id', authenticate, validate(updateCampaignSchema), async (req: any
   }
 });
 
-// Delete campaign
-router.delete('/:id', authenticate, async (req: any, res: any) => {
+// Delete campaign — OWNER/ADMIN only
+router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
   try {
     const campaign = await prisma.campaign.findFirst({
       where: {
@@ -239,8 +239,8 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Start campaign
-router.post('/:id/start', authenticate, async (req: any, res: any) => {
+// Start campaign — OWNER/ADMIN only
+router.post('/:id/start', authenticate, requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
   try {
     const campaign = await prisma.campaign.findFirst({
       where: {
@@ -331,8 +331,8 @@ router.post('/:id/start', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Pause campaign
-router.post('/:id/pause', authenticate, async (req: any, res: any) => {
+// Pause campaign — OWNER/ADMIN only
+router.post('/:id/pause', authenticate, requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
   try {
     const campaign = await prisma.campaign.findFirst({
       where: {
@@ -367,8 +367,8 @@ router.post('/:id/pause', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Send campaign (alias for start, for frontend parity)
-router.post('/:id/send', authenticate, async (req: any, res: any) => {
+// Send campaign (alias for start, for frontend parity) — OWNER/ADMIN only
+router.post('/:id/send', authenticate, requireRole('OWNER', 'ADMIN'), async (req: any, res: any) => {
   try {
     const campaign = await prisma.campaign.findFirst({
       where: {
@@ -433,8 +433,8 @@ router.post('/:id/send', authenticate, async (req: any, res: any) => {
   }
 });
 
-// Schedule campaign
-router.post('/:id/schedule', authenticate, validate(scheduleCampaignSchema), async (req: any, res: any) => {
+// Schedule campaign — OWNER/ADMIN only
+router.post('/:id/schedule', authenticate, requireRole('OWNER', 'ADMIN'), validate(scheduleCampaignSchema), async (req: any, res: any) => {
   try {
     const { scheduledAt } = req.body;
 
