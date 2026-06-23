@@ -237,6 +237,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   demoLogin: () => {
+    // Only allow demo mode if DEMO_MODE_ENABLED env var is set on server
+    // OR if we're on localhost (development)
+    const isLocalhost = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    
+    if (!isLocalhost) {
+      console.warn('[DemoMode] Blocked: demo mode only allowed on localhost');
+      return;
+    }
+
     // Enable demo mode
     localStorage.setItem('demoMode', 'true');
     localStorage.setItem('onboardingCompleted', 'true');
@@ -244,10 +254,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     const demoUser: User = {
       id: 'demo-user-id',
-      email: 'bizzauto.solution@gmail.com',
+      email: 'demo@bizzauto.com',
       name: 'Demo User',
       phone: '+91 8983027975',
-      role: 'OWNER',
+      role: 'VIEWER',  // Restrict demo to VIEWER — no destructive actions
       businessId: 'demo-business-id',
       avatar: undefined,
       lastLogin: new Date().toISOString(),
@@ -255,15 +265,17 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     const demoBusiness: Business = {
       id: 'demo-business-id',
-      name: 'Demo Business',
+      name: 'BizzAuto Demo',
       type: 'general',
       city: 'Demo City',
-      plan: 'PRO',
-      aiCreditsUsed: 45,
-      aiCreditsLimit: 1000,
+      plan: 'FREE',  // FREE plan — shows real limitations
+      aiCreditsUsed: 0,
+      aiCreditsLimit: 10,
+      contactsLimit: 100,
+      messagesLimit: 50,
       phone: '+91 8983027975',
-      email: 'bizzauto.solution@gmail.com',
-      address: 'I610,windsor county,Ambegaon bk,pune 411046',
+      email: 'demo@bizzauto.com',
+      address: 'Demo Address - Pune',
       website: 'https://www.bizzautoai.com',
     };
 
@@ -277,6 +289,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       admissionCompleted: true,
       isDemoMode: true,
     });
+
+    console.info('[DemoMode] Activated: role=VIEWER, plan=FREE, localhost only');
   },
 
   updateProfile: async (data) => {

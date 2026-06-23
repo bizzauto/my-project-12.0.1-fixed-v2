@@ -21,6 +21,9 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,8 +152,9 @@ services:
       - bizzauto-network
 
   # ==================== BACKUP ====================
+  # Automated PostgreSQL backups with retention, compression, and health checks
   backup:
-    image: postgres:15-alpine
+    image: prodrigestivill/postgres-backup-local:15
     container_name: bizzauto-backup
     restart: always
     environment:
@@ -158,20 +162,29 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      BACKUP_SCHEDULE: "0 2 * * *"  # Daily at 2 AM
-      BACKUP_RETENTION: 7
+      POSTGRES_EXTRA_OPTS: '-Z6 --schema=public --blobs'
+      SCHEDULE: "@daily"
+      BACKUP_DIR: /backups
+      BACKUP_SUFFIX: .sql.gz
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 3
+      HEALTHCHECK_PORT: 8080
     volumes:
       - ./backups:/backups
-      - postgres_data:/var/lib/postgresql/data
     networks:
       - bizzauto-network
-    entrypoint: |
-      sh -c "
-        echo '0 2 * * * pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} -F c -f /backups/backup-$$(date +%Y%m%d-%H%M%S).dump' > /etc/crontabs/root
-        echo '0 3 * * * find /backups -name '*.dump' -mtime +$${BACKUP_RETENTION} -delete' >> /etc/crontabs/root
-        crond
-        tail -f /dev/null
-      "
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres -U ${POSTGRES_USER} || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
 networks:
   bizzauto-network:

@@ -194,17 +194,26 @@ export const requireBusinessAccess = async (
       });
     }
 
-    const businessId = req.params.businessId || req.body.businessId;
-
-    if (!businessId) {
+    // SECURITY: Never trust businessId from request body or params.
+    // Always use the businessId from the authenticated JWT token.
+    // The only exception is for super admin who may manage multiple businesses.
+    if (req.user.role === 'SUPER_ADMIN') {
       return next();
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-    });
+    // businessId is ALWAYS sourced from JWT, never from request body
+    const userBusinessId = req.user.businessId;
 
-    if (user?.businessId !== businessId) {
+    if (!userBusinessId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No business associated with this account',
+      });
+    }
+
+    // If the route has a businessId param, verify it matches the JWT
+    const requestBusinessId = req.params.businessId;
+    if (requestBusinessId && requestBusinessId !== userBusinessId) {
       return res.status(403).json({
         success: false,
         error: 'Access denied to this business',

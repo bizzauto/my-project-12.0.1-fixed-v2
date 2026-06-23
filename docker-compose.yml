@@ -17,6 +17,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      # === Payments ===
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
       # === n8n (API key for app→n8n calls) ===
       - N8N_URL=${N8N_URL:-http://n8n:5678}
       - N8N_APP_API_KEY=${N8N_APP_API_KEY}

@@ -445,6 +445,23 @@ app.get('/cache-stats', (_req, res) => {
   res.json({ success: true, data: getCacheStats() });
 });
 
+// CSP violation report endpoint (POST from browsers when CSP is violated)
+app.post('/api/security/csp-report', express.json({ limit: '10kb' }), (req, res) => {
+  const report = req.body?.['csp-report'] || req.body;
+  if (report) {
+    console.warn('[CSP Violation]', JSON.stringify({
+      'document-uri': report['document-uri'],
+      'blocked-uri': report['blocked-uri'],
+      'violated-directive': report['violated-directive'],
+      'original-policy': report['original-policy']?.substring(0, 200),
+      'source-file': report['source-file'],
+      'line-number': report['line-number'],
+      timestamp: new Date().toISOString(),
+    }));
+  }
+  res.status(204).end();
+});
+
 // Health check - comprehensive
 app.get('/health', async (req, res) => {
   try {

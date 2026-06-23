@@ -75,8 +75,8 @@ export const additionalSecurityHeaders = (req: Request, res: Response, next: Nex
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   
-  // Custom security header
-  res.setHeader('X-Content-Security-Policy-Report-Only', 'report-uri /api/security/report');
+  // CSP violation reporting endpoint
+  res.setHeader('Content-Security-Policy-Report-Only', 'report-uri /api/security/csp-report');
   
   next();
 };
