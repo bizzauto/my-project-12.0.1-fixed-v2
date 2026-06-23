@@ -531,6 +531,8 @@ export const paymentLinksAPI = {
   delete: (id: string) => apiClient.delete(`/payment-links/${id}`),
   getTransactions: (id: string, params?: any) => apiClient.get(`/payment-links/${id}/transactions`, { params }),
   send: (id: string) => apiClient.post(`/payment-links/${id}/send`),
+  verifyTransaction: (transactionId: string) =>
+    apiClient.post('/payments/verify', { transactionId }),
 };
 
 // Live Chat API

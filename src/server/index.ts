@@ -137,6 +137,8 @@ import ssoRoutes from './routes/sso.js';
 import landingPagesRoutes from './routes/landing-pages.js';
 import customRolesRoutes from './routes/custom-roles.js';
 import uploadRoutes from './routes/upload.js';
+import { razorpayWebhook, verifyPayment as verifyPaymentHandler } from './services/whatsapp-payment.service.js';
+import { authenticate } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -181,7 +183,13 @@ app.use(compression());
 app.use(morgan(':method :url :status :response-time ms :req[host] :user-agent', {
   stream: { write: (message) => logger.info(message.trim()) },
 }));
-app.use(express.json({ limit: '10mb' }));
+// Capture raw body for webhook signature verification (used by Razorpay, etc.)
+app.use(express.json({
+  limit: '10mb',
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf.toString();
+  },
+}));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
 
@@ -293,7 +301,7 @@ app.use('/api', (req, res, next) => {
     return next();
   }
   // Skip CSRF for webhook endpoints (they use webhook-secret validation instead)
-  const webhookPaths = ['/dograh/webhook'];
+  const webhookPaths = ['/dograh/webhook', '/payments/webhook', '/payments/verify'];
   if (webhookPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -364,6 +372,11 @@ app.use('/api/video-meetings', videoMeetingsRoutes);
 app.use('/api/support-tickets', supportTicketsRoutes);
 app.use('/api/voice-calls', voiceCallsRoutes);
 app.use('/api/dograh/webhook', dograhWebhookRoutes);
+
+// Razorpay webhook — public endpoint for payment.captured / payment.failed events
+// Must be before CSRF/rate-limit to allow unauthenticated POST from Razorpay
+app.post('/api/payments/webhook', razorpayWebhook);
+app.post('/api/payments/verify', authenticate, verifyPaymentHandler);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/ledger', ledgerRoutes);

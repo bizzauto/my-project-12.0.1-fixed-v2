@@ -73,6 +73,7 @@ const PaymentLinks: React.FC = () => {
   const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [showQrLink, setShowQrLink] = useState<string | null>(null);
+  const [verifyingTxs, setVerifyingTxs] = useState<Record<string, boolean>>({});
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const [newLink, setNewLink] = useState({
@@ -166,6 +167,25 @@ const PaymentLinks: React.FC = () => {
       setLinks(prev => prev.map(l => l.id === link.id ? { ...l, isActive: !l.isActive } : l));
     } catch (err: any) {
       showError('Failed to update link');
+    }
+  };
+
+  const handleVerifyTransaction = async (tx: Transaction) => {
+    setVerifyingTxs(prev => ({ ...prev, [tx.id]: true }));
+    try {
+      const res = await paymentLinksAPI.verifyTransaction(tx.id);
+      const result = res.data;
+      if (result?.success) {
+        success(`Payment verified — status: ${result.status}`);
+        // Refresh transactions to show updated status
+        if (selectedLink) loadTransactions(selectedLink.id);
+      } else {
+        showError(`Verification returned: ${result?.status || 'unknown'}`);
+      }
+    } catch (err: any) {
+      showError(err.response?.data?.error || 'Failed to verify payment');
+    } finally {
+      setVerifyingTxs(prev => ({ ...prev, [tx.id]: false }));
     }
   };
 
@@ -386,6 +406,7 @@ const PaymentLinks: React.FC = () => {
                     <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400">Amount</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400">Status</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400">Payment ID</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -402,6 +423,22 @@ const PaymentLinks: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-gray-500 dark:text-gray-400 font-mono text-xs">
                         {tx.razorpayPaymentId || '—'}
+                      </td>
+                      <td className="py-3 px-4">
+                        {tx.status === 'pending' && tx.razorpayPaymentId && (
+                          <button
+                            onClick={() => handleVerifyTransaction(tx)}
+                            disabled={verifyingTxs[tx.id]}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white text-xs font-medium rounded-lg transition-colors"
+                            title="Check with Razorpay to confirm payment status"
+                          >
+                            {verifyingTxs[tx.id] ? (
+                              <><Loader2 size={12} className="animate-spin" /> Verifying...</>
+                            ) : (
+                              <><RefreshCw size={12} /> Verify</>
+                            )}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

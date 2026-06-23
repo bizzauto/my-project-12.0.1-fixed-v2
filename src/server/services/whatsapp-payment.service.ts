@@ -25,7 +25,12 @@ const UPI_VPA = process.env.UPI_VPA || 'bizzauto@upi';
 const UPI_MERCHANT_NAME = 'BizzAuto CRM';
 
 export class WhatsAppPaymentService {
-  
+  private razorpayClient: typeof razorpay | null;
+
+  constructor(razorpayClient?: typeof razorpay | null) {
+    this.razorpayClient = razorpayClient !== undefined ? razorpayClient : razorpay;
+  }
+
   // Create UPI payment link for WhatsApp
   async createUpiPayment(data: UpiPaymentRequest): Promise<UpiPaymentResponse> {
     try {
@@ -107,9 +112,9 @@ export class WhatsAppPaymentService {
         }
 
         // Pending with Razorpay payment ID — verify live with Razorpay API
-        if (transaction.razorpayPaymentId && razorpay) {
+        if (transaction.razorpayPaymentId && this.razorpayClient) {
           try {
-            const payment = await (razorpay.payments.fetch as any)(transaction.razorpayPaymentId);
+            const payment = await (this.razorpayClient.payments.fetch as any)(transaction.razorpayPaymentId);
             if (payment && payment.status === 'captured') {
               // Update DB to reflect captured status
               await prisma.paymentLinkTransaction.update({
@@ -130,9 +135,9 @@ export class WhatsAppPaymentService {
       }
 
       // 3. Not found in our DB — try direct Razorpay payment lookup
-      if (razorpay) {
+      if (this.razorpayClient) {
         try {
-          const payment = await (razorpay.payments.fetch as any)(transactionId);
+          const payment = await (this.razorpayClient.payments.fetch as any)(transactionId);
           if (payment && payment.status === 'captured') {
             return { verified: true, status: 'captured' };
           }
@@ -180,16 +185,137 @@ export class WhatsAppPaymentService {
     };
   }
 
+  // Handle Razorpay webhook events (payment.captured, payment.failed)
+  async handleRazorpayWebhook(event: string, payload: any): Promise<{ success: boolean }> {
+    try {
+      switch (event) {
+        case 'payment.captured': {
+          const payment = payload?.payment?.entity;
+          if (!payment?.id) {
+            console.warn('[WhatsAppPayment] Webhook missing payment entity');
+            return { success: false };
+          }
+
+          console.log(`[WhatsAppPayment] Payment captured: ${payment.id}, order: ${payment.order_id}, amount: ${payment.amount}`);
+
+          // Find and update the PaymentLinkTransaction
+          const transaction = await prisma.paymentLinkTransaction.findFirst({
+            where: { razorpayPaymentId: payment.id },
+          });
+
+          if (transaction) {
+            await prisma.paymentLinkTransaction.update({
+              where: { id: transaction.id },
+              data: { status: 'captured' },
+            });
+
+            // Also update the parent PaymentLink stats
+            await prisma.paymentLink.update({
+              where: { id: transaction.linkId },
+              data: {
+                paymentCount: { increment: 1 },
+                totalCollected: { increment: (payment.amount || 0) / 100 },
+              },
+            });
+
+            console.log(`[WhatsAppPayment] Transaction ${transaction.id} marked as captured`);
+          } else {
+            // Not found by razorpayPaymentId — try matching by order_id
+            const orderId = payment.order_id;
+            if (orderId) {
+              // Check if transaction already exists for this payment (prevents duplicates on webhook retry)
+              const existingByOrder = await prisma.paymentLinkTransaction.findFirst({
+                where: {
+                  metadata: { path: ['orderId'], equals: orderId },
+                } as any,
+              });
+
+              if (existingByOrder) {
+                console.log(`[WhatsAppPayment] Duplicate webhook — transaction already exists for order ${orderId}`);
+                break;
+              }
+
+              // Look up the PaymentLink by razorpayOrderId
+              const link = await prisma.paymentLink.findFirst({
+                where: { razorpayOrderId: orderId },
+              });
+
+              if (link) {
+                // Create a transaction record for this captured payment
+                await prisma.paymentLinkTransaction.create({
+                  data: {
+                    linkId: link.id,
+                    razorpayPaymentId: payment.id,
+                    amount: (payment.amount || 0) / 100,
+                    currency: payment.currency || 'INR',
+                    status: 'captured',
+                    paidAt: new Date(),
+                    metadata: {
+                      webhookEvent: 'payment.captured',
+                      orderId,
+                      method: payment.method,
+                      bank: payment.bank,
+                      vpa: payment.vpa,
+                    },
+                  },
+                });
+
+                await prisma.paymentLink.update({
+                  where: { id: link.id },
+                  data: {
+                    paymentCount: { increment: 1 },
+                    totalCollected: { increment: (payment.amount || 0) / 100 },
+                  },
+                });
+
+                console.log(`[WhatsAppPayment] Created transaction for payment ${payment.id} on link ${link.id}`);
+              }
+            }
+          }
+          break;
+        }
+
+        case 'payment.failed': {
+          const payment = payload?.payment?.entity;
+          if (!payment?.id) break;
+
+          console.warn(`[WhatsAppPayment] Payment failed: ${payment.id}, error: ${payment.error_description}`);
+
+          const transaction = await prisma.paymentLinkTransaction.findFirst({
+            where: { razorpayPaymentId: payment.id },
+          });
+
+          if (transaction) {
+            await prisma.paymentLinkTransaction.update({
+              where: { id: transaction.id },
+              data: { status: 'failed', metadata: { error: payment.error_description } },
+            });
+            console.log(`[WhatsAppPayment] Transaction ${transaction.id} marked as failed`);
+          }
+          break;
+        }
+
+        default:
+          console.log(`[WhatsAppPayment] Unhandled webhook event: ${event}`);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('[WhatsAppPayment] Webhook handler error:', error);
+      return { success: false };
+    }
+  }
+
   // Create Razorpay Order for larger payments
   async createRazorpayOrder(amount: number, currency: string = 'INR', receipt: string): Promise<{ id: string; amount: number; currency: string } | null> {
-    if (!razorpay) {
+    if (!this.razorpayClient) {
       console.log('Razorpay not configured');
       return null;
     }
 
     try {
 
-      const order = await (razorpay.orders.create as any)({
+      const order = await (this.razorpayClient.orders.create as any)({
         amount: amount * 100, // Convert to paise
         currency,
         receipt,
@@ -238,4 +364,49 @@ export const verifyPayment = async (req: Request, res: Response) => {
     success: result.verified,
     status: result.status,
   });
+};
+
+// Razorpay webhook handler — receives payment.captured / payment.failed events
+// This route must be mounted with express.raw({ type: 'application/json' }) to get the raw body for signature verification.
+export const razorpayWebhook = async (req: Request, res: Response) => {
+  try {
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const signature = req.headers['x-razorpay-signature'] as string;
+
+    if (webhookSecret && signature) {
+      // Verify webhook signature using raw body
+      const rawBody = (req as any).rawBody;
+      if (rawBody) {
+        const expectedSignature = crypto
+          .createHmac('sha256', webhookSecret)
+          .update(rawBody)
+          .digest('hex');
+
+        if (expectedSignature !== signature) {
+          console.warn('[WhatsAppPayment] Webhook signature mismatch');
+          return res.status(401).json({ success: false, error: 'Invalid signature' });
+        }
+      }
+    } else {
+      // In production, reject webhooks without a configured secret to prevent spoofing
+      if (process.env.NODE_ENV === 'production') {
+        console.warn('[WhatsAppPayment] Rejected webhook — RAZORPAY_WEBHOOK_SECRET not configured in production');
+        return res.status(401).json({ success: false, error: 'Webhook secret not configured' });
+      }
+      console.log('[WhatsAppPayment] Webhook secret not configured — skipping signature verification (dev mode only)');
+    }
+
+    const { event, payload } = req.body;
+
+    if (!event) {
+      return res.status(400).json({ success: false, error: 'Missing event field' });
+    }
+
+    const result = await whatsappPaymentService.handleRazorpayWebhook(event, payload);
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[WhatsAppPayment] Webhook error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 };
