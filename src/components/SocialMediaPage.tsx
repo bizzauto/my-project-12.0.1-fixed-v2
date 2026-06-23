@@ -245,14 +245,14 @@ const SocialMediaPage: React.FC = () => {
       // Fetch all social accounts status
       socialAccountsAPI.list().then(res => {
         if (res.data.success) {
-          setSocialAccounts(res.data.data);
+          setSocialAccounts(Array.isArray(res.data.data) ? res.data.data : []);
         }
       }).catch(() => {}).finally(() => setLoadingSocialStatus(false));
 
       // Check Instagram connection status
       instagramAPI.getStatus().then(res => {
         if (res.data.success) {
-          setIgStatus(res.data.data);
+          setIgStatus(res.data.data || null);
 
       // Fetch social analytics
       setSocialLoading(true);
@@ -569,7 +569,7 @@ const SocialMediaPage: React.FC = () => {
         closeConnectModal();
         // Refresh social accounts status
         const statusRes = await socialAccountsAPI.list();
-        if (statusRes.data.success) setSocialAccounts(statusRes.data.data);
+        if (statusRes.data.success) setSocialAccounts(Array.isArray(statusRes.data.data) ? statusRes.data.data : []);
       }
     } catch (err: any) {
       showToast(err?.response?.data?.error || `Failed to connect ${platform}`, 'error');
@@ -599,7 +599,7 @@ const SocialMediaPage: React.FC = () => {
         showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} disconnected`);
         // Refresh social accounts status
         const statusRes = await socialAccountsAPI.list();
-        if (statusRes.data.success) setSocialAccounts(statusRes.data.data);
+        if (statusRes.data.success) setSocialAccounts(Array.isArray(statusRes.data.data) ? statusRes.data.data : []);
       }
     } catch (err: any) {
       showToast(err?.response?.data?.error || `Failed to disconnect ${platform}`, 'error');
@@ -620,7 +620,7 @@ const SocialMediaPage: React.FC = () => {
         setShowIgConnectModal(false);
         // Refresh status
         const statusRes = await instagramAPI.getStatus();
-        if (statusRes.data.success) setIgStatus(statusRes.data.data);
+        if (statusRes.data.success) setIgStatus(statusRes.data.data || null);
       }
     } catch (err: any) {
       showToast(err?.response?.data?.error || 'Failed to connect Instagram', 'error');
@@ -707,7 +707,7 @@ const SocialMediaPage: React.FC = () => {
               Connected Accounts
             </h3>
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {socialAccounts.filter(a => a.connected).length}/{socialAccounts.length} connected
+              {(Array.isArray(socialAccounts) ? socialAccounts.filter(a => a.connected).length : 0)}/{(Array.isArray(socialAccounts) ? socialAccounts.length : 0)} connected
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3 p-3 sm:p-4">
@@ -719,7 +719,7 @@ const SocialMediaPage: React.FC = () => {
               { id: 'google_business', name: 'Google Business', icon: '🏢', color: 'bg-red-600' },
               { id: 'youtube', name: 'YouTube', icon: '📺', color: 'bg-red-600' },
             ].map(platform => {
-              const account = socialAccounts.find(a => a.platform === platform.id);
+              const account = Array.isArray(socialAccounts) ? socialAccounts.find(a => a.platform === platform.id) : undefined;
               const isConnected = account?.connected || false;
 
               return (
