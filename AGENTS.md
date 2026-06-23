@@ -13,9 +13,15 @@ npm run dev:all          # Frontend + Backend + Worker
 npm run build            # Uses --noEmitOnError false, may show TS warnings but builds
 
 # Database
-npx prisma generate      # Generate Prisma client (run after schema changes)
-npx prisma db push       # Push schema to DB
-npx prisma studio        # Open DB GUI
+npx prisma generate              # Generate Prisma client (run after schema changes)
+npx prisma migrate dev           # Create + apply a new migration (development)
+npx prisma migrate deploy        # Apply pending migrations (production)
+npx prisma migrate dev --create-only  # Create migration file without applying
+npx prisma studio                # Open DB GUI
+npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script  # SQL preview
+
+# Migrations are now the primary way to manage schema changes
+# prisma/db push is deprecated — always use prisma migrate for production
 
 # Mobile (Capacitor)
 cd mobile-app
