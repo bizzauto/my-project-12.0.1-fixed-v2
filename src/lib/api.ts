@@ -265,6 +265,8 @@ export const analyticsAPI = {
   campaigns: (params?: any) => apiClient.get('/analytics/campaigns', { params }),
   social: (params?: any) => apiClient.get('/analytics/social', { params }),
   contacts: (params?: any) => apiClient.get('/analytics/contacts', { params }),
+  roi: (params?: any) => apiClient.get('/analytics/roi', { params }),
+  funnel: (params?: any) => apiClient.get('/analytics/funnel', { params }),
 };
 
 // Reviews API

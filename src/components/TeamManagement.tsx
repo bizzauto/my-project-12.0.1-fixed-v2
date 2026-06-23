@@ -188,19 +188,19 @@ const TeamManagement: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+        <div className="gradient-card rounded-lg shadow-sm p-4 border border-gray-100">
           <p className="text-sm text-gray-500 mb-1">Total Members</p>
           <p className="text-xl sm:text-2xl font-bold text-gray-900">{team.length}</p>
         </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+        <div className="gradient-card rounded-lg shadow-sm p-4 border border-gray-100">
           <p className="text-sm text-gray-500 mb-1">Active</p>
           <p className="text-xl sm:text-2xl font-bold text-green-600">{team.filter((m) => m.isActive).length}</p>
         </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+        <div className="gradient-card rounded-lg shadow-sm p-4 border border-gray-100">
           <p className="text-sm text-gray-500 mb-1">Suspended</p>
           <p className="text-xl sm:text-2xl font-bold text-red-600">{team.filter((m) => !m.isActive).length}</p>
         </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+        <div className="gradient-card rounded-lg shadow-sm p-4 border border-gray-100">
           <p className="text-sm text-gray-500 mb-1">Owners</p>
           <p className="text-xl sm:text-2xl font-bold text-purple-600">{team.filter((m) => m.role === 'OWNER').length}</p>
         </div>
@@ -261,7 +261,7 @@ const TeamManagement: React.FC = () => {
                   <td className="px-6 py-4">{getRoleBadge(member.role)}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                      member.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      member.isActive ? 'bg-green-100 text-green-700 status-online' : 'bg-red-100 text-red-700 status-offline'
                     }`}>
                       {member.isActive ? 'Active' : 'Suspended'}
                     </span>

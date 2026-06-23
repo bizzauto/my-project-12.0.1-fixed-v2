@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { razorpay } from './razorpay.service.js';
+import { prisma } from '../db.js';
 
 interface UpiPaymentRequest {
   phone: string;
@@ -80,14 +81,72 @@ export class WhatsAppPaymentService {
     return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data)}`;
   }
 
-  // Verify payment status
+  // Verify payment status by checking DB + Razorpay API
   async verifyPayment(transactionId: string): Promise<{ verified: boolean; status: string }> {
-    // In production, this would check with payment gateway
-    // For demo, simulate verification
-    return {
-      verified: true,
-      status: 'completed',
-    };
+    try {
+      // 1. Look up transaction in DB by ID
+      let transaction = await prisma.paymentLinkTransaction.findUnique({
+        where: { id: transactionId },
+      });
+
+      // 2. If not found by ID, try as razorpayPaymentId
+      if (!transaction) {
+        transaction = await prisma.paymentLinkTransaction.findFirst({
+          where: { razorpayPaymentId: transactionId },
+        });
+      }
+
+      if (transaction) {
+        // Already captured/confirmed in DB
+        if (transaction.status === 'captured' || transaction.status === 'completed') {
+          return { verified: true, status: 'completed' };
+        }
+
+        if (transaction.status === 'failed') {
+          return { verified: false, status: 'failed' };
+        }
+
+        // Pending with Razorpay payment ID — verify live with Razorpay API
+        if (transaction.razorpayPaymentId && razorpay) {
+          try {
+            const payment = await (razorpay.payments.fetch as any)(transaction.razorpayPaymentId);
+            if (payment && payment.status === 'captured') {
+              // Update DB to reflect captured status
+              await prisma.paymentLinkTransaction.update({
+                where: { id: transaction.id },
+                data: { status: 'captured' },
+              });
+              return { verified: true, status: 'captured' };
+            }
+            return { verified: false, status: payment?.status || 'pending' };
+          } catch (razorpayErr) {
+            console.warn('[WhatsAppPayment] Razorpay fetch failed:', razorpayErr);
+            return { verified: false, status: transaction.status };
+          }
+        }
+
+        // UPI or non-Razorpay — can't auto-verify, return DB status
+        return { verified: false, status: transaction.status };
+      }
+
+      // 3. Not found in our DB — try direct Razorpay payment lookup
+      if (razorpay) {
+        try {
+          const payment = await (razorpay.payments.fetch as any)(transactionId);
+          if (payment && payment.status === 'captured') {
+            return { verified: true, status: 'captured' };
+          }
+          return { verified: false, status: payment?.status || 'unknown' };
+        } catch {
+          // Not a valid Razorpay payment ID either
+        }
+      }
+
+      return { verified: false, status: 'not_found' };
+    } catch (error) {
+      console.error('[WhatsAppPayment] verifyPayment error:', error);
+      return { verified: false, status: 'error' };
+    }
   }
 
   // Send payment link via WhatsApp

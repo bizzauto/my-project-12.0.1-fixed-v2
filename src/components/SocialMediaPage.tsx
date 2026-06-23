@@ -10,7 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RT,
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
-import { postsAPI, instagramAPI, socialAccountsAPI } from '../lib/api';
+import { postsAPI, instagramAPI, socialAccountsAPI, analyticsAPI } from '../lib/api';
 import { useAuthStore } from '../lib/authStore';
 
 // Types
@@ -76,9 +76,15 @@ const SocialMediaPage: React.FC = () => {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['facebook', 'instagram']);
   const [scheduleDate, setScheduleDate] = useState('');
   const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
+  const [socialStats, setSocialStats] = useState<{ total: number; published: number; scheduled: number; draft: number } | null>(null);
+  const [byPlatform, setByPlatform] = useState<Record<string, any>>({});
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [weeklyEngagement, setWeeklyEngagement] = useState<any[]>([]);
+
+  // Social analytics state (from real API)
 
   // Social Accounts state
-  const [socialAccounts, setSocialAccounts] = useState<Array<{ platform: string; connected: boolean; details?: any }>>([]);
+  const [socialAccounts, setSocialAccounts] = useState<Array<{ platform: string; connected: boolean; details?: any }>([]);
   const [loadingSocialStatus, setLoadingSocialStatus] = useState(true);
   const [connectModal, setConnectModal] = useState<{ platform: string; open: boolean } | null>(null);
   const [connectForm, setConnectForm] = useState<Record<string, string>>({});
@@ -150,17 +156,27 @@ const SocialMediaPage: React.FC = () => {
     },
   ];
 
-  // Demo platform stats
-  const platformStats = [
+  // Demo platform stats (fallback)
+  const demoPlatformStats = [
     { platform: 'Facebook', icon: '📘', posts: 45, followers: 12500, engagement: 4.8 },
     { platform: 'Instagram', icon: '📷', posts: 38, followers: 8900, engagement: 5.2 },
     { platform: 'LinkedIn', icon: '💼', posts: 28, followers: 4200, engagement: 3.9 },
     { platform: 'Twitter/X', icon: '🐦', posts: 26, followers: 3100, engagement: 4.1 },
     { platform: 'YouTube', icon: '📺', posts: 15, followers: 5600, engagement: 6.8 },
   ];
+  // Use real API data when available, fallback to demo
+  const platformStats = isDemoMode || Object.keys(byPlatform).length === 0
+    ? demoPlatformStats
+    : Object.entries(byPlatform).map(([name, count]) => ({
+        platform: name.charAt(0).toUpperCase() + name.slice(1),
+        icon: ({ facebook: '📘', instagram: '📷', linkedin: '💼', twitter: '🐦', youtube: '📺' })[name.toLowerCase()] || '📱',
+        posts: typeof count === 'number' ? count : 0,
+        followers: 0,
+        engagement: 0,
+      }));
 
-  // Demo analytics data
-  const engagementData = [
+  // Demo analytics data (fallback)
+  const demoEngagementData = [
     { name: 'Mon', likes: 245, comments: 32, shares: 18 },
     { name: 'Tue', likes: 312, comments: 45, shares: 24 },
     { name: 'Wed', likes: 189, comments: 28, shares: 15 },
@@ -170,13 +186,22 @@ const SocialMediaPage: React.FC = () => {
     { name: 'Sun', likes: 145, comments: 18, shares: 12 },
   ];
 
-  const platformDistribution = [
+  const demoPlatformDistribution = [
     { name: 'Facebook', value: 45, color: '#3B82F6' },
     { name: 'Instagram', value: 38, color: '#EC4899' },
     { name: 'LinkedIn', value: 28, color: '#0A66C2' },
     { name: 'Twitter/X', value: 26, color: '#000000' },
     { name: 'YouTube', value: 15, color: '#EF4444' },
   ];
+  const engagementData = isDemoMode || weeklyEngagement.length === 0 ? demoEngagementData : weeklyEngagement;
+
+  const platformDistribution = isDemoMode || Object.keys(byPlatform).length === 0
+    ? demoPlatformDistribution
+    : Object.entries(byPlatform).map(([name, count], i) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: typeof count === 'number' ? count : 0,
+        color: (['#3B82F6', '#EC4899', '#0A66C2', '#000000', '#EF4444'])[i % 5],
+      }));
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -228,6 +253,17 @@ const SocialMediaPage: React.FC = () => {
       instagramAPI.getStatus().then(res => {
         if (res.data.success) {
           setIgStatus(res.data.data);
+
+      // Fetch social analytics
+      setSocialLoading(true);
+      analyticsAPI.social().then(res => {
+        if (res.data.success) {
+          const d = res.data.data;
+          if (d.stats) setSocialStats(d.stats);
+          if (d.byPlatform) setByPlatform(d.byPlatform);
+          if (d.weeklyEngagement) setWeeklyEngagement(d.weeklyEngagement);
+        }
+      }).catch(() => {}).finally(() => setSocialLoading(false));
         }
       }).catch(() => {});
     } else {
@@ -604,10 +640,17 @@ const SocialMediaPage: React.FC = () => {
     }
   };
 
-  // Calendar data for current month
   const calendarDays = Array.from({ length: 35 }, (_, i) => {
-    const day = i - 2; // offset for starting day
-    return { day: day > 0 && day <= 30 ? day : null, posts: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0 };
+    const day = i - 2;
+    const scheduledOnDay = isDemoMode ? 0 : posts.filter(p => {
+      if (p.status !== 'scheduled' && p.status !== 'published') return false;
+      const date = p.scheduledAt || p.publishedAt;
+      if (!date) return false;
+      const d = new Date(date);
+      return d.getDate() === day && d.getMonth() === new Date().getMonth();
+    }).length;
+    const demoCount = Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0;
+    return { day: day > 0 && day <= 31 ? day : null, posts: isDemoMode ? demoCount : scheduledOnDay };
   });
 
   return (
@@ -729,10 +772,10 @@ const SocialMediaPage: React.FC = () => {
         <>
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <StatCard icon={<Send size={20} />} label="Total Posts" value="137" change="+12%" positive color="blue" />
-            <StatCard icon={<Clock size={20} />} label="Scheduled" value="8" change="+3" positive color="purple" />
-            <StatCard icon={<TrendingUp size={20} />} label="Engagement Rate" value="4.8%" change="+0.6%" positive color="green" />
-            <StatCard icon={<Eye size={20} />} label="Total Reach" value="24.5K" change="+18%" positive color="orange" />
+            <StatCard icon={<Send size={20} />} label="Total Posts" value={isDemoMode ? "137" : (socialStats?.total ?? 0).toString()} change={isDemoMode ? "+12%" : "+0%"} positive color="blue" />
+            <StatCard icon={<Clock size={20} />} label="Scheduled" value={isDemoMode ? "8" : (socialStats?.scheduled ?? 0).toString()} change={isDemoMode ? "+3" : "+0"} positive color="purple" />
+            <StatCard icon={<TrendingUp size={20} />} label="Engagement Rate" value={isDemoMode ? "4.8%" : posts.filter(p => p.status === 'published').length > 0 ? ((posts.reduce((s, p) => s + p.likes + p.comments, 0) / posts.filter(p => p.status === 'published').length) * 0.1).toFixed(1) + '%' : "0%"} change={isDemoMode ? "+0.6%" : "+0%"} positive color="green" />
+            <StatCard icon={<Eye size={20} />} label="Total Reach" value={isDemoMode ? "24.5K" : (() => { const r = posts.reduce((s, p) => s + (p.reach || 0), 0); return r > 1000 ? (r / 1000).toFixed(1) + 'K' : r.toString(); })()} change={isDemoMode ? "+18%" : "+0%"} positive color="orange" />
           </div>
 
           {/* Platform Cards */}
@@ -935,14 +978,14 @@ const SocialMediaPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 sm:p-4 sm:p-5 md:p-6 border border-gray-100 dark:border-gray-700">
               <h3 className="font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 text-sm sm:text-base">Follower Growth</h3>
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={[
+                <LineChart data={isDemoMode ? [
                   { name: 'Jan', followers: 8200 },
                   { name: 'Feb', followers: 8900 },
                   { name: 'Mar', followers: 9800 },
                   { name: 'Apr', followers: 10500 },
                   { name: 'May', followers: 11200 },
                   { name: 'Jun', followers: 12570 },
-                ]}>
+                ] : weeklyEngagement.length > 0 ? weeklyEngagement.map((w, i) => ({ name: w.name || w.day || 'Day ' + (i+1), followers: w.likes || w.reach || 0 })) : []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fontSize: 12 }} />
                   <YAxis stroke="#9CA3AF" tick={{ fontSize: 12 }} />

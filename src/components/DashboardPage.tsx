@@ -120,6 +120,7 @@ export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'quarter'>('week');
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
+  const [insights, setInsights] = useState<any[]>([]);
 
   // Demo mode data - 8 KPI Cards
   const demoStats: StatCardProps[] = [
@@ -239,6 +240,9 @@ export default function DashboardPage() {
       setAnalyticsData(demoAnalyticsData);
       setPipelineData(demoPipelineData);
       setRecentLeads(demoRecentLeads);
+      setRevenueData(demoRevenueData);
+      setActivityFeed(demoActivityFeed);
+      setInsights(demoInsights);
       setLoading(false);
       return;
     }
@@ -306,6 +310,18 @@ export default function DashboardPage() {
         avatar: (lead.name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
       }));
       setRecentLeads(formattedLeads);
+
+      // Set revenue data from API (fallback to demo)
+      const revData = dashData?.data?.revenue ?? [];
+      setRevenueData(Array.isArray(revData) && revData.length > 0 ? revData : demoRevenueData);
+
+      // Set activity feed from API (fallback to demo)
+      const actData = dashData?.data?.activity ?? [];
+      setActivityFeed(Array.isArray(actData) && actData.length > 0 ? actData : demoActivityFeed);
+
+      // Set AI insights from API (fallback to demo)
+      const insData = dashData?.data?.insights ?? [];
+      setInsights(Array.isArray(insData) && insData.length > 0 ? insData : demoInsights);
     } catch (err: any) {
       console.error('Failed to fetch dashboard data:', err);
       setError(err.response?.data?.message || 'Failed to load dashboard data. Please try again.');
@@ -422,7 +438,7 @@ export default function DashboardPage() {
         <div className="modern-card rounded-xl md:rounded-2xl p-4 sm:p-5 md:p-6">
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">Live Activity</h3>
           <div className="space-y-2 sm:space-y-3">
-            {demoActivityFeed.map((activity) => (
+            {activityFeed.map((activity) => (
               <div key={activity.id} className="flex items-start gap-2.5 sm:gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                   activity.color === 'blue' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
@@ -448,7 +464,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 modern-card rounded-xl md:rounded-2xl p-4 sm:p-5 md:p-6">
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">Revenue Trend</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={demoRevenueData}>
+            <BarChart data={revenueData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="name" stroke="#9CA3AF" />
               <YAxis stroke="#9CA3AF" />
@@ -467,7 +483,7 @@ export default function DashboardPage() {
             <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">AI Insights</h3>
           </div>
           <div className="space-y-3 sm:space-y-4">
-            {demoInsights.map((insight) => (
+            {insights.map((insight) => (
               <div key={insight.id} className="p-2.5 sm:p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg sm:rounded-xl border border-purple-200/50 dark:border-purple-800/30">
                 <div className="flex items-center justify-between mb-1 gap-2">
                   <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">

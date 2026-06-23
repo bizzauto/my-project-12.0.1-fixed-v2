@@ -59,7 +59,7 @@ const Particles: React.FC = () => {
 const Section: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => {
   const { ref, inView } = useInView();
   return (
-    <div ref={ref} className={`transition-all duration-700 ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} ${className}`}>
+    <div ref={ref} className={`transition-all duration-700 ${inView ? 'animate-reveal' : 'opacity-0'} ${className}`}>
       {children}
     </div>
   );
@@ -261,7 +261,7 @@ const LandingPage: React.FC = () => {
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-12 pb-16 sm:pt-16 sm:pb-20 lg:pt-24 lg:pb-32">
-        <div className="absolute inset-0"><div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-500/10 dark:bg-emerald-500/8 rounded-full blur-[150px]" /><div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/8 rounded-full blur-[150px]" /></div>
+        <div className="absolute inset-0"><div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-500/10 dark:bg-emerald-500/8 rounded-full blur-[150px] animate-float-delayed" /><div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/8 rounded-full blur-[150px] animate-float-slow" /></div>
         <Particles />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 text-center">
           <div className="max-w-4xl mx-auto animate-fade-in-up">

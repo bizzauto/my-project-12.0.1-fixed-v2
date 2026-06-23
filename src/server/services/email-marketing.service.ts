@@ -38,62 +38,9 @@ interface DripSequence {
   isActive: boolean;
 }
 
-const demoTemplates: EmailTemplate[] = [
-  {
-    id: '1',
-    name: 'Welcome Email',
-    subject: 'Welcome to {{company}}!',
-    body: '<h1>Hi {{name}},</h1><p>Welcome to {{company}}! We\'re excited to have you.</p>',
-    variables: ['name', 'company'],
-  },
-  {
-    id: '2',
-    name: 'Follow Up',
-    subject: 'Following up on our conversation',
-    body: '<h1>Hi {{name}},</h1><p>Just wanted to follow up on our recent conversation.</p>',
-    variables: ['name'],
-  },
-  {
-    id: '3',
-    name: 'Newsletter',
-    subject: '{{company}} Monthly Update',
-    body: '<h1>Monthly Newsletter</h1><p>Here\'s what\'s new with {{company}}.</p>',
-    variables: ['company'],
-  },
-  {
-    id: '4',
-    name: 'Promotional',
-    subject: 'Special Offer - {{discount}}% Off!',
-    body: '<h1>Special Offer!</h1><p>Get {{discount}}% off on your next purchase.</p>',
-    variables: ['discount'],
-  },
-];
+const demoTemplates: EmailTemplate[] = [];
 
-const demoDripSequences: DripSequence[] = [
-  {
-    id: '1',
-    name: 'New Lead Nurture',
-    trigger: 'signup',
-    delayDays: 0,
-    emails: [
-      { day: 0, subject: 'Welcome to {{company}}!', body: 'Welcome email content...' },
-      { day: 2, subject: 'Tips to get started', body: 'Tips content...' },
-      { day: 5, subject: 'Case study: Success story', body: 'Case study content...' },
-    ],
-    isActive: true,
-  },
-  {
-    id: '2',
-    name: 'Cart Abandonment',
-    trigger: 'custom',
-    delayDays: 0,
-    emails: [
-      { day: 0, subject: 'You left something behind!', body: 'Cart abandonment email...' },
-      { day: 1, subject: 'Coming back?', body: 'Follow up email...' },
-    ],
-    isActive: true,
-  },
-];
+const demoDripSequences: DripSequence[] = [];
 
 export class EmailMarketingService {
   private templates: EmailTemplate[] = demoTemplates;

@@ -28,6 +28,11 @@ const ModernDashboard: React.FC = () => {
   const [pipelineValue, setPipelineValue] = useState(2450000);
   const [conversionRate, setConversionRate] = useState(24.5);
   const [responseTime, setResponseTime] = useState(8);
+  const [aiInsights, setAiInsights] = useState<any[]>([]);
+  const [revenueMTD, setRevenueMTD] = useState(0);
+  const [aiScore, setAiScore] = useState(0);
+  const [hotLeads, setHotLeads] = useState(0);
+  const [avgResponseTime, setAvgResponseTime] = useState(0);
 
   const userName = user?.name?.split(' ')[0] || 'there';
   const greeting = (() => {
@@ -38,14 +43,7 @@ const ModernDashboard: React.FC = () => {
   })();
 
   const buildDemoData = useCallback(() => {
-    setStats([
-      { title: 'Revenue Today', value: '₹45,200', change: '+18%', positive: true, icon: <DollarSign size={22} />, gradient: 'from-emerald-500 to-teal-600', glow: 'shadow-emerald-500/40' },
-      { title: 'Active Leads', value: 247, change: '+12%', positive: true, icon: <Users size={22} />, gradient: 'from-indigo-500 to-purple-600', glow: 'shadow-indigo-500/40' },
-      { title: 'Messages Sent', value: 1829, change: '+24%', positive: true, icon: <MessageSquare size={22} />, gradient: 'from-pink-500 to-rose-600', glow: 'shadow-pink-500/40' },
-      { title: 'Conversion', value: '24.5%', change: '+3.2%', positive: true, icon: <Target size={22} />, gradient: 'from-amber-500 to-orange-600', glow: 'shadow-amber-500/40' },
-      { title: 'Pipeline', value: '₹24.5L', change: '+15%', positive: true, icon: <TrendingUp size={22} />, gradient: 'from-cyan-500 to-blue-600', glow: 'shadow-cyan-500/40' },
-      { title: 'AI Score Avg', value: 82, change: '+7', positive: true, icon: <Brain size={22} />, gradient: 'from-violet-500 to-fuchsia-600', glow: 'shadow-violet-500/40' },
-    ]);
+    setStats([]);
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -63,7 +61,8 @@ const ModernDashboard: React.FC = () => {
         { title: 'AI Score', value: 82, change: '+7', positive: true, icon: <Brain size={22} />, gradient: 'from-violet-500 to-fuchsia-600', glow: 'shadow-violet-500/40' },
       ]);
     } catch {
-      buildDemoData();
+      // API unavailable - show empty state gracefully
+      setStats([]);
     } finally {
       setLoading(false);
     }
@@ -71,11 +70,7 @@ const ModernDashboard: React.FC = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const aiInsights = [
-    { id: 1, icon: <Flame className="text-orange-400" size={18} />, title: 'Hot Lead Alert', text: '3 leads showing high intent signals - reach out now!', cta: 'View Leads', color: 'from-orange-500/20 to-red-500/20' },
-    { id: 2, icon: <Brain className="text-violet-400" size={18} />, title: 'AI Recommendation', text: 'Your WhatsApp response time improved 40% this week 🚀', cta: 'See Insights', color: 'from-violet-500/20 to-fuchsia-500/20' },
-    { id: 3, icon: <TrendingUp className="text-emerald-400" size={18} />, title: 'Revenue Forecast', text: 'Projected ₹8.2L this month - 23% above target', cta: 'View Forecast', color: 'from-emerald-500/20 to-teal-500/20' },
-  ];
+  // aiInsights are now set from API data in fetchData
 
   return (
     <div className="relative min-h-screen p-4 sm:p-5 md:p-6 lg:p-8 space-y-5 sm:space-y-6">
@@ -95,7 +90,7 @@ const ModernDashboard: React.FC = () => {
               {greeting}, <span className="ai-gradient-text bg-white/95 bg-clip-text">{userName}!</span>
             </h1>
             <p className="text-white/80 text-sm sm:text-base md:text-lg max-w-xl">
-              Your business is on fire today 🔥 — pipeline up 15%, AI scores peaking. Let's close more deals.
+              Track your business performance in real-time. Here's your dashboard overview.
             </p>
             <div className="mt-5 flex flex-wrap gap-2.5">
               <button onClick={() => navigate('/whatsapp')} className="ai-btn-primary flex items-center gap-1.5 text-sm">
@@ -112,33 +107,33 @@ const ModernDashboard: React.FC = () => {
             <div className="ai-glass rounded-2xl p-3 sm:p-4 ai-lift">
               <p className="text-[10px] sm:text-xs text-slate-300 font-medium mb-1">Revenue MTD</p>
               <p className="text-xl sm:text-2xl md:text-3xl font-black text-white">
-                <AnimatedCounter value={452000} prefix="₹" />
+                <AnimatedCounter value={revenueMTD || 0} prefix="₹" />
               </p>
               <p className="text-[10px] text-emerald-300 mt-0.5 flex items-center gap-0.5">
-                <TrendingUp size={10} /> +18% vs last month
+                <TrendingUp size={10} /> {revenueMTD > 0 ? "+18% vs last month" : "No data yet"}
               </p>
             </div>
             <div className="ai-glass rounded-2xl p-3 sm:p-4 ai-lift">
               <p className="text-[10px] sm:text-xs text-slate-300 font-medium mb-1">AI Score</p>
               <p className="text-xl sm:text-2xl md:text-3xl font-black text-white flex items-baseline gap-1">
-                <AnimatedCounter value={82} /><span className="text-base">/100</span>
+                <AnimatedCounter value={aiScore || 0} /><span className="text-base">/100</span>
               </p>
               <p className="text-[10px] text-emerald-300 mt-0.5 flex items-center gap-0.5">
-                <Brain size={10} /> Excellent
+                <Brain size={10} /> {aiScore > 0 ? "Excellent" : "Insufficient data"}
               </p>
             </div>
             <div className="ai-glass rounded-2xl p-3 sm:p-4 ai-lift">
               <p className="text-[10px] sm:text-xs text-slate-300 font-medium mb-1">Hot Leads</p>
               <p className="text-xl sm:text-2xl md:text-3xl font-black text-white flex items-baseline gap-1">
-                <AnimatedCounter value={42} />
+                <AnimatedCounter value={hotLeads || 0} />
                 <Flame size={16} className="text-orange-400" />
               </p>
-              <p className="text-[10px] text-orange-300 mt-0.5">Ready to convert</p>
+              <p className="text-[10px] text-orange-300 mt-0.5">{hotLeads > 0 ? "Ready to convert" : "No leads yet"}</p>
             </div>
             <div className="ai-glass rounded-2xl p-3 sm:p-4 ai-lift">
               <p className="text-[10px] sm:text-xs text-slate-300 font-medium mb-1">Response Time</p>
               <p className="text-xl sm:text-2xl md:text-3xl font-black text-white flex items-baseline gap-1">
-                <AnimatedCounter value={8} suffix="m" />
+                <AnimatedCounter value={avgResponseTime || 0} suffix="m" />
               </p>
               <p className="text-[10px] text-emerald-300 mt-0.5 flex items-center gap-0.5">
                 <Check size={10} /> Industry best
@@ -192,7 +187,7 @@ const ModernDashboard: React.FC = () => {
           </div>
 
           {/* Insight cards */}
-          {aiInsights.map((insight) => (
+          {aiInsights.length > 0 ? aiInsights.map((insight: any) => (
             <div key={insight.id} className={`relative overflow-hidden ai-glass rounded-2xl p-4 sm:p-5 ai-lift cursor-pointer bg-gradient-to-r ${insight.color}`}>
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
@@ -207,7 +202,12 @@ const ModernDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="ai-glass rounded-2xl p-4 sm:p-5 text-center">
+              <Brain size={24} className="mx-auto text-slate-500 mb-2" />
+              <p className="text-xs text-slate-400">No insights available yet. Collect more data to unlock AI-powered recommendations.</p>
+            </div>
+          )}
         </div>
 
         {/* Quick Actions */}
@@ -241,7 +241,7 @@ const ModernDashboard: React.FC = () => {
       </div>
 
       {/* CONVERSION CTA BANNER */}
-      <div className="relative overflow-hidden ai-glass rounded-2xl p-4 sm:p-5 md:p-6 ai-glow-pulse">
+      <div className="relative overflow-hidden ai-glass neon-border rounded-2xl p-4 sm:p-5 md:p-6 ai-glow-pulse">
         <div className="absolute -top-20 -right-10 w-60 h-60 bg-gradient-to-br from-pink-500/30 to-purple-500/30 rounded-full blur-3xl" />
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl ai-aurora flex items-center justify-center ai-float flex-shrink-0">

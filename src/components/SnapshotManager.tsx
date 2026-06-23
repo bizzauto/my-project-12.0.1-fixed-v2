@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useRef } from 'react';
+﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Download,
   Upload,
@@ -21,6 +21,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useToast } from './Toast';
+import { contactsAPI, pipelinesAPI, automationAPI, emailAPI, campaignsAPI, ecommerceAPI } from '../lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -115,43 +116,54 @@ const CATEGORIES: SnapshotCategory[] = [
 const STORAGE_KEY = 'snapshot_logs';
 const SNAPSHOT_VERSION = '1.0.0';
 
-// ─── Demo data (simulates what would come from an API / store) ──────────────
+// ─── Data Cache & Fetcher ─────────────────────────────────────────────────
 
-const DEMO_DATA: Record<SnapshotCategory, SnapshotItem[]> = {
-  contacts: [
-    { id: '1', name: 'Rahul Sharma', email: 'rahul@example.com', phone: '+917972888023', company: 'TechCorp' },
-    { id: '2', name: 'Priya Patel', email: 'priya@example.com', phone: '+919876543211', company: 'DesignHub' },
-    { id: '3', name: 'Amit Kumar', email: 'amit@example.com', phone: '+919876543212', company: 'CloudBase' },
-    { id: '4', name: 'Sneha Gupta', email: 'sneha@example.com', phone: '+919876543213', company: 'InnoLabs' },
-    { id: '5', name: 'Vikram Singh', email: 'vikram@example.com', phone: '+919876543214', company: 'DataFlow' },
-  ],
-  pipelines: [
-    { id: 'p1', name: 'Sales Pipeline', stages: ['Lead', 'Qualified', 'Proposal', 'Closed Won'] },
-    { id: 'p2', name: 'Onboarding Pipeline', stages: ['Signed Up', 'Setup', 'Training', 'Live'] },
-    { id: 'p3', name: 'Support Pipeline', stages: ['Ticket Open', 'In Progress', 'Resolved'] },
-  ],
-  automations: [
-    { id: 'a1', name: 'Welcome Email Sequence', trigger: 'contact_created', active: true },
-    { id: 'a2', name: 'Follow-up Reminder', trigger: 'no_reply_3d', active: true },
-    { id: 'a3', name: 'Deal Stage Notification', trigger: 'deal_stage_changed', active: false },
-    { id: 'a4', name: 'Re-engagement Campaign', trigger: 'inactive_30d', active: true },
-  ],
-  templates: [
-    { id: 't1', name: 'Welcome Email', type: 'email', subject: 'Welcome to our platform!' },
-    { id: 't2', name: 'Invoice Receipt', type: 'email', subject: 'Your invoice is ready' },
-    { id: 't3', name: 'SMS Appointment Reminder', type: 'sms', body: 'Your appointment is tomorrow at {time}' },
-  ],
-  campaigns: [
-    { id: 'c1', name: 'Summer Sale 2026', type: 'email', status: 'active', audience: 'All Contacts' },
-    { id: 'c2', name: 'Product Launch', type: 'sms', status: 'draft', audience: 'VIP Contacts' },
-  ],
-  products: [
-    { id: 'pr1', name: 'Starter Plan', price: 999, currency: 'INR', recurring: true },
-    { id: 'pr2', name: 'Pro Plan', price: 2999, currency: 'INR', recurring: true },
-    { id: 'pr3', name: 'Enterprise Plan', price: 9999, currency: 'INR', recurring: true },
-    { id: 'pr4', name: 'One-time Setup', price: 5000, currency: 'INR', recurring: false },
-  ],
-};
+// In-memory cache populated from real API on mount
+let cachedData: Record<SnapshotCategory, SnapshotItem[]> | null = null;
+
+async function fetchSnapshotData(): Promise<Record<SnapshotCategory, SnapshotItem[]>> {
+  if (cachedData) return cachedData;
+
+  const data: Record<SnapshotCategory, SnapshotItem[]> = {
+    contacts: [],
+    pipelines: [],
+    automations: [],
+    templates: [],
+    campaigns: [],
+    products: [],
+  };
+
+  const results = await Promise.allSettled([
+    contactsAPI.list({ limit: 100 }).then(r => r.data?.data?.contacts || r.data?.data || r.data || []).catch(() => []),
+    pipelinesAPI.list().then(r => r.data?.data?.pipelines || r.data?.data || r.data || []).catch(() => []),
+    automationAPI.listRules().then(r => r.data?.data?.rules || r.data?.data || r.data || []).catch(() => []),
+    emailAPI.listTemplates().then(r => r.data?.data?.templates || r.data?.data || r.data || []).catch(() => []),
+    campaignsAPI.list({ limit: 100 }).then(r => r.data?.data?.campaigns || r.data?.data || r.data || []).catch(() => []),
+    ecommerceAPI.listProducts({ limit: 100 }).then(r => r.data?.data?.products || r.data?.data || r.data || []).catch(() => []),
+  ]);
+
+  const mapResults = (idx: number, src: SnapshotCategory) => {
+    const r = results[idx];
+    const items = r.status === 'fulfilled' ? r.value : [];
+    data[src] = (Array.isArray(items) ? items : []).map((i: any) => ({
+      id: i.id || i._id || String(Math.random()),
+      name: i.name || i.title || 'Unknown',
+      ...i,
+    }));
+  };
+
+  mapResults(0, 'contacts');
+  mapResults(1, 'pipelines');
+  mapResults(2, 'automations');
+  mapResults(3, 'templates');
+  mapResults(4, 'campaigns');
+  mapResults(5, 'products');
+
+  cachedData = data;
+  return data;
+}
+
+
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -186,6 +198,26 @@ function formatTimestamp(ts: string) {
 
 const SnapshotManager: React.FC = () => {
   const { error: showError, success: showSuccess } = useToast();
+  const [liveData, setLiveData] = useState<Record<SnapshotCategory, SnapshotItem[]> | null>(null);
+
+  // Fetch real data on mount
+  useEffect(() => {
+    fetchSnapshotData().then(data => {
+      setLiveData(data);
+    });
+  }, []);
+
+  // Helper to get live data or empty
+  const getDataForCategory = useCallback((cat: SnapshotCategory): SnapshotItem[] => {
+    return liveData?.[cat] ?? [];
+  }, [liveData]);
+
+  // Helper to check if data exists (for conflict detection)
+  const itemExistsInLiveData = useCallback((cat: SnapshotCategory, name: string): boolean => {
+    const items = liveData?.[cat] ?? [];
+    return items.some(item => item.name === name);
+  }, [liveData]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // UI state
@@ -259,8 +291,8 @@ const SnapshotManager: React.FC = () => {
       let totalItems = 0;
       CATEGORIES.forEach((cat) => {
         if (exportSelected[cat]) {
-          categories[cat] = DEMO_DATA[cat];
-          totalItems += DEMO_DATA[cat].length;
+          categories[cat] = getDataForCategory(cat);
+          totalItems += categories[cat]?.length || 0;
         }
       });
 
@@ -335,7 +367,7 @@ const SnapshotManager: React.FC = () => {
               selected[cat] = true;
               conflicts[cat] = items.map((item) => ({
                 name: item.name || item.id,
-                existing: DEMO_DATA[cat]?.some((existing) => existing.name === item.name) ?? false,
+                existing: itemExistsInLiveData(cat, item.name),
               }));
             }
           });
@@ -528,7 +560,7 @@ const SnapshotManager: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {CATEGORIES.map((cat) =>
-                renderCategoryCheckbox(cat, exportSelected[cat], () => toggleExportCategory(cat), DEMO_DATA[cat].length),
+                renderCategoryCheckbox(cat, exportSelected[cat], () => toggleExportCategory(cat), (getDataForCategory(cat).length || 0)),
               )}
             </div>
 
@@ -569,7 +601,7 @@ const SnapshotManager: React.FC = () => {
               <div className="space-y-2">
                 {CATEGORIES.filter((c) => exportSelected[c]).map((cat) => {
                   const meta = CATEGORY_META[cat];
-                  const items = DEMO_DATA[cat];
+                  const items = getDataForCategory(cat);
                   return (
                     <div key={cat} className="flex items-center gap-3 text-sm">
                       <div className={`w-6 h-6 rounded flex items-center justify-center ${meta.bgColor} ${meta.color}`}>

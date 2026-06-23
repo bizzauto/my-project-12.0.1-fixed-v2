@@ -310,7 +310,7 @@ class WhatsAppMediaCleanupService {
       warnings.push({
         userId,
         userName: this.maskUserName(userId),
-        email: `${userId}@example.com`,
+        email: 'user@bizzauto.com',
         filesCount: files.length,
         totalSize: files.reduce((sum, f) => sum + f.fileSize, 0),
         oldestFileDate: files.reduce((oldest, f) => f.createdAt < oldest ? f.createdAt : oldest, files[0].createdAt),

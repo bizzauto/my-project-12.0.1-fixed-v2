@@ -329,7 +329,11 @@ const TriggerLinks: React.FC = () => {
   const { isDemoMode } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [links, setLinks] = useState<TriggerLink[]>([]);
-  const [analytics, setAnalytics] = useState<ClickAnalytics>(DEMO_ANALYTICS);
+  const [analytics, setAnalytics] = useState<ClickAnalytics>({
+    timeline: [], devices: [], browsers: [], countries: [], referrers: [],
+    totalClicks: 0, uniqueVisitors: 0, avgClicksPerDay: 0,
+    topCountry: '', topDevice: '', topBrowser: '',
+  });
   const [selectedLink, setSelectedLink] = useState<TriggerLink | null>(null);
   const [showQR, setShowQR] = useState<TriggerLink | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);

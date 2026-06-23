@@ -75,31 +75,31 @@ const triggers = [
     id: 'new_contact',
     name: 'New Contact Created',
     description: 'Triggers when a new contact is created',
-    sample: { id: '1', name: 'John Doe', phone: '+919999999999', email: 'john@example.com' },
+    sample: {},
   },
   {
     id: 'new_deal',
     name: 'New Deal Created',
     description: 'Triggers when a new deal is created',
-    sample: { id: '1', title: 'Enterprise License', value: 50000, stage: 'New Lead' },
+    sample: {},
   },
   {
     id: 'deal_won',
     name: 'Deal Won',
     description: 'Triggers when a deal is marked as won',
-    sample: { id: '1', title: 'Enterprise License', value: 50000, customer: 'Acme Corp' },
+    sample: {},
   },
   {
     id: 'order_created',
     name: 'New Order',
     description: 'Triggers when a new order is created',
-    sample: { id: '1', customerName: 'John Doe', total: 1500, items: 2 },
+    sample: {},
   },
   {
     id: 'appointment_scheduled',
     name: 'Appointment Scheduled',
     description: 'Triggers when an appointment is scheduled',
-    sample: { id: '1', title: 'Product Demo', clientName: 'John Doe', date: '2024-01-25' },
+    sample: {},
   },
 ];
 

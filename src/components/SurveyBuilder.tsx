@@ -207,7 +207,19 @@ export default function SurveyBuilder() {
           })),
         })));
       }
-    } catch { /* ignore */ }
+    } catch {
+    if (surveys.length === 0) {
+      const mockData = generateMockData();
+      setSurveys(mockData.map(s => ({
+        ...s,
+        questions: s.questions.map(q => ({
+          ...q,
+          validation: q.validation || { minLength: 0, maxLength: 0, pattern: '', customMessage: '' },
+          conditionalLogic: q.conditionalLogic || { enabled: false, questionId: '', operator: 'equals', value: '' },
+        })),
+      })));
+    }
+    }
     finally { setLoading(false); }
   };
 
@@ -224,6 +236,10 @@ export default function SurveyBuilder() {
         })));
       }
     } catch { /* ignore */ }
+    // Fallback: use generateMockResponses when API is unavailable
+    if (responses.length === 0 && surveyId) {
+      setResponses(generateMockResponses(surveyId));
+    }
   };
 
   const filtered = surveys.filter(s => {

@@ -191,7 +191,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       {/* Tablet (md-lg): slide-out drawer with w-72 */}
       {/* Desktop (lg+): always visible, collapsible w-64/w-20 */}
       <div
-        className={`bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 fixed left-0 top-0 z-50 flex-col transition-all duration-300 ${
+        className={`bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 fixed left-0 top-0 z-50 flex-col transition-all duration-300 sidebar-glow ${
           isMobile ? 'hidden' :
           isTablet ? (sidebarOpen ? 'flex w-72 shadow-2xl' : 'hidden') :
           'flex ' + (collapsed ? 'w-20' : 'w-64')
@@ -213,7 +213,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               onClick={() => navigate(item.id)}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                 isActive(item.id)
-                  ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium'
+                  ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium relative nav-indicator'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
               title={collapsed ? item.label : undefined}
@@ -246,7 +246,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   onClick={() => navigate(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                     isActive(item.id)
-                      ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium'
+                      ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium relative nav-indicator'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                   title={collapsed ? item.label : undefined}
@@ -268,7 +268,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               onClick={() => navigate(item.id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                 isActive(item.id)
-                  ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium'
+                  ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium relative nav-indicator'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
               title={collapsed ? item.label : undefined}

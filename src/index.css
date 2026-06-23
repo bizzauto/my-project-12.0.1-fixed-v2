@@ -1171,7 +1171,7 @@ body {
 }
 .ai-gradient-border:hover::before { opacity: 1; }
 
-/* Gradient text */
+/* Gradient text — uses existing @keyframes gradient-shift */
 .ai-gradient-text {
   background: linear-gradient(135deg, #818cf8 0%, #ec4899 50%, #14b8a6 100%);
   background-size: 200% 200%;
@@ -1179,10 +1179,6 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: gradient-shift 6s ease infinite;
-}
-@keyframes gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
 }
 
 /* Glowing button */
@@ -1204,15 +1200,15 @@ body {
 }
 .ai-btn-primary:active { transform: translateY(0); }
 
-/* Glowing pulse */
-@keyframes glow-pulse {
+/* Glowing pulse (stronger variant for AI mode) */
+@keyframes glow-pulse-strong {
   0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.4), 0 0 40px rgba(99, 102, 241, 0.2); }
   50% { box-shadow: 0 0 30px rgba(236, 72, 153, 0.6), 0 0 60px rgba(236, 72, 153, 0.3); }
 }
-.ai-glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+.ai-glow-pulse { animation: glow-pulse-strong 3s ease-in-out infinite; }
 
-/* Shimmer effect */
-@keyframes shimmer {
+/* Shimmer effect for AI mode — percentage-based for universal sizing */
+@keyframes shimmer-wide {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
@@ -1224,7 +1220,7 @@ body {
     rgba(255, 255, 255, 0) 100%
   );
   background-size: 200% 100%;
-  animation: shimmer 3s linear infinite;
+  animation: shimmer-wide 3s linear infinite;
 }
 
 /* Floating animation */

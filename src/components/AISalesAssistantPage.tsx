@@ -46,31 +46,14 @@ export default function AISalesAssistantPage() {
         setHotLeads(data.data.hotLeads || []);
         setForecast(data.data.forecast || { expected: 0, confidence: 0, pipeline: 0 });
       } else {
-        // Demo data
-        setInsights([
-          { type: 'opportunity', title: 'Follow up with Rahul Sharma', description: 'He showed interest in Enterprise plan 2 days ago. High conversion probability.', action: 'Send follow-up message', priority: 'high' },
-          { type: 'warning', title: 'Priya Patel going cold', description: 'No engagement in 7 days. Last interaction was opening email.', action: 'Re-engage with offer', priority: 'high' },
-          { type: 'tip', title: 'Best time to call leads', description: 'Data shows 10AM-12PM and 4PM-6PM have 3x higher connect rate.', priority: 'medium' },
-          { type: 'trend', title: 'Enterprise leads increasing', description: '23% more enterprise inquiries this month compared to last.', priority: 'low' },
-          { type: 'opportunity', title: 'Upsell opportunity detected', description: '3 Starter plan users are near their limits. Perfect time to upgrade.', action: 'Send upgrade offer', priority: 'medium' },
-        ]);
-        setHotLeads([
-          { id: '1', name: 'Rahul Sharma', score: 92, category: 'very_hot', nextAction: 'Call now - high intent signal' },
-          { id: '2', name: 'Anita Desai', score: 85, category: 'hot', nextAction: 'Send pricing details' },
-          { id: '3', name: 'Vikram Singh', score: 78, category: 'hot', nextAction: 'Schedule demo' },
-          { id: '4', name: 'Meera Nair', score: 71, category: 'warm', nextAction: 'Send case study' },
-        ]);
-        setForecast({ expected: 125000, confidence: 78, pipeline: 450000 });
+        // No data available - show empty state
+      setInsights([]);
+      setHotLeads([]);
+      setForecast({ expected: 0, confidence: 0, pipelineValue: 0 });
       }
     } catch {
-      setInsights([
-        { type: 'opportunity', title: 'Follow up with Rahul Sharma', description: 'He showed interest in Enterprise plan 2 days ago.', action: 'Send follow-up', priority: 'high' },
-        { type: 'warning', title: 'Priya Patel going cold', description: 'No engagement in 7 days.', action: 'Re-engage', priority: 'high' },
-      ]);
-      setHotLeads([
-        { id: '1', name: 'Rahul Sharma', score: 92, category: 'very_hot', nextAction: 'Call now' },
-        { id: '2', name: 'Anita Desai', score: 85, category: 'hot', nextAction: 'Send pricing' },
-      ]);
+      setInsights([]);
+      setHotLeads([]);
       setForecast({ expected: 125000, confidence: 78, pipeline: 450000 });
     } finally {
       setLoading(false);

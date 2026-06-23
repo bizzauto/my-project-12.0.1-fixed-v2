@@ -50,6 +50,13 @@ const ReportsPage: React.FC = () => {
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter'>('week');
 
+  // Real API data for ROI & Funnel tabs
+  const [roiData, setRoiData] = useState<any[]>([]);
+  const [funnelData, setFunnelData] = useState<any[]>([]);
+  const [sourceStats, setSourceStats] = useState<any[]>([]);
+  const [roiLoading, setRoiLoading] = useState(false);
+  const [funnelLoading, setFunnelLoading] = useState(false);
+
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444'];
 
   const demoRoiData = [
@@ -153,6 +160,22 @@ const ReportsPage: React.FC = () => {
         });
         setWeeklyData(data.weeklyData || []);
       }
+
+      // Fetch ROI data (non-demo)
+      setRoiLoading(true);
+      analyticsAPI.roi().then(res => {
+        if (res.data.success) setRoiData(res.data.data || []);
+      }).catch(() => {}).finally(() => setRoiLoading(false));
+
+      // Fetch Funnel data (non-demo)
+      setFunnelLoading(true);
+      analyticsAPI.funnel().then(res => {
+        if (res.data.success) {
+          const d = res.data.data;
+          setFunnelData(d.funnel || []);
+          setSourceStats(d.sources || []);
+        }
+      }).catch(() => {}).finally(() => setFunnelLoading(false));
 
       if (leadsRes.data.success) {
         const leads = leadsRes.data.data?.contacts || [];
@@ -425,48 +448,68 @@ const ReportsPage: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <DollarSign size={20} className="text-green-600" />ROI by Channel
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="p-4 bg-green-50 rounded-xl">
-                <p className="text-sm text-green-600 font-medium">Total Spend</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-700">{formatCurrency(demoRoiData.reduce((s, r) => s + r.spend, 0))}</p>
+            {roiLoading && !isDemoMode ? (
+              <div className="p-8 text-center">
+                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Loading ROI data...</p>
               </div>
-              <div className="p-4 bg-blue-50 rounded-xl">
-                <p className="text-sm text-blue-600 font-medium">Total Revenue</p>
-                <p className="text-xl sm:text-2xl font-bold text-blue-700">{formatCurrency(demoRoiData.reduce((s, r) => s + r.revenue, 0))}</p>
-              </div>
-              <div className="p-4 bg-purple-50 rounded-xl">
-                <p className="text-sm text-purple-600 font-medium">Average ROI</p>
-                <p className="text-xl sm:text-2xl font-bold text-purple-700">{Math.round(demoRoiData.reduce((s, r) => s + r.roi, 0) / demoRoiData.length)}%</p>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Channel</th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Spend</th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Revenue</th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">ROI</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Performance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {demoRoiData.map((item, i) => (
-                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium text-gray-900">{item.source}</td>
-                      <td className="py-3 px-4 text-right text-gray-600">{formatCurrency(item.spend)}</td>
-                      <td className="py-3 px-4 text-right text-green-600 font-medium">{formatCurrency(item.revenue)}</td>
-                      <td className="py-3 px-4 text-right font-bold text-blue-600">{item.roi}%</td>
-                      <td className="py-3 px-4">
-                        <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(100, item.roi / 30)}%` }} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            ) : (() => {
+              const displayRoi = isDemoMode ? demoRoiData : roiData;
+              if (!displayRoi || displayRoi.length === 0) {
+                return (
+                  <div className="p-8 text-center text-gray-500">
+                    <DollarSign size={40} className="mx-auto mb-3 opacity-30" />
+                    <p>No ROI data available yet. Connect your ad accounts and start campaigns to see channel performance.</p>
+                  </div>
+                );
+              }
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="p-4 bg-green-50 rounded-xl">
+                      <p className="text-sm text-green-600 font-medium">Total Spend</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-700">{formatCurrency(displayRoi.reduce((s: any, r: any) => s + (r.spend || 0), 0))}</p>
+                    </div>
+                    <div className="p-4 bg-blue-50 rounded-xl">
+                      <p className="text-sm text-blue-600 font-medium">Total Revenue</p>
+                      <p className="text-xl sm:text-2xl font-bold text-blue-700">{formatCurrency(displayRoi.reduce((s: any, r: any) => s + (r.revenue || 0), 0))}</p>
+                    </div>
+                    <div className="p-4 bg-purple-50 rounded-xl">
+                      <p className="text-sm text-purple-600 font-medium">Average ROI</p>
+                      <p className="text-xl sm:text-2xl font-bold text-purple-700">{displayRoi.length > 0 ? Math.round(displayRoi.reduce((s: any, r: any) => s + (r.roi || 0), 0) / displayRoi.length) : 0}%</p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Channel</th>
+                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Spend</th>
+                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Revenue</th>
+                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">ROI</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Performance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayRoi.map((item: any, i: number) => (
+                          <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="py-3 px-4 font-medium text-gray-900">{item.source || item.name}</td>
+                            <td className="py-3 px-4 text-right text-gray-600">{formatCurrency(item.spend || 0)}</td>
+                            <td className="py-3 px-4 text-right text-green-600 font-medium">{formatCurrency(item.revenue || 0)}</td>
+                            <td className="py-3 px-4 text-right font-bold text-blue-600">{item.roi || 0}%</td>
+                            <td className="py-3 px-4">
+                              <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(100, (item.roi || 0) / 30)}%` }} />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -478,60 +521,98 @@ const ReportsPage: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
               <TrendingUp size={20} className="text-blue-600" />Sales Funnel Visualization
             </h3>
-            <div className="flex flex-col items-center space-y-2">
-              {demoFunnelData.map((stage, i) => {
-                const width = 100 - (i * 15);
-                const convRate = i > 0 ? ((stage.count / demoFunnelData[i - 1].count) * 100).toFixed(1) : '100';
+            {funnelLoading && !isDemoMode ? (
+              <div className="p-8 text-center">
+                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Loading funnel data...</p>
+              </div>
+            ) : (() => {
+              const displayFunnel = isDemoMode ? demoFunnelData : funnelData;
+              if (!displayFunnel || displayFunnel.length === 0) {
                 return (
-                  <div key={stage.stage} className="text-center" style={{ width: `${width}%` }}>
-                    <div
-                      className="py-4 px-4 sm:px-5 md:px-6 rounded-lg text-white font-semibold text-sm transition-all hover:opacity-90 cursor-pointer"
-                      style={{ backgroundColor: stage.color }}
-                    >
-                      {stage.stage}: {stage.count.toLocaleString()}
-                    </div>
-                    {i > 0 && (
-                      <p className="text-xs text-gray-500 mt-1">{convRate}% conversion</p>
-                    )}
+                  <div className="p-8 text-center text-gray-500">
+                    <TrendingUp size={40} className="mx-auto mb-3 opacity-30" />
+                    <p>No funnel data available yet. Add contacts and start tracking your pipeline.</p>
                   </div>
                 );
-              })}
-            </div>
+              }
+              return (
+                <div className="flex flex-col items-center space-y-2">
+                  {displayFunnel.map((stage: any, i: number) => {
+                    const width = 100 - (i * 15);
+                    const convRate = i > 0 ? ((stage.count / displayFunnel[i - 1].count) * 100).toFixed(1) : '100';
+                    return (
+                      <div key={stage.stage || stage.name} className="text-center" style={{ width: `${width}%` }}>
+                        <div
+                          className="py-4 px-4 sm:px-5 md:px-6 rounded-lg text-white font-semibold text-sm transition-all hover:opacity-90 cursor-pointer"
+                          style={{ backgroundColor: stage.color || '#3B82F6' }}
+                        >
+                          {stage.stage || stage.name}: {(stage.count || 0).toLocaleString()}
+                        </div>
+                        {i > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">{convRate}% conversion</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Source Distribution */}
           <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6 border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Source Distribution</h3>
-            <div className="flex items-center gap-8">
-              <ResponsiveContainer width="50%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={demoSourceStats}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}%`}
-                  >
-                    {demoSourceStats.map((entry, i) => (
-                      <Cell key={`cell-${i}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-3">
-                {demoSourceStats.map((source, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: source.color }} />
-                      <span className="text-sm text-gray-700">{source.name}</span>
-                    </div>
-                    <span className="text-sm font-semibold text-gray-900">{source.value}%</span>
-                  </div>
-                ))}
+            {funnelLoading && !isDemoMode ? (
+              <div className="p-8 text-center">
+                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               </div>
-            </div>
+            ) : (() => {
+              const displaySources = isDemoMode ? demoSourceStats : sourceStats;
+              if (!displaySources || displaySources.length === 0) {
+                return (
+                  <div className="p-8 text-center text-gray-500">
+                    <p>No source data available</p>
+                  </div>
+                );
+              }
+              const total = displaySources.reduce((s: any, src: any) => s + (src.value || 0), 0);
+              return (
+                <div className="flex items-center gap-8">
+                  <ResponsiveContainer width="50%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={displaySources.map((s: any) => ({ ...s, value: total > 0 ? Math.round((s.value || 0) / total * 100) : 0 }))}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}%`}
+                      >
+                        {displaySources.map((_: any, i: number) => (
+                          <Cell key={`cell-${i}`} fill={displaySources[i].color || COLORS[i % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex-1 space-y-3">
+                    {displaySources.map((source: any, i: number) => {
+                      const pct = total > 0 ? Math.round((source.value || 0) / total * 100) : 0;
+                      return (
+                        <div key={i} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: source.color || COLORS[i % COLORS.length] }} />
+                            <span className="text-sm text-gray-700">{source.name}</span>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900">{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

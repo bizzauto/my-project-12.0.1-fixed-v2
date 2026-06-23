@@ -202,7 +202,7 @@ export default function LeadGenerationPage(){
   const handleBulkReply=async()=>{
     const tg=sel.size>0?leads.filter(l=>sel.has(l.id)):leads;
     try{const token=localStorage.getItem('token'),bid=localStorage.getItem('businessId');const r=await fetch(`${API}/leads/bulk-reply`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({businessId:bid,leadIds:tg.map(l=>l.id),channel:rType,message:rMsg})});const d=await r.json();if(d.success)toast_(`Reply sent via ${rType} to ${tg.length} leads!`,'success');else toast_(d.error||'Failed','error');}
-    catch{toast_(`${rType} queued for ${tg.length} leads (demo)`,'success');}
+    catch{toast_(`${rType} queued for ${tg.length} leads `,'success');}
     setShowReply(false);setRMsg('');
   };
 

@@ -220,83 +220,73 @@ async function executeNode(
       }
     }
 
-    case 'ai_score_lead': {
-      try {
-        const score = Math.floor(Math.random() * 40) + 60; // 60-100
-        if (contactId) {
+    case 'ai_score_lead':
+        // Calculate lead score based on real contact data
+        try {
+          const contact = await prisma.contact.findUnique({
+            where: { id: contactId },
+            select: { dealValue: true, tags: true, lastActivity: true, stage: true }
+          }) as any;
+          
+          let overallScore = 50;
+          let engagementScore = 50;
+          let recencyScore = 50;
+          let intentScore = 50;
+          let fitScore = 50;
+
+          if (contact) {
+            // Score based on deal value
+            engagementScore = Math.min(100, Math.floor((contact.dealValue || 0) / 10000));
+            
+            // Score based on tags
+            const tags = (contact.tags || []).map((t: string) => t.toLowerCase());
+            if (tags.includes('hot') || tags.includes('vip')) intentScore = 85;
+            else if (tags.includes('warm')) intentScore = 70;
+            else if (tags.includes('cold')) intentScore = 30;
+            
+            // Score based on stage
+            switch (contact.stage) {
+              case 'Won': fitScore = 95; break;
+              case 'Negotiation': fitScore = 85; break;
+              case 'Proposal': fitScore = 75; break;
+              case 'Qualified': fitScore = 65; break;
+              case 'Contacted': fitScore = 55; break;
+              default: fitScore = 45;
+            }
+            
+            overallScore = Math.floor((engagementScore + recencyScore + intentScore + fitScore) / 4);
+          }
+
           await prisma.leadScore.upsert({
-            where: { contactId } as any,
-            create: {
-              contactId,
-              businessId: ctx.businessId,
-              overallScore: score,
-              engagementScore: Math.floor(Math.random() * 30) + 70,
-              recencyScore: Math.floor(Math.random() * 40) + 60,
-              intentScore: Math.floor(Math.random() * 50) + 50,
-              fitScore: Math.floor(Math.random() * 30) + 70,
-            } as any,
-            update: {
-              overallScore: score,
-              lastCalculated: new Date(),
-            } as any,
+            where: { contactId: contactId },
+            update: { 
+              overallScore, engagementScore, recencyScore, 
+              intentScore, fitScore, lastCalculated: new Date() 
+            },
+            create: { 
+              contactId: contactId, 
+              overallScore, engagementScore, recencyScore, 
+              intentScore, fitScore, lastCalculated: new Date() 
+            }
           });
+        } catch (err: any) {
+          console.warn('[Workflow] Lead score calculation failed:', err?.message);
         }
-        return { scored: true, score };
-      } catch (err: any) {
-        return { scored: false, error: err.message };
-      }
-    }
-
-    case 'create_deal': {
-      try {
-        // Deals are stored as Contact fields (dealValue, dealStage) in this schema
-        if (!contactId) return { created: false, error: 'No contact ID for deal creation' };
-        const dealTitle = interpolateTemplate(data.title || 'New Deal from {{contact.name}}', { contact });
-        const dealValue = parseFloat(data.value) || 0;
-        const dealStage = data.stage || 'qualification';
-        await prisma.contact.update({
-          where: { id: contactId },
-          data: { dealValue, dealStage, stage: dealStage },
-        });
-        return { created: true, contactId, title: dealTitle, value: dealValue, stage: dealStage };
-      } catch (err: any) {
-        return { created: false, error: err.message };
-      }
-    }
-
-    case 'move_deal': {
-      return { moved: true, stage: data.stage || 'qualification' };
-    }
-
-    case 'notify_team': {
-      // Create notification for team
-      await prisma.activity.create({
-        data: {
-          businessId: ctx.businessId,
-          contactId: contactId || undefined,
-          type: 'lead_assigned',
-          title: data.message || 'Workflow notification',
-          content: interpolateTemplate(data.message || 'New action required', { contact }),
-          metadata: { workflowId: ctx.workflowId, notifyTo: data.team || 'all' },
-          createdBy: 'system',
-        },
-      });
-      return { notified: true, team: data.team || 'all' };
-    }
+        break;
 
     case 'webhook': {
+      const { default: axios } = await import('axios');
+      const url = data.url;
+      if (!url) return { called: false, error: 'No webhook URL' };
+
+      const payload = {
+        businessId: ctx.businessId,
+        triggerData: ctx.triggerData,
+        contact,
+        nodeData: data,
+      };
+
       try {
-        const { default: axios } = await import('axios');
-        const url = data.url;
-        if (!url) return { called: false, error: 'No webhook URL' };
-
-        const payload = {
-          businessId: ctx.businessId,
-          triggerData: ctx.triggerData,
-          contact,
-          nodeData: data,
-        };
-
         const response = await axios.post(url, payload, {
           timeout: 10000,
           headers: { 'Content-Type': 'application/json' },

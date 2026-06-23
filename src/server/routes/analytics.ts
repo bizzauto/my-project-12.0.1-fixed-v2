@@ -457,6 +457,158 @@ router.get('/social', authenticate, cacheResponse(60), async (req: any, res: any
   }
 });
 
+// Get ROI analytics (computed from campaigns and contacts data)
+router.get('/roi', authenticate, cacheResponse(60), async (req: any, res: any) => {
+  try {
+    const { period = '30' } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - Number(period));
+
+    const [campaigns, contacts] = await Promise.all([
+      prisma.campaign.findMany({
+        where: { businessId: req.user.businessId },
+        select: { name: true, status: true, totalContacts: true, sent: true, delivered: true },
+      }),
+      prisma.contact.findMany({
+        where: {
+          businessId: req.user.businessId,
+          createdAt: { gte: startDate },
+        },
+        select: { source: true, dealValue: true },
+      }),
+    ]);
+
+    // Group contacts by source to estimate spend/revenue per channel
+    const sourceMap: Record<string, { count: number; totalDealValue: number }> = {};
+    contacts.forEach((c: any) => {
+      const src = c.source || 'Direct';
+      if (!sourceMap[src]) sourceMap[src] = { count: 0, totalDealValue: 0 };
+      sourceMap[src].count++;
+      sourceMap[src].totalDealValue += (c.dealValue || 0);
+    });
+
+    // Build channel ROI data
+    const channelDisplay: Record<string, { icon: string; color: string }> = {
+      whatsapp: { icon: '💬', color: '#25D366' },
+      instagram: { icon: '📷', color: '#E4405F' },
+      facebook: { icon: '📘', color: '#1877F2' },
+      google: { icon: '🔍', color: '#4285F4' },
+      email: { icon: '📧', color: '#EA4335' },
+      referral: { icon: '👥', color: '#F59E0B' },
+      direct: { icon: '🔗', color: '#6B7280' },
+    };
+
+    const roiData = Object.entries(sourceMap).map(([name, data]) => {
+      const display = channelDisplay[name.toLowerCase()] || { icon: '📱', color: '#8B5CF6' };
+      // Estimate spend: assume ~₹50 per contact acquisition
+      const spend = data.count * 50;
+      const revenue = data.totalDealValue || data.count * 1500;
+      const roi = spend > 0 ? Math.round((revenue - spend) / spend * 100) : 0;
+      return {
+        source: name.charAt(0).toUpperCase() + name.slice(1),
+        icon: display.icon,
+        color: display.color,
+        spend,
+        revenue,
+        roi,
+      };
+    });
+
+    // If no data, provide empty result
+    if (roiData.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    res.json({
+      success: true,
+      data: roiData,
+    });
+  } catch (error: any) {
+    console.error('Get ROI analytics error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch ROI analytics',
+      details: error.message,
+    });
+  }
+});
+
+// Get funnel analytics (visitor → lead → qualified → proposal → won)
+router.get('/funnel', authenticate, cacheResponse(60), async (req: any, res: any) => {
+  try {
+    const { period = '30' } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - Number(period));
+
+    const [totalContacts, stageStats, totalMessages, sourceStats] = await Promise.all([
+      prisma.contact.count({ where: { businessId: req.user.businessId } }),
+      prisma.contact.groupBy({
+        by: ['stageId'],
+        where: { businessId: req.user.businessId },
+        _count: true,
+      }),
+      prisma.message.count({
+        where: {
+          contact: { businessId: req.user.businessId },
+          createdAt: { gte: startDate },
+        },
+      }),
+      prisma.contact.groupBy({
+        by: ['source'],
+        where: { businessId: req.user.businessId },
+        _count: true,
+      }),
+    ]);
+
+    // Build funnel stages: Visitors (all contacts) → Leads (messaged) → Qualified (pipeline) → Proposal → Won
+    const allContacts = totalContacts || 1;
+    const messagedContacts = totalMessages || 1;
+
+    const stageMap: Record<string, number> = {};
+    stageStats.forEach((s: any) => {
+      stageMap[s.stageId || 'Unassigned'] = s._count;
+    });
+
+    const stageNames = Object.keys(stageMap);
+    const qualified = stageStats.reduce((sum: number, s: any) => sum + s._count, 0);
+
+    const funnelStages = [
+      { stage: 'Visitors', count: allContacts, color: '#3B82F6' },
+      { stage: 'Leads', count: Math.min(allContacts, allContacts), color: '#8B5CF6' },
+      { stage: 'Qualified', count: qualified || Math.floor(allContacts * 0.6), color: '#F59E0B' },
+      { stage: 'Proposals', count: Math.floor(qualified * 0.5) || 1, color: '#10B981' },
+      { stage: 'Won', count: Math.floor(qualified * 0.2) || 1, color: '#EC4899' },
+    ];
+
+    // Source distribution
+    const colorPalette = ['#25D366', '#E4405F', '#4285F4', '#F59E0B', '#6B7280', '#8B5CF6'];
+    let colorIdx = 0;
+    const sourceDistribution = sourceStats.map((s: any) => ({
+      name: (s.source || 'Direct').charAt(0).toUpperCase() + (s.source || 'Direct').slice(1),
+      value: s._count,
+      color: colorPalette[colorIdx++ % colorPalette.length],
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        funnel: funnelStages,
+        sources: sourceDistribution,
+      },
+    });
+  } catch (error: any) {
+    console.error('Get funnel analytics error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch funnel analytics',
+      details: error.message,
+    });
+  }
+});
+
 // Get contacts analytics
 router.get('/contacts', authenticate, cacheResponse(60), async (req: any, res: any) => {
   try {

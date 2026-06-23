@@ -283,7 +283,7 @@ export default function FunnelTemplatePicker({ isOpen, onClose }: FunnelTemplate
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredTemplates.map(template => {
                 const pageCount = template.content?.pages?.length || 0;
-                const pageTypes = template.content?.pages?.map((p: any) => p.type) || [];
+                const pageTypes: string[] = template.content?.pages?.map((p: any) => p.type) || [];
                 const meta = CATEGORY_META[template.category] || CATEGORY_META.default;
                 const CatIcon = meta.icon;
                 const isCloning = cloningId === template.id;

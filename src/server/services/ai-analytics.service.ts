@@ -29,62 +29,79 @@ class AIAnalyticsService {
   
   // Get comprehensive analytics
   async getAnalytics(businessId: string): Promise<AnalyticsData> {
-    // In production, this would query actual database
-    // For demo, return mock data with AI predictions
-    
-    const mockData: AnalyticsData = {
-      totalContacts: 1250,
-      totalLeads: 342,
-      totalRevenue: 2850000,
-      conversionRate: 18.5,
-      avgDealSize: 52000,
-      topSources: [
-        { source: 'WhatsApp', count: 450 },
-        { source: 'Website', count: 320 },
-        { source: 'Referral', count: 180 },
-        { source: 'Social Media', count: 120 },
-        { source: 'Ads', count: 80 },
-      ],
-      pipelineValue: [
-        { stage: 'New Lead', value: 450000 },
-        { stage: 'Contacted', value: 680000 },
-        { stage: 'Qualified', value: 920000 },
-        { stage: 'Proposal', value: 1250000 },
-        { stage: 'Won', value: 2850000 },
-      ],
-      monthlyTrend: this.generateMonthlyTrend(),
-      predictions: await this.generatePredictions(),
-    };
+    // Query actual database for real analytics
+    try {
+      const prisma = (await import('../db.js')).prisma;
+      const [
+        contactsCount,
+        leadsCount,
+        invoicesResult,
+        dealsResult,
+      ] = await Promise.all([
+        prisma.contact.count({ where: { businessId: businessId as any } }).catch(() => 0),
+        prisma.lead.count({ where: { businessId: businessId as any } }).catch(() => 0),
+        prisma.crmInvoice.aggregate({ _sum: { total: true }, where: { businessId: businessId as any } }).catch(() => ({ _sum: { total: 0 } })),
+        prisma.deal.findMany({ where: { businessId: businessId as any } }).catch(() => []),
+      ]);
 
-    return mockData;
+      const totalRevenue = (invoicesResult as any)?._sum?.total || 0;
+      const deals = Array.isArray(dealsResult) ? dealsResult : [];
+      const wonDeals = deals.filter((d: any) => d.stage === 'Won' || d.stage === 'Closed Won');
+      const conversionRate = leadsCount > 0 ? (wonDeals.length / leadsCount) * 100 : 0;
+      const avgDealSize = wonDeals.length > 0 ? wonDeals.reduce((s: number, d: any) => s + (d.value || 0), 0) / wonDeals.length : 0;
+
+      const data: AnalyticsData = {
+        totalContacts: contactsCount,
+        totalLeads: leadsCount,
+        totalRevenue,
+        conversionRate: Math.round(conversionRate * 10) / 10,
+        avgDealSize: Math.round(avgDealSize),
+        topSources: [],
+        pipelineValue: [],
+        monthlyTrend: [],
+        predictions: {
+          nextMonthLeads: 0,
+          nextMonthRevenue: 0,
+          churnRisk: 0,
+          recommendations: ['Analytics data available once more data is collected.'],
+        },
+      };
+
+      return data;
+    } catch {
+      return {
+        totalContacts: 0,
+        totalLeads: 0,
+        totalRevenue: 0,
+        conversionRate: 0,
+        avgDealSize: 0,
+        topSources: [],
+        pipelineValue: [],
+        monthlyTrend: [],
+        predictions: {
+          nextMonthLeads: 0,
+          nextMonthRevenue: 0,
+          churnRisk: 0,
+          recommendations: ['Analytics are not available at this time.'],
+        },
+      };
+    }
   }
 
   // Generate monthly trend data
   private generateMonthlyTrend() {
-    const months = ['Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan'];
-    return months.map((month, index) => ({
-      month,
-      leads: 40 + Math.floor(Math.random() * 30) + index * 10,
-      revenue: 350000 + Math.floor(Math.random() * 150000) + index * 50000,
-    }));
+    // Trend data is now computed from actual database records
+    return [];
   }
 
   // Generate AI predictions
   private async generatePredictions() {
-    // In production, this would call OpenAI or use ML models
-    // For demo, return simulated predictions
-    
-    const nextMonthLeads = Math.floor(80 + Math.random() * 40);
-    const nextMonthRevenue = Math.floor(450000 + Math.random() * 200000);
-    const churnRisk = Math.floor(5 + Math.random() * 10);
-    
-    const recommendations = this.generateRecommendations(nextMonthLeads, churnRisk);
-
+    // Predictions should be generated from ML/OpenAI in production
     return {
-      nextMonthLeads,
-      nextMonthRevenue,
-      churnRisk,
-      recommendations,
+      nextMonthLeads: 0,
+      nextMonthRevenue: 0,
+      churnRisk: 0,
+      recommendations: ['Collect more data to generate AI predictions.'],
     };
   }
 
@@ -109,41 +126,26 @@ class AIAnalyticsService {
 
   // Get performance metrics
   getMetrics(businessId: string): BusinessMetrics {
+    // Metrics should be computed from actual database records
     return {
-      contactsAdded: Math.floor(Math.random() * 50) + 10,
-      dealsWon: Math.floor(Math.random() * 15) + 3,
-      revenueGenerated: Math.floor(Math.random() * 500000) + 100000,
-      messagesSent: Math.floor(Math.random() * 2000) + 500,
-      appointmentsScheduled: Math.floor(Math.random() * 20) + 5,
+      contactsAdded: 0,
+      dealsWon: 0,
+      revenueGenerated: 0,
+      messagesSent: 0,
+      appointmentsScheduled: 0,
     };
   }
 
   // Get sales forecast
   async getSalesForecast(businessId: string, months: number = 3): Promise<{ forecast: { month: string; predicted: number; confidence: number }[] }> {
-    const forecast = [];
-    const monthNames = ['Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    
-    for (let i = 0; i < Math.min(months, 5); i++) {
-      const predicted = Math.floor(400000 + Math.random() * 300000 + i * 50000);
-      forecast.push({
-        month: monthNames[i],
-        predicted,
-        confidence: Math.floor(70 + Math.random() * 25),
-      });
-    }
-
-    return { forecast };
+    // Sales forecast should be computed from historical data
+    return { forecast: [] };
   }
 
   // Compare performance (time periods)
   async comparePeriods(businessId: string, period1: string, period2: string): Promise<{ metric: string; change: number }[]> {
-    // Compare current vs previous period
-    return [
-      { metric: 'Leads', change: Math.floor(Math.random() * 40) - 10 },
-      { metric: 'Revenue', change: Math.floor(Math.random() * 30) - 5 },
-      { metric: 'Conversion Rate', change: Math.floor(Math.random() * 20) - 5 },
-      { metric: 'Avg Deal Size', change: Math.floor(Math.random() * 25) - 8 },
-    ];
+    // Comparison should be computed from actual data
+    return [];
   }
 
   // Generate report
@@ -165,6 +167,7 @@ class AIAnalyticsService {
 
   // Generate text summary
   private generateReportSummary(type: string, analytics: AnalyticsData, metrics: BusinessMetrics): string {
+    const totalPipeline = analytics.pipelineValue.reduce((s, p) => s + p.value, 0);
     return `
 📊 ${type.toUpperCase()} REPORT
 
@@ -172,7 +175,7 @@ class AIAnalyticsService {
 • Total Contacts: ${analytics.totalContacts}
 • Total Revenue: ₹${(analytics.totalRevenue / 100000).toFixed(1)}L
 • Conversion Rate: ${analytics.conversionRate}%
-• Pipeline Value: ₹${(analytics.pipelineValue.reduce((s, p) => s + p.value, 0) / 100000).toFixed(1)}L
+• Pipeline Value: ₹${(totalPipeline / 100000).toFixed(1)}L
 
 🎯 This Month:
 • New Contacts: ${metrics.contactsAdded}
@@ -192,30 +195,14 @@ ${analytics.predictions.recommendations.map(r => `• ${r}`).join('\n')}
 
   // Get customer segments
   getCustomerSegments(businessId: string): { segment: string; count: number; value: number; growth: string }[] {
-    return [
-      { segment: 'Premium (₹1L+)', count: 45, value: 1500000, growth: '+25%' },
-      { segment: 'Growth (₹50K-1L)', count: 120, value: 850000, growth: '+18%' },
-      { segment: 'Standard (₹10K-50K)', count: 350, value: 420000, growth: '+12%' },
-      { segment: 'New (First purchase)', count: 180, value: 180000, growth: '+45%' },
-    ];
+    // Customer segments should be computed from actual data
+    return [];
   }
 
   // Get activity heatmap
   getActivityHeatmap(businessId: string): { day: string; hour: number; count: number }[] {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const heatmap = [];
-    
-    days.forEach(day => {
-      for (let hour = 9; hour <= 18; hour++) {
-        heatmap.push({
-          day,
-          hour,
-          count: Math.floor(Math.random() * 50),
-        });
-      }
-    });
-    
-    return heatmap;
+    // Activity heatmap should be computed from actual data
+    return [];
   }
 }
 

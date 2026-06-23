@@ -1409,17 +1409,14 @@ function WorkflowBuilderInner({ workflowId }: { workflowId?: string }) {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      const payload: Record<string, any> = {
+      const triggerNode = nodes.find(n => n.data.category === 'trigger');
+      const payload = {
         name: workflowName,
+        triggerType: triggerNode?.data?.nodeType || 'message_received',
+        triggerConfig: triggerNode?.data?.config || {},
         nodes: nodes.map((n) => ({ ...n })),
         edges: edges.map((e) => ({ ...e })),
       };
-      if (!workflowId) {
-        // Find trigger type from nodes
-        const triggerNode = nodes.find(n => n.data.category === 'trigger');
-        payload.triggerType = triggerNode?.data?.nodeType || 'message_received';
-        payload.triggerConfig = triggerNode?.data?.config || {};
-      }
       if (workflowId) {
         await workflowsAPI.update(workflowId, payload);
         toastSuccess('Workflow saved');
