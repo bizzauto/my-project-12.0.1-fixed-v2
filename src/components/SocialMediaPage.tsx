@@ -84,7 +84,7 @@ const SocialMediaPage: React.FC = () => {
   // Social analytics state (from real API)
 
   // Social Accounts state
-  const [socialAccounts, setSocialAccounts] = useState<Array<{ platform: string; connected: boolean; details?: any }>([]);
+  const [socialAccounts, setSocialAccounts] = useState<Array<{ platform: string; connected: boolean; details?: any }>>([]);
   const [loadingSocialStatus, setLoadingSocialStatus] = useState(true);
   const [connectModal, setConnectModal] = useState<{ platform: string; open: boolean } | null>(null);
   const [connectForm, setConnectForm] = useState<Record<string, string>>({});
@@ -245,27 +245,30 @@ const SocialMediaPage: React.FC = () => {
       // Fetch all social accounts status
       socialAccountsAPI.list().then(res => {
         if (res.data.success) {
-          setSocialAccounts(Array.isArray(res.data.data) ? res.data.data : []);
+          const data = Array.isArray(res.data.data) ? res.data.data : [];
+          setSocialAccounts(data);
         }
       }).catch(() => {}).finally(() => setLoadingSocialStatus(false));
 
-      // Check Instagram connection status
+      // Check Instagram connection status (independent call)
       instagramAPI.getStatus().then(res => {
         if (res.data.success) {
           setIgStatus(res.data.data || null);
+        }
+      }).catch(() => {});
 
-      // Fetch social analytics
+      // Fetch social analytics (independent — not nested inside Instagram callback)
       setSocialLoading(true);
       analyticsAPI.social().then(res => {
         if (res.data.success) {
           const d = res.data.data;
-          if (d.stats) setSocialStats(d.stats);
-          if (d.byPlatform) setByPlatform(d.byPlatform);
-          if (d.weeklyEngagement) setWeeklyEngagement(d.weeklyEngagement);
+          if (d) {
+            if (d.stats) setSocialStats(d.stats);
+            if (d.byPlatform) setByPlatform(d.byPlatform);
+            if (d.weeklyEngagement) setWeeklyEngagement(d.weeklyEngagement);
+          }
         }
       }).catch(() => {}).finally(() => setSocialLoading(false));
-        }
-      }).catch(() => {});
     } else {
       setLoadingSocialStatus(false);
     }
@@ -699,7 +702,7 @@ const SocialMediaPage: React.FC = () => {
       </div>
 
       {/* Connected Accounts Panel */}
-      {!loadingSocialStatus && (
+      {!loadingSocialStatus && Array.isArray(socialAccounts) && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-4 sm:mb-6 overflow-hidden">
           <div className="px-3 sm:px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
             <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base flex items-center gap-2">
@@ -1813,7 +1816,7 @@ const SocialMediaPage: React.FC = () => {
                 <Loader2 size={24} className="animate-spin text-pink-500 mx-auto mb-2" />
                 <p className="text-sm text-gray-500">Loading Instagram data...</p>
               </div>
-            ) : igRecentMedia.length === 0 ? (
+            ) : !Array.isArray(igRecentMedia) || igRecentMedia.length === 0 ? (
               <div className="p-4 sm:p-6 md:p-8 text-center text-gray-500 dark:text-gray-400">
                 <Instagram size={40} className="mx-auto mb-3 opacity-20" />
                 <p className="text-sm">No recent posts found. Publish your first post!</p>
@@ -1826,7 +1829,7 @@ const SocialMediaPage: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-px bg-gray-200 dark:bg-gray-700">
-                {igRecentMedia.map((media) => (
+                {Array.isArray(igRecentMedia) && igRecentMedia.map((media) => (
                   <div key={media.id} className="relative group aspect-square bg-gray-100 dark:bg-gray-800 overflow-hidden">
                     {media.media_type === 'VIDEO' ? (
                       <div className="w-full h-full relative">
