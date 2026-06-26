@@ -3,10 +3,16 @@ import crypto from 'crypto';
 import { prisma } from '../db.js';
 
 // Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_your_key_id',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'your_razorpay_secret_key',
-});
+const razorpayKey = process.env.RAZORPAY_KEY_ID;
+const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+const razorpay = razorpayKey && razorpaySecret
+  ? new Razorpay({ key_id: razorpayKey, key_secret: razorpaySecret })
+  : null;
+
+function requireRazorpay(): Razorpay {
+  if (!razorpay) throw new Error('Razorpay not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.');
+  return razorpay;
+}
 
 // Plan pricing
 export const PLAN_PRICES: Record<string, { month: number; year: number }> = {
@@ -51,7 +57,7 @@ export const createRazorpayOrder = async (
       },
     };
 
-    const order = await razorpay.orders.create(options);
+    const order = await requireRazorpay().orders.create(options);
 
     return {
       success: true,
@@ -293,7 +299,7 @@ export const createSubscriptionPlan = async (
   interval: string
 ) => {
   try {
-    const plan = await razorpay.plans.create({
+    const plan = await requireRazorpay().plans.create({
       period: interval === 'month' ? 'monthly' : 'yearly',
       interval: 1, // Every 1 period
       item: {
@@ -327,7 +333,7 @@ export const createSubscription = async (
   total_count: number
 ) => {
   try {
-    const subscription = await (razorpay.subscriptions.create as any)({
+    const subscription = await (requireRazorpay().subscriptions.create as any)({
       plan_id: planId,
       customer_id: customerId,
       total_count,
@@ -350,7 +356,7 @@ export const createSubscription = async (
 // Cancel subscription
 export const cancelSubscription = async (subscriptionId: string) => {
   try {
-    const subscription = await razorpay.subscriptions.cancel(subscriptionId);
+    const subscription = await requireRazorpay().subscriptions.cancel(subscriptionId);
     return {
       success: true,
       data: subscription,
@@ -367,7 +373,7 @@ export const cancelSubscription = async (subscriptionId: string) => {
 // Fetch subscription
 export const fetchSubscription = async (subscriptionId: string) => {
   try {
-    const subscription = await razorpay.subscriptions.fetch(subscriptionId);
+    const subscription = await requireRazorpay().subscriptions.fetch(subscriptionId);
     return {
       success: true,
       data: subscription,

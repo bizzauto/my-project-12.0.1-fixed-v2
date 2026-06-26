@@ -2,10 +2,10 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db.js';
+import { getJwtSecret, verifyToken } from '../utils/auth.js';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.JWT_REFRESH_SECRET || 'bizzauto-wl-secret-key-change-in-production';
 const PLAN_PRICES: Record<string, number> = { STARTER: 999, PRO: 2499, ENTERPRISE: 9999 };
 
 // Auth middleware for white-label routes
@@ -16,7 +16,7 @@ const wlAuth = async (req: Request, res: Response, next: Function) => {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as { resellerId: string };
+    const decoded = verifyToken(token) as { resellerId: string };
     (req as any).resellerId = decoded.resellerId;
     next();
   } catch {

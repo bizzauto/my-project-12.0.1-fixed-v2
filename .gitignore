@@ -71,6 +71,7 @@ fly.toml
 .qodo/
 .qwen/
 .roo/
+.kilo/
 
 # Windows reserved device names
 /nul
@@ -82,4 +83,39 @@ MY\ PROJECT*/
 # Android local SDK path (machine-specific, not in repo)
 /local.properties
 local.properties
+
+# SECURITY: SSH keys, secrets, and sensitive files
+.encryption.key
+*.key
+*.pub
+*-key
+*_key*
+bizzauto-new-key*
+temp_vps_key*
+coolify_cookies.txt
+*.cookies.txt
+
+# Debug/fix scripts (one-shot, not part of production code)
+_fix_login.*
+fix-whatsapp.*
+fix-query-types.*
+setup-test-user.*
+
+# Build output logs
+build-output*.txt
+build[0-9]*.txt
+
+# SQL scripts outside prisma/migrations
+*.sql
+
+# Screenshots
+screenshot*
+*.png
+*.jpg
+
+# Replit
+.replit
+
+# Stale empty files
+/npx
 

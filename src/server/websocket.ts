@@ -3,6 +3,7 @@ import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { default as redisClient } from './services/redis.service.js';
 import { checkConnectionLimit, checkMessageLimit, cleanupSocketLimits, startRateLimitCleanup } from './middleware/websocket-rate-limit.js';
+import { getJwtSecret } from './utils/auth.js';
 
 export function setupWebSocket(httpServer: HttpServer) {
   const io = new SocketServer(httpServer, {
@@ -36,7 +37,7 @@ export function setupWebSocket(httpServer: HttpServer) {
         return next(new Error('Authentication required'));
       }
 
-      const decoded = jwt.verify(token as string, process.env.JWT_SECRET!) as any;
+      const decoded = jwt.verify(token as string, getJwtSecret()) as any;
       socket.userId = decoded.userId;
       socket.businessId = decoded.businessId;
       socket.plan = decoded.plan || 'FREE';
