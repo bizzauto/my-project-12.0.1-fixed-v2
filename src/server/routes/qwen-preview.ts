@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import axios from 'axios';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.post('/test', async (req: any, res: any) => {
       apiKeyActive: apiKey ? 'Yes' : 'No',
     });
   } catch (error: any) {
-    console.error('Qwen test error:', error.response?.data || error.message);
+    logger.error('Qwen test error:', error.response?.data || error.message);
     res.status(500).json({
       success: false,
       error: 'Qwen API test failed',
@@ -137,7 +138,7 @@ router.post('/', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Qwen 3.6 Plus Preview error:', error);
+    logger.error('Qwen 3.6 Plus Preview error:', error);
     res.status(500).json({
       success: false,
       error: 'Qwen 3.6 Plus generation failed',
@@ -219,12 +220,12 @@ router.post('/stream', authenticate, async (req: any, res: any) => {
     });
 
     response.data.on('error', (error: Error) => {
-      console.error('Stream error:', error);
+      logger.error('Stream error:', error);
       res.write(`data: ${JSON.stringify({ error: 'Stream error' })}\n\n`);
       res.end();
     });
   } catch (error: any) {
-    console.error('Qwen 3.6 Plus Stream error:', error);
+    logger.error('Qwen 3.6 Plus Stream error:', error);
     res.status(500).json({
       success: false,
       error: 'Streaming failed',

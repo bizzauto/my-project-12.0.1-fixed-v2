@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { comparePassword } from '../utils/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.post('/delete-account', authenticate, async (req: AuthRequest, res: Respo
 
     res.json({ success: true, message: 'Account deleted successfully' });
   } catch (error: any) {
-    console.error('Delete account error:', error);
+    logger.error('Delete account error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete account' });
   }
 });

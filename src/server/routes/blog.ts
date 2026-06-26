@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ router.get('/posts', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Get blog posts error:', error);
+    logger.error('Get blog posts error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch posts', details: error.message });
   }
 });
@@ -85,7 +86,7 @@ router.get('/posts/:id', authenticate, async (req: AuthRequest, res: Response) =
 
     res.json({ success: true, data: post });
   } catch (error: any) {
-    console.error('Get blog post error:', error);
+    logger.error('Get blog post error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch post', details: error.message });
   }
 });
@@ -138,7 +139,7 @@ router.post('/posts', authenticate, requireRole('OWNER', 'ADMIN'), async (req: A
 
     res.status(201).json({ success: true, data: post });
   } catch (error: any) {
-    console.error('Create blog post error:', error);
+    logger.error('Create blog post error:', error);
     res.status(500).json({ success: false, error: 'Failed to create post', details: error.message });
   }
 });
@@ -196,7 +197,7 @@ router.put('/posts/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req
 
     res.json({ success: true, data: post });
   } catch (error: any) {
-    console.error('Update blog post error:', error);
+    logger.error('Update blog post error:', error);
     res.status(500).json({ success: false, error: 'Failed to update post', details: error.message });
   }
 });
@@ -219,7 +220,7 @@ router.delete('/posts/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (
 
     res.json({ success: true, message: 'Post deleted' });
   } catch (error: any) {
-    console.error('Delete blog post error:', error);
+    logger.error('Delete blog post error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete post', details: error.message });
   }
 });
@@ -248,7 +249,7 @@ router.patch('/posts/:id/publish', authenticate, requireRole('OWNER', 'ADMIN'), 
 
     res.json({ success: true, data: post });
   } catch (error: any) {
-    console.error('Toggle publish error:', error);
+    logger.error('Toggle publish error:', error);
     res.status(500).json({ success: false, error: 'Failed to toggle publish status', details: error.message });
   }
 });
@@ -266,7 +267,7 @@ router.get('/categories', authenticate, async (req: AuthRequest, res: Response) 
 
     res.json({ success: true, data: categories });
   } catch (error: any) {
-    console.error('Get blog categories error:', error);
+    logger.error('Get blog categories error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch categories', details: error.message });
   }
 });
@@ -300,7 +301,7 @@ router.post('/categories', authenticate, requireRole('OWNER', 'ADMIN'), async (r
 
     res.status(201).json({ success: true, data: category });
   } catch (error: any) {
-    console.error('Create blog category error:', error);
+    logger.error('Create blog category error:', error);
     res.status(500).json({ success: false, error: 'Failed to create category', details: error.message });
   }
 });
@@ -342,7 +343,7 @@ router.put('/categories/:id', authenticate, requireRole('OWNER', 'ADMIN'), async
 
     res.json({ success: true, data: category });
   } catch (error: any) {
-    console.error('Update blog category error:', error);
+    logger.error('Update blog category error:', error);
     res.status(500).json({ success: false, error: 'Failed to update category', details: error.message });
   }
 });
@@ -369,7 +370,7 @@ router.delete('/categories/:id', authenticate, requireRole('OWNER', 'ADMIN'), as
 
     res.json({ success: true, message: 'Category deleted' });
   } catch (error: any) {
-    console.error('Delete blog category error:', error);
+    logger.error('Delete blog category error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete category', details: error.message });
   }
 });
@@ -416,7 +417,7 @@ router.get('/posts/:id/comments', authenticate, async (req: AuthRequest, res: Re
       },
     });
   } catch (error: any) {
-    console.error('Get blog comments error:', error);
+    logger.error('Get blog comments error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch comments', details: error.message });
   }
 });
@@ -441,7 +442,7 @@ router.patch('/comments/:id/approve', authenticate, requireRole('OWNER', 'ADMIN'
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    console.error('Approve blog comment error:', error);
+    logger.error('Approve blog comment error:', error);
     res.status(500).json({ success: false, error: 'Failed to approve comment', details: error.message });
   }
 });
@@ -510,7 +511,7 @@ router.get('/p', async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Public list posts error:', error);
+    logger.error('Public list posts error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch posts', details: error.message });
   }
 });
@@ -547,7 +548,7 @@ router.get('/p/:slug', async (req: any, res: Response) => {
 
     res.json({ success: true, data: { ...post, viewCount: post.viewCount + 1 } });
   } catch (error: any) {
-    console.error('Public get post error:', error);
+    logger.error('Public get post error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch post', details: error.message });
   }
 });
@@ -584,7 +585,7 @@ router.post('/p/:postId/comments', async (req: any, res: Response) => {
 
     res.status(201).json({ success: true, data: comment });
   } catch (error: any) {
-    console.error('Submit comment error:', error);
+    logger.error('Submit comment error:', error);
     res.status(500).json({ success: false, error: 'Failed to submit comment', details: error.message });
   }
 });

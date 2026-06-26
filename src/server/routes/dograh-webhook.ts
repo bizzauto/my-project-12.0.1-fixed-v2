@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import crypto from 'crypto';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.post('/:businessId', async (req: Request, res: Response) => {
           .update(JSON.stringify(payload))
           .digest('hex');
         if (signature !== expected) {
-          console.warn('Dograh webhook signature mismatch for business:', businessId);
+          logger.warn('Dograh webhook signature mismatch for business:', businessId);
         }
       }
     }
@@ -201,7 +202,7 @@ router.post('/:businessId', async (req: Request, res: Response) => {
           });
         } else {
           // Insufficient balance - log warning
-          console.warn(
+          logger.warn(
             `Insufficient wallet balance for business ${businessId}. ` +
             `Required: ₹${totalDeduction}, Available: ₹${wallet?.balance || 0}`
           );
@@ -211,7 +212,7 @@ router.post('/:businessId', async (req: Request, res: Response) => {
 
     res.json({ status: 'ok' });
   } catch (error: any) {
-    console.error('Dograh webhook error:', error);
+    logger.error('Dograh webhook error:', error);
     // Always return 200 to prevent retries
     res.json({ status: 'ok' });
   }

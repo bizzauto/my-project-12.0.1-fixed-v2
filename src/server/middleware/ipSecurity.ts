@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from '../utils/logger.js';
 
 /**
  * IP Whitelist - Allow only specific IPs (for admin panel)
@@ -27,7 +28,7 @@ export const ipWhitelist = (req: Request, res: Response, next: NextFunction) => 
     }
   }
   
-  console.warn(`[Security] Blocked request from non-whitelisted IP: ${clientIP}`);
+  logger.warn(`[Security] Blocked request from non-whitelisted IP: ${clientIP}`);
   
   res.status(403).json({
     success: false,
@@ -118,7 +119,7 @@ export const adminRouteProtection = (req: Request, res: Response, next: NextFunc
     const clientIP = req.ip;
     
     if (adminIPs.length > 0 && !adminIPs.includes(clientIP)) {
-      console.warn(`[Security] Admin route accessed from non-admin IP: ${clientIP}`);
+      logger.warn(`[Security] Admin route accessed from non-admin IP: ${clientIP}`);
       // Don't block, but log for monitoring
     }
   }

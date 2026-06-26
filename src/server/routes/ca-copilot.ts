@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -125,7 +126,7 @@ router.post('/bank-reconciliation/upload', authenticate, async (req: AuthRequest
       }
     });
   } catch (error: any) {
-    console.error('Bank reconciliation error:', error);
+    logger.error('Bank reconciliation error:', error);
     res.status(500).json({ success: false, error: 'Bank reconciliation failed', details: error.message });
   }
 });
@@ -185,7 +186,7 @@ router.get('/invoice-matching', authenticate, async (req: AuthRequest, res: any)
       }
     });
   } catch (error: any) {
-    console.error('Invoice matching error:', error);
+    logger.error('Invoice matching error:', error);
     res.status(500).json({ success: false, error: 'Invoice matching failed', details: error.message });
   }
 });
@@ -263,7 +264,7 @@ router.post('/gst-reconciliation', authenticate, async (req: AuthRequest, res: a
       }
     });
   } catch (error: any) {
-    console.error('GST reconciliation error:', error);
+    logger.error('GST reconciliation error:', error);
     res.status(500).json({ success: false, error: 'GST reconciliation failed', details: error.message });
   }
 });
@@ -400,7 +401,7 @@ router.get('/ledger-scrutiny', authenticate, async (req: AuthRequest, res: any) 
       }
     });
   } catch (error: any) {
-    console.error('Ledger scrutiny error:', error);
+    logger.error('Ledger scrutiny error:', error);
     res.status(500).json({ success: false, error: 'Ledger scrutiny failed', details: error.message });
   }
 });
@@ -468,7 +469,7 @@ router.post('/ai-audit/query', authenticate, async (req: AuthRequest, res: any) 
 
     res.json({ success: true, data: { query, answer, context: { totalIncome, totalExpenses, entries: entries.length, invoices: invoices.length } } });
   } catch (error: any) {
-    console.error('AI audit query error:', error);
+    logger.error('AI audit query error:', error);
     res.status(500).json({ success: false, error: 'AI audit query failed', details: error.message });
   }
 });
@@ -546,7 +547,7 @@ router.get('/reports', authenticate, async (req: AuthRequest, res: any) => {
       }
     });
   } catch (error: any) {
-    console.error('CA reports error:', error);
+    logger.error('CA reports error:', error);
     res.status(500).json({ success: false, error: 'CA reports generation failed', details: error.message });
   }
 });

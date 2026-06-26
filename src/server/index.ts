@@ -9,7 +9,6 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
-import winston from 'winston';
 import path from 'path';
 import { prisma } from './db.js';
 
@@ -132,13 +131,14 @@ import aiOutreachRoutes from './routes/ai-outreach.js';
 import whiteLabelRoutes from './routes/white-label.js';
 import vcardRoutes from './routes/vcard.js';
 import websiteRoutes from './routes/websites.js';
-import surveyRoutes from './routes/surveys.js';
+// surveyRoutes removed — duplicate of surveysRoutes above
 import ssoRoutes from './routes/sso.js';
 import landingPagesRoutes from './routes/landing-pages.js';
 import customRolesRoutes from './routes/custom-roles.js';
 import uploadRoutes from './routes/upload.js';
 import { razorpayWebhook, verifyPayment as verifyPaymentHandler } from './services/whatsapp-payment.service.js';
 import { authenticate } from './middleware/auth.js';
+import logger from './utils/logger.js';
 
 dotenv.config();
 
@@ -152,24 +152,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // Initialize Prisma with optimized connection pool
 // connection_limit defaults to num_cpus * 2 + 1; pool_timeout controls wait time
 
-// Winston Logger
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' }),
-  ],
-});
 
-if (NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.simple(),
-  }));
-}
 
 // Trust proxy — required when behind a reverse proxy (Nginx, Coolify, Cloudflare)
 // so that rate-limiter and req.ip use the real client IP from X-Forwarded-For
@@ -393,7 +376,7 @@ app.use('/api/outreach', aiOutreachRoutes);
 app.use('/api/wl', whiteLabelRoutes);
 app.use('/api/vcard', vcardRoutes);
 app.use('/api/websites', websiteRoutes);
-app.use('/api/surveys', surveyRoutes);
+// Duplicate /api/surveys removed — already registered above with surveysRoutes
 app.use('/api/sso', ssoRoutes);
 app.use('/api/landing-pages', landingPagesRoutes);
 app.use('/api/custom-roles', customRolesRoutes);
@@ -449,7 +432,7 @@ app.get('/cache-stats', (_req, res) => {
 app.post('/api/security/csp-report', express.json({ limit: '10kb' }), (req, res) => {
   const report = req.body?.['csp-report'] || req.body;
   if (report) {
-    console.warn('[CSP Violation]', JSON.stringify({
+    logger.warn('[CSP Violation]', JSON.stringify({
       'document-uri': report['document-uri'],
       'blocked-uri': report['blocked-uri'],
       'violated-directive': report['violated-directive'],
@@ -540,7 +523,6 @@ if (NODE_ENV === 'production') {
     if (missing.length > 0) {
       const msg = `CRITICAL: Missing required environment variables: ${missing.join(', ')}`;
       logger.warn(msg);
-      console.warn(`WARNING: ${msg}`);
     }
   }
 })();
@@ -571,9 +553,7 @@ app.use((req, res) => {
 
 // Graceful shutdown
 process.on('unhandledRejection', (error: any) => {
-  console.error('UNHANDLED REJECTION:', error);
-  console.error('Stack:', error?.stack);
-  logger.error('Unhandled Rejection:', error);
+  logger.error('UNHANDLED REJECTION:', error);
 });
 
 process.on('SIGTERM', async () => {
@@ -590,7 +570,7 @@ process.on('SIGTERM', async () => {
   logger.end();
   // Give up to 30s for in-flight transactions to complete before force-exit
   setTimeout(() => {
-    console.warn('[Shutdown] Force exit after 30s timeout');
+    logger.warn('[Shutdown] Force exit after 30s timeout');
     process.exit(0);
   }, 30000); // Increased from 5000ms to 30000ms
 });
@@ -609,15 +589,13 @@ process.on('SIGINT', async () => {
   logger.end();
   // Give up to 30s for in-flight transactions to complete before force-exit
   setTimeout(() => {
-    console.warn('[Shutdown] Force exit after 30s timeout');
+    logger.warn('[Shutdown] Force exit after 30s timeout');
     process.exit(0);
   }, 30000); // Increased from 5000ms to 30000ms
 });
 
 process.on('uncaughtException', async (error) => {
-  console.error('UNCAUGHT EXCEPTION:', error);
-  console.error('Stack:', error.stack);
-  logger.error('Uncaught Exception:', error);
+  logger.error('UNCAUGHT EXCEPTION:', error);
   // Exit after uncaught exception - process is in undefined state
   setTimeout(() => process.exit(1), 1000);
 });
@@ -629,9 +607,8 @@ startSlowQueryLogger();
 startAuditPruneCron();
 
 // Start server
-console.log(`Starting server on ${HOST}:${PORT} in ${NODE_ENV} mode`);
+logger.info(`Starting server on ${HOST}:${PORT} in ${NODE_ENV} mode`);
 app.listen(Number(PORT), () => {
-  console.log(`Server running on port ${PORT} in ${NODE_ENV} mode`);
   logger.info(`Server running on port ${PORT} in ${NODE_ENV} mode`);
 });
 

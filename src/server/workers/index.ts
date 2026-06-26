@@ -7,13 +7,14 @@ import { GBPAutoPostService } from '../services/gbp-auto-post.service.js';
 import { webhookDeliveryQueue, shutdownWebhookWorker } from '../services/webhook-retry.service.js';
 import { prisma } from '../db.js';
 import { createRedisConnection } from '../utils/redis-connection.js';
+import logger from '../utils/logger.js';
 
 // Redis connection
 const redisConnection = createRedisConnection();
 const redisAvailable = redisConnection !== null;
 
 if (!redisAvailable) {
-  console.log('[Workers] Redis not available — background jobs disabled. App will run without queues.');
+  logger.info('[Workers] Redis not available — background jobs disabled. App will run without queues.');
 }
 
 // Queues (only created if Redis is available)
@@ -316,7 +317,7 @@ leadProcessingWorker = new Worker(
         results.assignedTo = assignedUserId;
       }
     } catch (error: any) {
-      console.error('Lead auto-assignment error:', error.message);
+      logger.error('Lead auto-assignment error:', error.message);
       results.assignmentError = error.message;
     }
 
@@ -340,7 +341,7 @@ leadProcessingWorker = new Worker(
         });
       }
     } catch (error: any) {
-      console.error('Lead notification error:', error.message);
+      logger.error('Lead notification error:', error.message);
     }
 
     // 3. Update lead score if contact has enough data
@@ -362,7 +363,7 @@ leadProcessingWorker = new Worker(
       });
       results.score = scoreValue.score;
     } catch (error: any) {
-      console.error('Lead scoring error:', error.message);
+      logger.error('Lead scoring error:', error.message);
     }
 
     return results;
@@ -697,7 +698,7 @@ gbpAutoPostWorker = new Worker(
             ...result,
           });
         } catch (error: any) {
-          console.error(`Error processing auto-post for business ${business.id}:`, error.message);
+          logger.error(`Error processing auto-post for business ${business.id}:`, error.message);
           results.push({
             businessId: business.id,
             businessName: business.name,
@@ -739,10 +740,10 @@ export const workers = {
  * Graceful shutdown
  */
 export async function shutdownWorkers() {
-  console.log('Shutting down workers...');
+  logger.info('Shutting down workers...');
   
   if (!redisAvailable) {
-    console.log('No Redis — no workers to shut down');
+    logger.info('No Redis — no workers to shut down');
     return;
   }
   
@@ -758,7 +759,7 @@ export async function shutdownWorkers() {
   ]);
 
   await redisConnection?.quit();
-  console.log('All workers shut down successfully');
+  logger.info('All workers shut down successfully');
 }
 
 // Handle process termination

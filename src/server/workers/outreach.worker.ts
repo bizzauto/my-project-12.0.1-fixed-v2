@@ -4,6 +4,7 @@ import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EvolutionApiService } from '../services/evolution.service.js';
 import { FollowUpEngineService } from '../services/followup-engine.service.js';
 import { createRedisConnection } from '../utils/redis-connection.js';
+import logger from '../utils/logger.js';
 
 /**
  * Smart send: detects which WhatsApp channel is configured and routes accordingly.
@@ -21,7 +22,7 @@ async function smartSendText(businessId: string, to: string, message: string): P
 const redisConnection = createRedisConnection();
 
 if (!redisConnection) {
-  console.log('[Outreach Worker] Redis not available — worker disabled');
+  logger.info('[Outreach Worker] Redis not available — worker disabled');
 }
 
 // Queue for outreach messages

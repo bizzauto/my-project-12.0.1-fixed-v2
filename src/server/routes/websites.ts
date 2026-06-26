@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { websites } });
   } catch (err) {
-    console.error('Get websites error:', err);
+    logger.error('Get websites error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch websites' });
   }
 });
@@ -41,7 +42,7 @@ router.post('/', async (req: Request, res: Response) => {
     });
     res.status(201).json({ success: true, data: { website } });
   } catch (err) {
-    console.error('Create website error:', err);
+    logger.error('Create website error:', err);
     res.status(500).json({ success: false, error: 'Failed to create website' });
   }
 });
@@ -69,7 +70,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { website } });
   } catch (err) {
-    console.error('Update website error:', err);
+    logger.error('Update website error:', err);
     res.status(500).json({ success: false, error: 'Failed to update website' });
   }
 });
@@ -84,7 +85,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await (prisma as any).websites.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Website deleted' });
   } catch (err) {
-    console.error('Delete website error:', err);
+    logger.error('Delete website error:', err);
     res.status(500).json({ success: false, error: 'Failed to delete website' });
   }
 });
@@ -102,7 +103,7 @@ router.post('/:id/publish', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { website } });
   } catch (err) {
-    console.error('Publish website error:', err);
+    logger.error('Publish website error:', err);
     res.status(500).json({ success: false, error: 'Failed to publish website' });
   }
 });

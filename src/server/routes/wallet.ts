@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import Razorpay from 'razorpay';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -106,7 +107,7 @@ router.post('/recharge', authenticate, async (req: AuthRequest, res: Response) =
       },
     });
   } catch (error: any) {
-    console.error('Error creating recharge order:', error);
+    logger.error('Error creating recharge order:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -173,7 +174,7 @@ router.post('/recharge/verify', authenticate, async (req: AuthRequest, res: Resp
       },
     });
   } catch (error: any) {
-    console.error('Error verifying recharge:', error);
+    logger.error('Error verifying recharge:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

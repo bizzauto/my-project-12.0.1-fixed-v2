@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createCustomFieldSchema } from '../validations/remaining-schemas.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.get('/entity/:entityType', authenticate, async (req: any, res: any) => {
       data: fields,
     });
   } catch (error: any) {
-    console.error('Get entity fields error:', error);
+    logger.error('Get entity fields error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch entity fields',
@@ -121,7 +122,7 @@ router.get('/entity/:entityType/:entityId', authenticate, async (req: any, res: 
       data: { fields, values },
     });
   } catch (error: any) {
-    console.error('Get entity field values error:', error);
+    logger.error('Get entity field values error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch entity field values',
@@ -236,7 +237,7 @@ router.post('/entity/:entityType/values', authenticate, async (req: any, res: an
       data: updated,
     });
   } catch (error: any) {
-    console.error('Save entity field values error:', error);
+    logger.error('Save entity field values error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to save entity field values',
@@ -295,7 +296,7 @@ router.put('/reorder', authenticate, async (req: any, res: any) => {
       data: reordered,
     });
   } catch (error: any) {
-    console.error('Reorder fields error:', error);
+    logger.error('Reorder fields error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to reorder fields',
@@ -344,7 +345,7 @@ router.get('/', authenticate, async (req: any, res: any) => {
       data: fields,
     });
   } catch (error: any) {
-    console.error('Get custom fields error:', error);
+    logger.error('Get custom fields error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch custom fields',
@@ -375,7 +376,7 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
       data: field,
     });
   } catch (error: any) {
-    console.error('Get custom field error:', error);
+    logger.error('Get custom field error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch custom field',
@@ -487,7 +488,7 @@ router.post('/', authenticate, validate(createCustomFieldSchema), async (req: an
       data: field,
     });
   } catch (error: any) {
-    console.error('Create custom field error:', error);
+    logger.error('Create custom field error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create custom field',
@@ -606,7 +607,7 @@ router.put('/:id', authenticate, async (req: any, res: any) => {
       data: updated,
     });
   } catch (error: any) {
-    console.error('Update custom field error:', error);
+    logger.error('Update custom field error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update custom field',
@@ -668,7 +669,7 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
       message: 'Custom field deleted successfully',
     });
   } catch (error: any) {
-    console.error('Delete custom field error:', error);
+    logger.error('Delete custom field error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete custom field',

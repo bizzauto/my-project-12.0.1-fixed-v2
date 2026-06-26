@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -96,7 +97,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Cart recovery stats error:', error);
+    logger.error('Cart recovery stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch cart recovery stats', details: error.message });
   }
 });
@@ -175,7 +176,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('List cart recoveries error:', error);
+    logger.error('List cart recoveries error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch cart recoveries', details: error.message });
   }
 });
@@ -204,7 +205,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: cart });
   } catch (error: any) {
-    console.error('Get cart recovery error:', error);
+    logger.error('Get cart recovery error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch cart recovery record', details: error.message });
   }
 });
@@ -277,7 +278,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.status(201).json({ success: true, message: 'Abandoned cart recorded', data: cart });
   } catch (error: any) {
-    console.error('Record cart abandonment error:', error);
+    logger.error('Record cart abandonment error:', error);
     res.status(500).json({ success: false, error: 'Failed to record abandoned cart', details: error.message });
   }
 });
@@ -386,7 +387,7 @@ router.post('/:id/remind', authenticate, async (req: AuthRequest, res: Response)
 
     res.json({ success: true, message: 'Reminder sent successfully', data: updated });
   } catch (error: any) {
-    console.error('Send cart reminder error:', error);
+    logger.error('Send cart reminder error:', error);
     res.status(500).json({ success: false, error: 'Failed to send cart reminder', details: error.message });
   }
 });
@@ -451,7 +452,7 @@ router.patch('/:id/recover', authenticate, async (req: AuthRequest, res: Respons
 
     res.json({ success: true, message: 'Cart marked as recovered', data: updated });
   } catch (error: any) {
-    console.error('Recover cart error:', error);
+    logger.error('Recover cart error:', error);
     res.status(500).json({ success: false, error: 'Failed to mark cart as recovered', details: error.message });
   }
 });
@@ -500,7 +501,7 @@ router.patch('/:id/lost', authenticate, async (req: AuthRequest, res: Response) 
 
     res.json({ success: true, message: 'Cart marked as lost', data: updated });
   } catch (error: any) {
-    console.error('Mark cart lost error:', error);
+    logger.error('Mark cart lost error:', error);
     res.status(500).json({ success: false, error: 'Failed to mark cart as lost', details: error.message });
   }
 });

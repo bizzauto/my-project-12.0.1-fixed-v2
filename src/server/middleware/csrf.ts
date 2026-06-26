@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { CSRFService } from '../services/csrf.service.js';
 import { AuthRequest } from './auth.js';
+import logger from '../utils/logger.js';
 
 /**
  * CSRF Token Validation Middleware
@@ -44,7 +45,7 @@ export const validateCSRF = async (
 
     next();
   } catch (error: any) {
-    console.error('CSRF validation error:', error);
+    logger.error('CSRF validation error:', error);
     res.status(500).json({
       success: false,
       error: 'CSRF validation failed',

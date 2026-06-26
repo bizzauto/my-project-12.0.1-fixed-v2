@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { prisma } from '../db.js';
 import { decrypt, encrypt } from '../utils/auth.js';
+import logger from '../utils/logger.js';
 
 const WHATSAPP_API_BASE = 'https://graph.facebook.com/v18.0';
 
@@ -81,7 +82,7 @@ export class WhatsAppService {
 
       return response.data;
     } catch (error: any) {
-      console.error('WhatsApp send error:', error.response?.data || error.message);
+      logger.error('WhatsApp send error:', error.response?.data || error.message);
 
       // Save failed message
       await prisma.message.create({
@@ -181,7 +182,7 @@ export class WhatsAppService {
 
       return response.data;
     } catch (error: any) {
-      console.error('WhatsApp template send error:', error.response?.data || error.message);
+      logger.error('WhatsApp template send error:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -257,7 +258,7 @@ export class WhatsAppService {
 
       return response.data;
     } catch (error: any) {
-      console.error('WhatsApp media send error:', error.response?.data || error.message);
+      logger.error('WhatsApp media send error:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -402,7 +403,7 @@ export class WhatsAppService {
 
       return response.data.data || [];
     } catch (error: any) {
-      console.error('Fetch templates error:', error.response?.data || error.message);
+      logger.error('Fetch templates error:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -534,7 +535,7 @@ export class WhatsAppService {
       }
       return result.qrCode;
     } catch (error: any) {
-      console.error('[WhatsApp] QR generation via Evolution API failed:', error.message);
+      logger.error('[WhatsApp] QR generation via Evolution API failed:', error.message);
       
       // Check if Evolution API is configured at all
       try {

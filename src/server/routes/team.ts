@@ -4,6 +4,7 @@ import { prisma } from '../db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { checkUserLimit } from '../middleware/planLimits.js';
 import { hashPassword } from '../utils/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -61,7 +62,7 @@ router.get('/', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('List team error:', error);
+    logger.error('List team error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to list team members',
@@ -120,7 +121,7 @@ router.get('/members', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('List team members error:', error);
+    logger.error('List team members error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to list team members',
@@ -191,7 +192,7 @@ router.post('/invite', requireRole('OWNER', 'ADMIN'), checkUserLimit, async (req
       },
     });
   } catch (error: any) {
-    console.error('Invite user error:', error);
+    logger.error('Invite user error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to invite user',
@@ -253,7 +254,7 @@ router.put('/:id/role', requireRole('OWNER', 'ADMIN'), async (req: any, res: any
       data: updatedUser,
     });
   } catch (error: any) {
-    console.error('Update role error:', error);
+    logger.error('Update role error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update role',
@@ -314,7 +315,7 @@ router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: any) 
       message: 'User removed successfully',
     });
   } catch (error: any) {
-    console.error('Remove user error:', error);
+    logger.error('Remove user error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to remove user',
@@ -354,7 +355,7 @@ router.put('/members/:id', requireRole('OWNER', 'ADMIN'), async (req: any, res: 
       data: updated,
     });
   } catch (error: any) {
-    console.error('Update team member error:', error);
+    logger.error('Update team member error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update team member',
@@ -393,7 +394,7 @@ router.delete('/members/:id', requireRole('OWNER', 'ADMIN'), async (req: any, re
       message: 'Team member removed successfully',
     });
   } catch (error: any) {
-    console.error('Remove team member error:', error);
+    logger.error('Remove team member error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to remove team member',
@@ -435,7 +436,7 @@ router.post('/:id/reset-password', requireRole('OWNER', 'ADMIN'), async (req: an
       tempPassword,
     });
   } catch (error: any) {
-    console.error('Reset password error:', error);
+    logger.error('Reset password error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to reset password',
@@ -491,7 +492,7 @@ router.post('/transfer-ownership', requireRole('OWNER'), async (req: any, res: a
       message: `Ownership transferred to ${newOwner.name || newOwner.email}`,
     });
   } catch (error: any) {
-    console.error('Transfer ownership error:', error);
+    logger.error('Transfer ownership error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to transfer ownership',
@@ -537,7 +538,7 @@ router.get('/audit-logs', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Get audit logs error:', error);
+    logger.error('Get audit logs error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch audit logs',
@@ -587,7 +588,7 @@ router.get('/audit-logs/export', async (req: any, res: any) => {
       res.json({ success: true, data: logs });
     }
   } catch (error: any) {
-    console.error('Export audit logs error:', error);
+    logger.error('Export audit logs error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to export audit logs',
@@ -618,7 +619,7 @@ router.get('/api-keys', async (req: any, res: any) => {
 
     res.json({ success: true, data: apiKeys });
   } catch (error: any) {
-    console.error('Get API keys error:', error);
+    logger.error('Get API keys error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch API keys',
@@ -664,7 +665,7 @@ router.post('/api-keys', requireRole('OWNER', 'ADMIN'), async (req: any, res: an
       },
     });
   } catch (error: any) {
-    console.error('Create API key error:', error);
+    logger.error('Create API key error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create API key',
@@ -685,7 +686,7 @@ router.delete('/api-keys/:id', requireRole('OWNER', 'ADMIN'), async (req: any, r
 
     res.json({ success: true, message: 'API key revoked successfully' });
   } catch (error: any) {
-    console.error('Revoke API key error:', error);
+    logger.error('Revoke API key error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to revoke API key',

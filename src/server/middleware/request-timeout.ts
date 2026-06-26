@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from '../utils/logger.js';
 
 /**
  * Request Timeout Middleware
@@ -30,7 +31,7 @@ export function requestTimeout(timeoutMs?: number) {
     req.socket.on('timeout', () => {
       if (!responded && !res.headersSent) {
         responded = true;
-        console.warn(`Request timeout (${timeout}ms): ${req.method} ${req.path} from ${req.ip}`);
+        logger.warn(`Request timeout (${timeout}ms): ${req.method} ${req.path} from ${req.ip}`);
         res.status(408).json({
           success: false,
           error: 'Request timeout. The server took too long to process your request.',

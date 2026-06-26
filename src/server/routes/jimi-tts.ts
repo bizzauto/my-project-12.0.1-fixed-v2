@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -118,7 +119,7 @@ STYLE: Sirf 1 line. Plain text. NO emojis.`;
     clearTimeout(timeout);
     
     if (!response.ok) {
-      console.error('[Jimi Chat] NVIDIA API error:', response.status);
+      logger.error('[Jimi Chat] NVIDIA API error:', response.status);
       return res.status(502).json({ error: 'NVIDIA API error' });
     }
 
@@ -139,7 +140,7 @@ STYLE: Sirf 1 line. Plain text. NO emojis.`;
 
     res.json({ reply });
   } catch (error: any) {
-    console.error('[Jimi Chat] Error:', error.message);
+    logger.error('[Jimi Chat] Error:', error.message);
     res.status(500).json({ error: 'AI service unavailable' });
   }
 });
@@ -244,7 +245,7 @@ router.post('/tts/gemini', async (req: Request, res: Response) => {
 
     const apiKey = process.env.GEMINI_API_KEY || '';
     if (!apiKey) {
-      console.log('[Jimi Gemini] No GEMINI_API_KEY configured');
+      logger.info('[Jimi Gemini] No GEMINI_API_KEY configured');
       return res.json({ fallback: true, text: cleaned });
     }
 
@@ -292,7 +293,7 @@ router.post('/tts/gemini', async (req: Request, res: Response) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('[Jimi Gemini] API error:', response.status, errText.substring(0, 200));
+      logger.error('[Jimi Gemini] API error:', response.status, errText.substring(0, 200));
       return res.json({ fallback: true, text: cleaned });
     }
 
@@ -303,7 +304,7 @@ router.post('/tts/gemini', async (req: Request, res: Response) => {
     // Find audio part (Gemini returns inlineData with audio)
     const audioPart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith('audio/'));
     if (audioPart?.inlineData?.data) {
-      console.log('[Jimi Gemini] TTS success with Aoede voice 🎤');
+      logger.info('[Jimi Gemini] TTS success with Aoede voice 🎤');
       // Return actual mimeType from Gemini response so client plays correct format
       const mimeType = audioPart.inlineData.mimeType || 'audio/mpeg';
       const format = mimeType.includes('wav') ? 'wav' : mimeType.includes('ogg') ? 'ogg' : 'mp3';
@@ -311,10 +312,10 @@ router.post('/tts/gemini', async (req: Request, res: Response) => {
     }
 
     // If no audio, return fallback
-    console.log('[Jimi Gemini] No audio in response');
+    logger.info('[Jimi Gemini] No audio in response');
     res.json({ fallback: true, text: cleaned });
   } catch (error: any) {
-    console.error('[Jimi Gemini] TTS failed:', error.message);
+    logger.error('[Jimi Gemini] TTS failed:', error.message);
     res.json({ fallback: true, text: req.body.text || '' });
   }
 });
@@ -361,7 +362,7 @@ router.post('/tts/kyutai', async (req: Request, res: Response) => {
     clearTimeout(timeout);
 
     if (!response.ok) {
-      console.error('[Jimi Kyutai] TTS error:', response.status);
+      logger.error('[Jimi Kyutai] TTS error:', response.status);
       return res.json({ fallback: true, text: cleaned });
     }
 
@@ -369,7 +370,7 @@ router.post('/tts/kyutai', async (req: Request, res: Response) => {
     const audio = Buffer.from(buffer).toString('base64');
     res.json({ audio, format: 'mp3', engine: 'kyutai' });
   } catch (error: any) {
-    console.error('[Jimi Kyutai] TTS failed:', error.message);
+    logger.error('[Jimi Kyutai] TTS failed:', error.message);
     res.json({ fallback: true, text: req.body.text || '' });
   }
 });

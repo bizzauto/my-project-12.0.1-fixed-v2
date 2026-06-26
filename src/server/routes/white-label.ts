@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db.js';
 import { getJwtSecret, verifyToken } from '../utils/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -71,7 +72,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('WL login error:', err);
+    logger.error('WL login error:', err);
     res.status(500).json({ success: false, error: 'Login failed' });
   }
 });
@@ -114,7 +115,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       data: { reseller: safeReseller },
     });
   } catch (err) {
-    console.error('WL register error:', err);
+    logger.error('WL register error:', err);
     res.status(500).json({ success: false, error: 'Registration failed' });
   }
 });
@@ -143,7 +144,7 @@ router.get('/auth/me', wlAuth, async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('WL me error:', err);
+    logger.error('WL me error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
   }
 });
@@ -169,7 +170,7 @@ router.get('/clients', wlAuth, async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('WL get clients error:', err);
+    logger.error('WL get clients error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch clients' });
   }
 });
@@ -211,7 +212,7 @@ router.post('/clients', wlAuth, async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('WL create client error:', err);
+    logger.error('WL create client error:', err);
     res.status(500).json({ success: false, error: 'Failed to create client' });
   }
 });
@@ -238,7 +239,7 @@ router.delete('/clients/:id', wlAuth, async (req: Request, res: Response) => {
 
     res.json({ success: true, message: 'Client removed' });
   } catch (err) {
-    console.error('WL delete client error:', err);
+    logger.error('WL delete client error:', err);
     res.status(500).json({ success: false, error: 'Failed to delete client' });
   }
 });
@@ -268,7 +269,7 @@ router.patch('/clients/:id/status', wlAuth, async (req: Request, res: Response) 
 
     res.json({ success: true, data: { client: updated } });
   } catch (err) {
-    console.error('WL update client status error:', err);
+    logger.error('WL update client status error:', err);
     res.status(500).json({ success: false, error: 'Failed to update status' });
   }
 });
@@ -289,7 +290,7 @@ router.get('/clients/stats', wlAuth, async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('WL client stats error:', err);
+    logger.error('WL client stats error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch stats' });
   }
 });
@@ -316,7 +317,7 @@ router.get('/branding', wlAuth, async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('WL get branding error:', err);
+    logger.error('WL get branding error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch branding' });
   }
 });
@@ -352,7 +353,7 @@ router.put('/branding', wlAuth, async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('WL update branding error:', err);
+    logger.error('WL update branding error:', err);
     res.status(500).json({ success: false, error: 'Failed to update branding' });
   }
 });

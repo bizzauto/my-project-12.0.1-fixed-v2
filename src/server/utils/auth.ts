@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import logger from '../utils/logger.js';
 
 // ── JWT_SECRET (lazy resolution) ──
 // NOTE: process.env is read at CALL TIME, not module eval time.
@@ -20,16 +21,16 @@ export function getJwtSecret(): string {
   if (secret) {
     if (!_loggedSecret) {
       _loggedSecret = true;
-      console.log(`[Auth] JWT_SECRET loaded (length: ${secret.length}, first4: ${secret.slice(0, 4)}...)`);
+      logger.info(`[Auth] JWT_SECRET loaded (length: ${secret.length}, first4: ${secret.slice(0, 4)}...)`);
     }
     return secret;
   }
   const isProd = process.env.NODE_ENV === 'production';
   if (isProd) {
-    console.error('CRITICAL: JWT_SECRET environment variable is not set. Server cannot start in production without a JWT_SECRET.');
+    logger.error('CRITICAL: JWT_SECRET environment variable is not set. Server cannot start in production without a JWT_SECRET.');
     process.exit(1);
   }
-  console.warn('WARNING: JWT_SECRET not set. Using dev fallback (tokens will invalidate on restart).');
+  logger.warn('WARNING: JWT_SECRET not set. Using dev fallback (tokens will invalidate on restart).');
   return DEV_JWT_FALLBACK;
 }
 
@@ -45,10 +46,10 @@ function loadOrGenerateDevEncryptionKey(): string {
     if (fs.existsSync(keyFile)) {
       const existing = fs.readFileSync(keyFile, 'utf8').trim();
       if (existing.length === 64) {
-        console.log('[Auth] Loaded existing encryption key from .encryption.key');
+        logger.info('[Auth] Loaded existing encryption key from .encryption.key');
         return existing;
       }
-      console.warn('[Auth] Existing .encryption.key is invalid, generating new one...');
+      logger.warn('[Auth] Existing .encryption.key is invalid, generating new one...');
     }
   } catch (e) {
     // Ignore - will generate new
@@ -57,7 +58,7 @@ function loadOrGenerateDevEncryptionKey(): string {
   const newKey = crypto.randomBytes(32).toString('hex');
   try {
     fs.writeFileSync(keyFile, newKey, 'utf8');
-    console.log('[Auth] Generated new encryption key → .encryption.key (DO NOT COMMIT)');
+    logger.info('[Auth] Generated new encryption key → .encryption.key (DO NOT COMMIT)');
     // Add to .gitignore if not already there
     const gitignorePath = path.resolve(process.cwd(), '.gitignore');
     if (fs.existsSync(gitignorePath)) {
@@ -67,7 +68,7 @@ function loadOrGenerateDevEncryptionKey(): string {
       }
     }
   } catch (e) {
-    console.warn('[Auth] Could not persist encryption key to file. Data will be lost on restart.');
+    logger.warn('[Auth] Could not persist encryption key to file. Data will be lost on restart.');
   }
   return newKey;
 }
@@ -76,7 +77,7 @@ if (!ENCRYPTION_KEY) {
   const isProd = process.env.NODE_ENV === 'production';
   const msg = `CRITICAL: ENCRYPTION_KEY environment variable is not set.`;
   if (isProd) {
-    console.error(msg + ' Server cannot start in production without an ENCRYPTION_KEY.');
+    logger.error(msg + ' Server cannot start in production without an ENCRYPTION_KEY.');
     process.exit(1);
   }
   DEV_ENC_FALLBACK = loadOrGenerateDevEncryptionKey();
@@ -141,7 +142,7 @@ export function decrypt(encryptedText: string): string {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (error) {
-    console.error('Decryption failed:', error);
+    logger.error('Decryption failed:', error);
     return '';
   }
 }

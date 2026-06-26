@@ -42,6 +42,18 @@ jest.mock('@react-oauth/google', () => {
   };
 });
 
+jest.mock('../src/components/GoogleLoginButton', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props: any) => {
+      // Delegate to the GoogleLogin mock so callback capture still works
+      const { GoogleLogin } = require('@react-oauth/google');
+      return React.createElement(GoogleLogin, props);
+    },
+  };
+});
+
 jest.mock('../src/components/AppleLogin', () => {
   const React = require('react');
   return {

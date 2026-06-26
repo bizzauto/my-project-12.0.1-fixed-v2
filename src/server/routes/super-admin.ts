@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -72,7 +73,7 @@ router.get('/stats', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Super admin stats error:', error);
+    logger.error('Super admin stats error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch stats',
@@ -133,7 +134,7 @@ router.get('/analytics', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Super admin analytics error:', error);
+    logger.error('Super admin analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch analytics',
@@ -181,7 +182,7 @@ router.get('/growth', async (req: any, res: any) => {
 
     res.json({ success: true, data });
   } catch (error: any) {
-    console.error('Super admin growth error:', error);
+    logger.error('Super admin growth error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch growth data', details: error.message });
   }
 });
@@ -241,7 +242,7 @@ router.get('/businesses', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('List businesses error:', error);
+    logger.error('List businesses error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to list businesses',
@@ -281,7 +282,7 @@ router.get('/businesses/:id', async (req: any, res: any) => {
 
     res.json({ success: true, data: business });
   } catch (error: any) {
-    console.error('Get business error:', error);
+    logger.error('Get business error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get business',
@@ -311,7 +312,7 @@ router.put('/businesses/:id/plan', async (req: any, res: any) => {
 
     res.json({ success: true, data: business });
   } catch (error: any) {
-    console.error('Update plan error:', error);
+    logger.error('Update plan error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update plan',
@@ -351,7 +352,7 @@ router.put('/businesses/:id/status', async (req: any, res: any) => {
       data: business,
     });
   } catch (error: any) {
-    console.error('Update status error:', error);
+    logger.error('Update status error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update status',
@@ -411,7 +412,7 @@ router.get('/users', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('List users error:', error);
+    logger.error('List users error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to list users',
@@ -438,7 +439,7 @@ router.put('/users/:id/role', async (req: any, res: any) => {
 
     res.json({ success: true, data: user });
   } catch (error: any) {
-    console.error('Update role error:', error);
+    logger.error('Update role error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update role',
@@ -469,7 +470,7 @@ router.put('/users/:id/status', async (req: any, res: any) => {
       data: user,
     });
   } catch (error: any) {
-    console.error('Update user status error:', error);
+    logger.error('Update user status error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update user status',
@@ -490,7 +491,7 @@ router.delete('/users/:id', async (req: any, res: any) => {
       message: 'User deleted successfully',
     });
   } catch (error: any) {
-    console.error('Delete user error:', error);
+    logger.error('Delete user error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete user',
@@ -542,7 +543,7 @@ router.get('/subscriptions', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('List subscriptions error:', error);
+    logger.error('List subscriptions error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to list subscriptions',
@@ -661,7 +662,7 @@ router.get('/settings', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Get settings error:', error);
+    logger.error('Get settings error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch settings',

@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
+import logger from '../utils/logger.js';
 
 /**
  * Global Rate Limiter - Prevents brute force & DDoS
@@ -71,6 +72,24 @@ export const uploadRateLimiter = rateLimit({
  * Speed Limiter - No-op placeholder
  */
 export const speedLimiter = (req: Request, res: Response, next: NextFunction) => {
+  const startTime = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    
+    // Log slow requests (> 5 seconds) for monitoring
+    if (duration > 5000) {
+      logger.warn(`[SpeedLimiter] Slow request: ${req.method} ${req.path} took ${duration}ms from ${req.ip}`);
+    }
+    
+    // If request took > 30 seconds, the request-timeout middleware
+    // would have already terminated it. This is a safety net for
+    // responses that barely squeak under the timeout.
+    if (duration > 30000) {
+      logger.error(`[SpeedLimiter] Extremely slow request: ${req.method} ${req.path} took ${duration}ms — potential DoS`);
+    }
+  });
+  
   next();
 };
 

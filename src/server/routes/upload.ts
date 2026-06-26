@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { UploadService } from '../services/upload.service.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -82,7 +83,7 @@ router.post(
         message: `${results.length} file(s) uploaded successfully${errors.length ? `, ${errors.length} failed` : ''}`,
       });
     } catch (error: any) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Upload failed',
@@ -110,7 +111,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error('List uploads error:', error);
+    logger.error('List uploads error:', error);
     res.status(500).json({ success: false, error: 'Failed to list uploads' });
   }
 });
@@ -124,7 +125,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     const result = await UploadService.deleteFile(req.params.id, businessId);
     res.json(result);
   } catch (error: any) {
-    console.error('Delete upload error:', error);
+    logger.error('Delete upload error:', error);
     res.status(404).json({ success: false, error: error.message || 'Upload not found' });
   }
 });
@@ -137,7 +138,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
     const stats = await UploadService.getStorageStats(req.user.businessId);
     res.json({ success: true, data: stats });
   } catch (error: any) {
-    console.error('Upload stats error:', error);
+    logger.error('Upload stats error:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to get storage stats' });
   }
 });

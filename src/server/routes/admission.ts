@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import multer from 'multer';
 import path from 'path';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -139,7 +140,7 @@ router.post('/submit', authenticate, upload.fields([
       }
     });
   } catch (error: any) {
-    console.error('Admission form submission error:', error);
+    logger.error('Admission form submission error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to submit admission form',

@@ -1,4 +1,5 @@
 import { encrypt, decrypt } from '../utils/auth.js';
+import logger from '../utils/logger.js';
 
 /**
  * Sensitive fields on the Business model that must be encrypted at rest.
@@ -42,7 +43,7 @@ export function decryptField(value: string | null | undefined): string | null {
   try {
     return decrypt(value.slice(ENCRYPTED_PREFIX.length));
   } catch {
-    console.error('[SecretsService] Failed to decrypt field');
+    logger.error('[SecretsService] Failed to decrypt field');
     return null;
   }
 }

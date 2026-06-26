@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 /**
  * Environment Hardening Middleware
  * Validates critical environment variables at startup and blocks
@@ -76,26 +77,26 @@ export function validateProductionEnvironment(): EnvironmentValidationResult {
 
 export function printEnvironmentReport(result: EnvironmentValidationResult): void {
   const nodeEnv = process.env.NODE_ENV || 'development';
-  console.log(`\n🔧 Environment Hardening Report (${nodeEnv})`);
+  logger.info(`\n🔧 Environment Hardening Report (${nodeEnv})`);
 
   if (result.valid) {
-    console.log('✅ All security checks passed');
+    logger.info('✅ All security checks passed');
   } else {
-    console.log('❌ Security issues found:');
+    logger.info('❌ Security issues found:');
     for (const err of result.errors) {
-      console.log(`   ❌ ${err}`);
+      logger.info(`   ❌ ${err}`);
     }
   }
 
   if (result.warnings.length > 0) {
-    console.log('⚠️ Warnings:');
+    logger.info('⚠️ Warnings:');
     for (const warn of result.warnings) {
-      console.log(`   ⚠️ ${warn}`);
+      logger.info(`   ⚠️ ${warn}`);
     }
   }
 
   if (nodeEnv === 'production' && !result.valid) {
-    console.log('\n🚫 BLOCKING: Server will NOT start with security issues in production!');
+    logger.info('\n🚫 BLOCKING: Server will NOT start with security issues in production!');
     process.exit(1);
   }
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.get('/', async (req: any, res: any) => {
 
     res.json({ success: true, data: agency });
   } catch (error: any) {
-    console.error('Get agency error:', error);
+    logger.error('Get agency error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch agency',
@@ -92,7 +93,7 @@ router.post('/', async (req: any, res: any) => {
 
     res.status(201).json({ success: true, data: agency });
   } catch (error: any) {
-    console.error('Create agency error:', error);
+    logger.error('Create agency error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create agency',
@@ -132,7 +133,7 @@ router.put('/', async (req: any, res: any) => {
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    console.error('Update agency error:', error);
+    logger.error('Update agency error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update agency',
@@ -214,7 +215,7 @@ router.get('/sub-accounts', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('List sub-accounts error:', error);
+    logger.error('List sub-accounts error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to list sub-accounts',
@@ -317,7 +318,7 @@ router.post('/sub-accounts', async (req: any, res: any) => {
 
     res.status(201).json({ success: true, data: subAccount });
   } catch (error: any) {
-    console.error('Create sub-account error:', error);
+    logger.error('Create sub-account error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create sub-account',
@@ -379,7 +380,7 @@ router.put('/sub-accounts/:id', async (req: any, res: any) => {
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    console.error('Update sub-account error:', error);
+    logger.error('Update sub-account error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update sub-account',
@@ -436,7 +437,7 @@ router.patch('/sub-accounts/:id/status', async (req: any, res: any) => {
       data: updated,
     });
   } catch (error: any) {
-    console.error('Update sub-account status error:', error);
+    logger.error('Update sub-account status error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update sub-account status',
@@ -488,7 +489,7 @@ router.delete('/sub-accounts/:id', async (req: any, res: any) => {
       message: 'Sub-account removed successfully',
     });
   } catch (error: any) {
-    console.error('Delete sub-account error:', error);
+    logger.error('Delete sub-account error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete sub-account',
@@ -572,7 +573,7 @@ router.get('/stats', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Agency stats error:', error);
+    logger.error('Agency stats error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch agency stats',
@@ -616,7 +617,7 @@ router.put('/branding', async (req: any, res: any) => {
 
     res.json({ success: true, data: { branding: updated.branding } });
   } catch (error: any) {
-    console.error('Update agency branding error:', error);
+    logger.error('Update agency branding error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update agency branding',

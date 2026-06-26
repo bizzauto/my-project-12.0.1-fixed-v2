@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 /**
  * Environment Validator
  * Validates all required environment variables on startup
@@ -88,22 +89,22 @@ export function validateEnvironment(): ValidationResult {
 }
 
 export function printValidationResult(result: ValidationResult): void {
-  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🔍 Environment Configuration Check');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  logger.info('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  logger.info('🔍 Environment Configuration Check');
+  logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   if (result.warnings.length > 0) {
-    console.log('\nWarnings:');
-    result.warnings.forEach(w => console.log(`  ${w}`));
+    logger.info('\nWarnings:');
+    result.warnings.forEach(w => logger.info(`  ${w}`));
   }
 
   if (result.errors.length > 0) {
-    console.log('\nErrors (server will NOT start):');
-    result.errors.forEach(e => console.log(`  ${e}`));
-    console.log('\n💡 Fix these in your .env file and restart.');
+    logger.info('\nErrors (server will NOT start):');
+    result.errors.forEach(e => logger.info(`  ${e}`));
+    logger.info('\n💡 Fix these in your .env file and restart.');
   } else {
-    console.log('\n✅ All required environment variables are configured correctly.');
+    logger.info('\n✅ All required environment variables are configured correctly.');
   }
 
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }

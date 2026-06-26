@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createCampaignSchema, updateCampaignSchema, scheduleCampaignSchema } from '../validations/crm-schemas.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -47,7 +48,7 @@ router.get('/', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Get campaigns error:', error);
+    logger.error('Get campaigns error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch campaigns',
@@ -84,7 +85,7 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
       data: campaign,
     });
   } catch (error: any) {
-    console.error('Get campaign error:', error);
+    logger.error('Get campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch campaign',
@@ -136,7 +137,7 @@ router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), validate(createCam
       data: campaign,
     });
   } catch (error: any) {
-    console.error('Create campaign error:', error);
+    logger.error('Create campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create campaign',
@@ -188,7 +189,7 @@ router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateC
       data: updated,
     });
   } catch (error: any) {
-    console.error('Update campaign error:', error);
+    logger.error('Update campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update campaign',
@@ -230,7 +231,7 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: a
       message: 'Campaign deleted successfully',
     });
   } catch (error: any) {
-    console.error('Delete campaign error:', error);
+    logger.error('Delete campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete campaign',
@@ -322,7 +323,7 @@ router.post('/:id/start', authenticate, requireRole('OWNER', 'ADMIN'), async (re
       data: { contactCount: contacts.length },
     });
   } catch (error: any) {
-    console.error('Start campaign error:', error);
+    logger.error('Start campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to start campaign',
@@ -358,7 +359,7 @@ router.post('/:id/pause', authenticate, requireRole('OWNER', 'ADMIN'), async (re
       message: 'Campaign paused successfully',
     });
   } catch (error: any) {
-    console.error('Pause campaign error:', error);
+    logger.error('Pause campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to pause campaign',
@@ -424,7 +425,7 @@ router.post('/:id/send', authenticate, requireRole('OWNER', 'ADMIN'), async (req
       data: { contactCount: contacts.length },
     });
   } catch (error: any) {
-    console.error('Send campaign error:', error);
+    logger.error('Send campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send campaign',
@@ -481,7 +482,7 @@ router.post('/:id/schedule', authenticate, requireRole('OWNER', 'ADMIN'), valida
       data: { scheduledAt: scheduledDate },
     });
   } catch (error: any) {
-    console.error('Schedule campaign error:', error);
+    logger.error('Schedule campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to schedule campaign',
@@ -564,7 +565,7 @@ router.get('/:id/stats', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Get campaign stats error:', error);
+    logger.error('Get campaign stats error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get campaign statistics',

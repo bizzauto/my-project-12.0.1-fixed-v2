@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { LeadFinderService } from '../services/lead-finder.service.js';
 import { AiLeadScoringService } from '../services/ai-lead-scoring.service.js';
 import { GoogleSheetsService } from '../services/google-sheets.service.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.post('/search', authenticate, async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Lead finder search error:', error);
+    logger.error('Lead finder search error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

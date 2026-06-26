@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { cards } });
   } catch (err) {
-    console.error('Get vCards error:', err);
+    logger.error('Get vCards error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch vCards' });
   }
 });
@@ -42,7 +43,7 @@ router.post('/', async (req: Request, res: Response) => {
     });
     res.status(201).json({ success: true, data: { card } });
   } catch (err) {
-    console.error('Create vCard error:', err);
+    logger.error('Create vCard error:', err);
     res.status(500).json({ success: false, error: 'Failed to create vCard' });
   }
 });
@@ -74,7 +75,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { card } });
   } catch (err) {
-    console.error('Update vCard error:', err);
+    logger.error('Update vCard error:', err);
     res.status(500).json({ success: false, error: 'Failed to update vCard' });
   }
 });
@@ -89,7 +90,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await (prisma as any).vCards.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'vCard deleted' });
   } catch (err) {
-    console.error('Delete vCard error:', err);
+    logger.error('Delete vCard error:', err);
     res.status(500).json({ success: false, error: 'Failed to delete vCard' });
   }
 });

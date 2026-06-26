@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
+import logger from '../utils/logger.js';
 
 /**
  * Security Headers using Helmet.js
@@ -174,7 +175,7 @@ export const sqlInjectionHeaders = (req: Request, res: Response, next: NextFunct
   const checkString = (str: string) => {
     for (const pattern of suspiciousPatterns) {
       if (pattern.test(str)) {
-        console.warn(`[Security] Suspicious pattern detected: ${pattern} in ${str}`);
+        logger.warn(`[Security] Suspicious pattern detected: ${pattern} in ${str}`);
         return false;
       }
     }
@@ -218,7 +219,7 @@ export const securityMonitor = (req: Request, res: Response, next: NextFunction)
     for (const check of checks) {
       for (const indicator of suspiciousIndicators) {
         if (indicator.pattern.test(check)) {
-          console.warn(`[Security Alert] ${indicator.name} detected from IP: ${req.ip}`);
+          logger.warn(`[Security Alert] ${indicator.name} detected from IP: ${req.ip}`);
           // Log for admin review but don't block immediately
           return false;
         }
@@ -238,7 +239,7 @@ export const securityMonitor = (req: Request, res: Response, next: NextFunction)
 export const requestTimeout = (req: Request, res: Response, next: NextFunction) => {
   // Set timeout to 30 seconds
   req.setTimeout(30000, () => {
-    console.warn(`[Security] Request timeout: ${req.path} from ${req.ip}`);
+    logger.warn(`[Security] Request timeout: ${req.path} from ${req.ip}`);
     res.status(408).json({
       success: false,
       error: 'Request timeout',

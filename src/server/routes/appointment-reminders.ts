@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Get appointment reminder stats error:', error);
+    logger.error('Get appointment reminder stats error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch reminder stats',
@@ -111,7 +112,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Get appointment reminders error:', error);
+    logger.error('Get appointment reminders error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch appointment reminders',
@@ -207,7 +208,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       data: reminder,
     });
   } catch (error: any) {
-    console.error('Create appointment reminder error:', error);
+    logger.error('Create appointment reminder error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to create appointment reminder',
@@ -254,7 +255,7 @@ router.post('/:id/send', authenticate, async (req: AuthRequest, res: Response) =
       message: `Reminder sent via ${reminder.channel}`,
     });
   } catch (error: any) {
-    console.error('Send appointment reminder error:', error);
+    logger.error('Send appointment reminder error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to send appointment reminder',
@@ -288,7 +289,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       message: 'Reminder deleted successfully',
     });
   } catch (error: any) {
-    console.error('Delete appointment reminder error:', error);
+    logger.error('Delete appointment reminder error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete appointment reminder',
@@ -398,7 +399,7 @@ router.post('/auto-schedule', authenticate, async (req: AuthRequest, res: Respon
       message: `Auto-scheduled ${createdCount} reminders for ${upcomingAppointments.length} upcoming appointments`,
     });
   } catch (error: any) {
-    console.error('Auto-schedule appointment reminders error:', error);
+    logger.error('Auto-schedule appointment reminders error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to auto-schedule appointment reminders',

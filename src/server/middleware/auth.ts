@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { prisma } from '../db.js';
 import { verifyToken } from '../utils/auth.js';
 import { CSRFService } from '../services/csrf.service.js';
+import logger from '../utils/logger.js';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -34,7 +35,7 @@ async function authenticateViaN8nApiKey(req: AuthRequest): Promise<boolean> {
   const signature = req.headers['x-business-signature'] as string | undefined;
 
   if (!rawBusinessId || !signature) {
-    console.warn('[n8nAuth] Missing x-business-id or x-business-signature header');
+    logger.warn('[n8nAuth] Missing x-business-id or x-business-signature header');
     return false; // Let the calling authenticate middleware handle the 401
   }
 
@@ -45,7 +46,7 @@ async function authenticateViaN8nApiKey(req: AuthRequest): Promise<boolean> {
     .digest('hex');
 
   if (!crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signature))) {
-    console.warn('[n8nAuth] Invalid business signature — possible tenant breakout attempt');
+    logger.warn('[n8nAuth] Invalid business signature — possible tenant breakout attempt');
     return false; // Let the calling authenticate middleware handle the 403
   }
 
@@ -276,7 +277,7 @@ export async function validateWebhook(
     req.user = { businessId, isWebhook: true };
     next();
   } catch (error: any) {
-    console.error('Webhook validation error:', error.message);
+    logger.error('Webhook validation error:', error.message);
     res.status(500).json({ success: false, error: 'Webhook validation failed' });
   }
 }

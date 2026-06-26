@@ -4,6 +4,7 @@ import { authenticate, requireBusinessOwner } from '../middleware/auth.js';
 import { getUsageStats, PLAN_LIMITS } from '../middleware/planLimits.js';
 import razorpayService from '../services/razorpay.service.js';
 import { AutoOnboardingService } from '../services/auto-onboarding.service.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -339,15 +340,15 @@ router.post('/webhook', async (req: any, res: any) => {
           planName: subscription.plan,
           metadata: { businessId: subscription.businessId },
         });
-        console.log(`[Webhook] Auto-onboarding triggered for ${subscription.businessId}`);
+        logger.info(`[Webhook] Auto-onboarding triggered for ${subscription.businessId}`);
       } catch (onboardingError: any) {
-        console.error(`[Webhook] Auto-onboarding error:`, onboardingError.message);
+        logger.error(`[Webhook] Auto-onboarding error:`, onboardingError.message);
       }
     }
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('Webhook error:', error);
+    logger.error('Webhook error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -383,7 +384,7 @@ router.post('/onboard', authenticate, async (req: any, res: any) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('Onboard error:', error);
+    logger.error('Onboard error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

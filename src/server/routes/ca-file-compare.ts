@@ -5,6 +5,7 @@ import multer from 'multer';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
+import logger from '../utils/logger.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -455,7 +456,7 @@ router.post('/compare', authenticate, upload.fields([
       }
     });
   } catch (error: any) {
-    console.error('File compare error:', error);
+    logger.error('File compare error:', error);
     res.status(500).json({ success: false, error: 'File comparison failed', details: error.message });
   }
 });
@@ -473,7 +474,7 @@ router.post('/export/excel', authenticate, async (req: AuthRequest, res: any) =>
     res.setHeader('Content-Disposition', `attachment; filename="ca-copilot-comparison-${Date.now()}.xlsx"`);
     res.send(buffer);
   } catch (error: any) {
-    console.error('Excel export error:', error);
+    logger.error('Excel export error:', error);
     res.status(500).json({ success: false, error: 'Excel export failed', details: error.message });
   }
 });
@@ -491,7 +492,7 @@ router.post('/export/pdf', authenticate, async (req: AuthRequest, res: any) => {
     res.setHeader('Content-Disposition', `attachment; filename="ca-copilot-comparison-${Date.now()}.pdf"`);
     res.send(buffer);
   } catch (error: any) {
-    console.error('PDF export error:', error);
+    logger.error('PDF export error:', error);
     res.status(500).json({ success: false, error: 'PDF export failed', details: error.message });
   }
 });

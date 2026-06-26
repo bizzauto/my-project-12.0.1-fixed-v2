@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createTriggerLinkSchema, updateTriggerLinkSchema } from '../validations/remaining-schemas.js';
 import crypto from 'crypto';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -97,7 +98,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Error listing trigger links:', error);
+    logger.error('Error listing trigger links:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -154,7 +155,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Error getting trigger link:', error);
+    logger.error('Error getting trigger link:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -210,7 +211,7 @@ router.post('/', authenticate, validate(createTriggerLinkSchema), async (req: Re
 
     res.status(201).json({ success: true, data: link });
   } catch (error: any) {
-    console.error('Error creating trigger link:', error);
+    logger.error('Error creating trigger link:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -254,7 +255,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response) => {
 
     res.json({ success: true, data: link });
   } catch (error: any) {
-    console.error('Error updating trigger link:', error);
+    logger.error('Error updating trigger link:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -279,7 +280,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
 
     res.json({ success: true, message: 'Trigger link deleted' });
   } catch (error: any) {
-    console.error('Error deleting trigger link:', error);
+    logger.error('Error deleting trigger link:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -305,7 +306,7 @@ router.patch('/:id/toggle', authenticate, async (req: Request, res: Response) =>
 
     res.json({ success: true, data: link });
   } catch (error: any) {
-    console.error('Error toggling trigger link:', error);
+    logger.error('Error toggling trigger link:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -386,7 +387,7 @@ router.get('/:id/clicks', authenticate, async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Error getting click history:', error);
+    logger.error('Error getting click history:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -429,7 +430,7 @@ router.get('/s/:shortCode', async (req: Request, res: Response) => {
           browser: parsed.browser,
         },
       })
-      .catch((err) => console.error('Error recording click:', err));
+      .catch((err) => logger.error('Error recording click:', err));
 
     // Increment clickCount asynchronously
     prisma.triggerLink
@@ -440,12 +441,12 @@ router.get('/s/:shortCode', async (req: Request, res: Response) => {
           lastClickedAt: new Date(),
         },
       })
-      .catch((err) => console.error('Error incrementing click count:', err));
+      .catch((err) => logger.error('Error incrementing click count:', err));
 
     // Redirect to original URL
     res.redirect(302, link.originalUrl);
   } catch (error: any) {
-    console.error('Error handling redirect:', error);
+    logger.error('Error handling redirect:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

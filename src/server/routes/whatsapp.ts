@@ -5,6 +5,8 @@ import { authenticate, requireBusinessOwner, AuthRequest } from '../middleware/a
 import { checkMessageLimit } from '../middleware/planLimits.js';
 import axios from 'axios';
 import { encrypt, decrypt } from '../utils/auth.js';
+import WhatsAppService from '../services/whatsapp.service.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -52,13 +54,13 @@ router.get('/webhook/:businessId', async (req: Request, res: Response) => {
     }
 
     if (verifyToken === business.waWebhookSecret) {
-      console.log(`[WhatsApp] Webhook verified for business ${businessId}`);
+      logger.info(`[WhatsApp] Webhook verified for business ${businessId}`);
       return res.send(challenge);
     }
 
     return res.status(403).send('Verification failed');
   } catch (error) {
-    console.error('[WhatsApp] Webhook verification error:', error);
+    logger.error('[WhatsApp] Webhook verification error:', error);
     return res.status(500).send('Verification error');
   }
 });
@@ -86,11 +88,39 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
       return res.status(403).send('Verification failed');
     }
 
-    // For POST (incoming messages), verify webhook secret via query param or header
+    // Verify webhook authenticity via one of:
+    // 1. Meta's x-hub-signature-256 (HMAC-SHA256 of body using META_APP_SECRET)
+    // 2. Custom ?secret= or x-webhook-secret header (for Evolution API, n8n, custom integrations)
+    const rawBody = (req as any).rawBody || JSON.stringify(body);
+    const metaSignature = req.headers['x-hub-signature-256'] as string;
     const requestSecret = (req.query['secret'] as string) || (req.headers['x-webhook-secret'] as string);
-    if (requestSecret && requestSecret !== business.waWebhookSecret) {
-      console.warn(`[WhatsApp] Rejected webhook with invalid secret for business ${businessId}`);
-      return res.status(403).json({ error: 'Invalid webhook secret' });
+
+    let authenticated = false;
+
+    // Check 1: Meta's x-hub-signature-256
+    if (metaSignature && process.env.META_APP_SECRET) {
+      if (WhatsAppService.verifyWebhookSignature(rawBody, metaSignature, process.env.META_APP_SECRET)) {
+        authenticated = true;
+      } else {
+        logger.warn(`[WhatsApp] Rejected webhook — invalid x-hub-signature-256 for business ${businessId}`);
+        return res.status(403).json({ error: 'Invalid webhook signature' });
+      }
+    }
+
+    // Check 2: Custom webhook secret (only if not already authenticated via Meta signature)
+    if (!authenticated && requestSecret) {
+      if (requestSecret === business.waWebhookSecret) {
+        authenticated = true;
+      } else {
+        logger.warn(`[WhatsApp] Rejected webhook with invalid secret for business ${businessId}`);
+        return res.status(403).json({ error: 'Invalid webhook secret' });
+      }
+    }
+
+    // If neither check passed, require at least one form of authentication
+    if (!authenticated) {
+      logger.warn(`[WhatsApp] Rejected unauthenticated webhook for business ${businessId}`);
+      return res.status(401).json({ error: 'Missing webhook authentication. Provide x-hub-signature-256 header (Meta) or ?secret= / x-webhook-secret header (custom).' });
     }
 
     // Process incoming messages
@@ -127,7 +157,7 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
             },
           });
           isNewContact = true;
-          console.log(`[WhatsApp] New lead created: ${senderPhone}`);
+          logger.info(`[WhatsApp] New lead created: ${senderPhone}`);
 
           // Create activity log
           await prisma.activity.create({
@@ -157,9 +187,9 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
           const { handleIncomingMessage } = await import('../services/ai-auto-reply.service.js');
           const messageText = message.text?.body || '';
           const autoResult = await handleIncomingMessage(businessId, senderPhone, messageText, message.id);
-          console.log(`[WhatsApp] Auto-reply result: replied=${autoResult.replied}, channel=${autoResult.channel}, workflow=${autoResult.workflowTriggered}`);
+          logger.info(`[WhatsApp] Auto-reply result: replied=${autoResult.replied}, channel=${autoResult.channel}, workflow=${autoResult.workflowTriggered}`);
         } catch (aiError: any) {
-          console.error(`[WhatsApp] AI auto-reply failed, falling back to static:`, aiError.message);
+          logger.error(`[WhatsApp] AI auto-reply failed, falling back to static:`, aiError.message);
           // Fallback to static auto-reply
           try {
             const business = await prisma.business.findUnique({
@@ -183,7 +213,7 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
               );
             }
           } catch (fallbackError: any) {
-            console.error(`[WhatsApp] Static auto-reply also failed:`, fallbackError.message);
+            logger.error(`[WhatsApp] Static auto-reply also failed:`, fallbackError.message);
           }
         }
 
@@ -228,7 +258,7 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
         });
 
         if (chatbotFlow) {
-          console.log('Triggering chatbot for message:', message.id);
+          logger.info('Triggering chatbot for message:', message.id);
         }
       }
     }
@@ -251,7 +281,7 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
 
     res.json({ received: true });
   } catch (error: any) {
-    console.error('Webhook error:', error);
+    logger.error('Webhook error:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
@@ -304,7 +334,7 @@ router.get('/conversations', authenticate, async (req: AuthRequest, res: Respons
       },
     });
   } catch (error: any) {
-    console.error('Get conversations error:', error);
+    logger.error('Get conversations error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch conversations',
@@ -364,7 +394,7 @@ router.get('/conversation/:contactId', authenticate, async (req: AuthRequest, re
       },
     });
   } catch (error: any) {
-    console.error('Get conversation error:', error);
+    logger.error('Get conversation error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch conversation',
@@ -485,7 +515,7 @@ router.post('/send/text', authenticate, checkMessageLimit, async (req: AuthReque
       data: savedMessage,
     });
   } catch (error: any) {
-    console.error('Send message error:', error);
+    logger.error('Send message error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send message',
@@ -584,7 +614,7 @@ router.post('/send/template', authenticate, checkMessageLimit, async (req: AuthR
       data: message,
     });
   } catch (error: any) {
-    console.error('Send template error:', error);
+    logger.error('Send template error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send template message',
@@ -643,7 +673,7 @@ router.post('/connect', authenticate, requireBusinessOwner, async (req: AuthRequ
       },
     });
   } catch (error: any) {
-    console.error('Connect WhatsApp error:', error);
+    logger.error('Connect WhatsApp error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to initiate WhatsApp connection',
@@ -658,7 +688,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     const { code, state, error: fbError } = req.query;
 
     if (fbError) {
-      console.error('[WhatsApp Callback] Facebook error:', fbError);
+      logger.error('[WhatsApp Callback] Facebook error:', fbError);
       return res.redirect(`${process.env.FRONTEND_URL}/whatsapp?error=auth_denied`);
     }
 
@@ -685,12 +715,12 @@ router.get('/callback', async (req: Request, res: Response) => {
     const redirectUri = process.env.WHATSAPP_REDIRECT_URL;
 
     if (!appId || !appSecret) {
-      console.error('[WhatsApp Callback] META_APP_ID or META_APP_SECRET not configured');
+      logger.error('[WhatsApp Callback] META_APP_ID or META_APP_SECRET not configured');
       return res.redirect(`${process.env.FRONTEND_URL}/whatsapp?error=server_config_missing`);
     }
 
     // Step 1: Exchange code for short-lived access token
-    console.log('[WhatsApp Callback] Exchanging code for access token...');
+    logger.info('[WhatsApp Callback] Exchanging code for access token...');
     const tokenResponse = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
       params: {
         client_id: appId,
@@ -702,12 +732,12 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     const { access_token: shortToken } = tokenResponse.data;
     if (!shortToken) {
-      console.error('[WhatsApp Callback] Failed to get access token');
+      logger.error('[WhatsApp Callback] Failed to get access token');
       return res.redirect(`${process.env.FRONTEND_URL}/whatsapp?error=token_exchange_failed`);
     }
 
     // Step 2: Exchange short-lived token for long-lived token (60 days)
-    console.log('[WhatsApp Callback] Exchanging for long-lived token...');
+    logger.info('[WhatsApp Callback] Exchanging for long-lived token...');
     const longTokenResponse = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
       params: {
         grant_type: 'fb_exchange_token',
@@ -720,7 +750,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     const longLivedToken = longTokenResponse.data.access_token || shortToken;
 
     // Step 3: Get WhatsApp Business Account (WABA) ID and Phone Number ID
-    console.log('[WhatsApp Callback] Fetching WABA and phone number...');
+    logger.info('[WhatsApp Callback] Fetching WABA and phone number...');
     const wabaResponse = await axios.get('https://graph.facebook.com/v18.0/debug_token', {
       params: {
         input_token: longLivedToken,
@@ -754,10 +784,10 @@ router.get('/callback', async (req: Request, res: Response) => {
         const phoneNumbers = phoneResponse.data?.data || [];
         if (phoneNumbers.length > 0) {
           phoneNumberId = phoneNumbers[0].id;
-          console.log(`[WhatsApp Callback] Found phone number: ${phoneNumbers[0].display_phone_number} (${phoneNumberId})`);
+          logger.info(`[WhatsApp Callback] Found phone number: ${phoneNumbers[0].display_phone_number} (${phoneNumberId})`);
         }
       } catch (phoneErr: any) {
-        console.warn('[WhatsApp Callback] Could not fetch phone numbers:', phoneErr.message);
+        logger.warn('[WhatsApp Callback] Could not fetch phone numbers:', phoneErr.message);
       }
     }
 
@@ -766,7 +796,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     const webhookSecret = crypto.randomBytes(24).toString('hex');
 
     // Step 6: Save to database
-    console.log('[WhatsApp Callback] Saving credentials to database...');
+    logger.info('[WhatsApp Callback] Saving credentials to database...');
     await prisma.business.update({
       where: { id: businessId },
       data: {
@@ -777,14 +807,14 @@ router.get('/callback', async (req: Request, res: Response) => {
       },
     });
 
-    console.log(`[WhatsApp Callback] WhatsApp connected for business ${businessId}`);
-    console.log(`[WhatsApp Callback] WABA ID: ${wabaId}`);
-    console.log(`[WhatsApp Callback] Phone Number ID: ${phoneNumberId}`);
+    logger.info(`[WhatsApp Callback] WhatsApp connected for business ${businessId}`);
+    logger.info(`[WhatsApp Callback] WABA ID: ${wabaId}`);
+    logger.info(`[WhatsApp Callback] Phone Number ID: ${phoneNumberId}`);
 
     // Redirect back to frontend with success
     res.redirect(`${process.env.FRONTEND_URL}/whatsapp?success=connected`);
   } catch (error: any) {
-    console.error('[WhatsApp Callback] Error:', error.response?.data || error.message);
+    logger.error('[WhatsApp Callback] Error:', error.response?.data || error.message);
     res.redirect(`${process.env.FRONTEND_URL}/whatsapp?error=callback_failed`);
   }
 });
@@ -836,7 +866,7 @@ router.post('/connect-manual', authenticate, requireBusinessOwner, async (req: A
       },
     });
 
-    console.log(`[WhatsApp] Manual connect successful for business ${req.user.businessId}`);
+    logger.info(`[WhatsApp] Manual connect successful for business ${req.user.businessId}`);
 
     res.json({
       success: true,
@@ -848,7 +878,7 @@ router.post('/connect-manual', authenticate, requireBusinessOwner, async (req: A
       },
     });
   } catch (error: any) {
-    console.error('Manual connect error:', error);
+    logger.error('Manual connect error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to connect WhatsApp',
@@ -889,7 +919,7 @@ router.get('/templates', authenticate, async (req: AuthRequest, res: Response) =
       data: response.data.data || [],
     });
   } catch (error: any) {
-    console.error('Get templates error:', error);
+    logger.error('Get templates error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch templates',
@@ -956,12 +986,12 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
         { delay }
       );
     } else {
-      console.warn('[WhatsApp] Redis not available — scheduled message created but not queued');
+      logger.warn('[WhatsApp] Redis not available — scheduled message created but not queued');
     }
 
     res.json({ success: true, data: scheduledMessage });
   } catch (error: any) {
-    console.error('Create scheduled message error:', error);
+    logger.error('Create scheduled message error:', error);
     res.status(500).json({ success: false, error: 'Failed to create scheduled message', details: error.message });
   }
 });
@@ -991,7 +1021,7 @@ router.get('/scheduled', authenticate, async (req: AuthRequest, res: Response) =
       data: { messages, pagination: { total, page: Number(page), limit: Number(limit) } },
     });
   } catch (error: any) {
-    console.error('Get scheduled messages error:', error);
+    logger.error('Get scheduled messages error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch scheduled messages' });
   }
 });
@@ -1020,7 +1050,7 @@ router.patch('/scheduled/:id/cancel', authenticate, async (req: AuthRequest, res
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    console.error('Cancel scheduled message error:', error);
+    logger.error('Cancel scheduled message error:', error);
     res.status(500).json({ success: false, error: 'Failed to cancel scheduled message' });
   }
 });
@@ -1065,7 +1095,7 @@ router.patch('/scheduled/:id', authenticate, async (req: AuthRequest, res: Respo
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    console.error('Update scheduled message error:', error);
+    logger.error('Update scheduled message error:', error);
     res.status(500).json({ success: false, error: 'Failed to update scheduled message' });
   }
 });
@@ -1090,7 +1120,7 @@ router.delete('/scheduled/:id', authenticate, async (req: AuthRequest, res: Resp
     await prisma.scheduledMessage.delete({ where: { id } });
     res.json({ success: true, message: 'Scheduled message deleted' });
   } catch (error: any) {
-    console.error('Delete scheduled message error:', error);
+    logger.error('Delete scheduled message error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete scheduled message' });
   }
 });
@@ -1146,7 +1176,7 @@ router.get('/messages/:contactId', authenticate, async (req: AuthRequest, res: R
       },
     });
   } catch (error: any) {
-    console.error('Get messages error:', error);
+    logger.error('Get messages error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch messages',
@@ -1249,7 +1279,7 @@ router.post('/send/image', authenticate, async (req: AuthRequest, res: Response)
       data: message,
     });
   } catch (error: any) {
-    console.error('Send image error:', error);
+    logger.error('Send image error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send image',
@@ -1304,7 +1334,7 @@ router.post('/templates', authenticate, requireBusinessOwner, async (req: AuthRe
       data: response.data,
     });
   } catch (error: any) {
-    console.error('Create template error:', error);
+    logger.error('Create template error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create template',
@@ -1345,7 +1375,7 @@ router.delete('/templates/:id', authenticate, requireBusinessOwner, async (req: 
       message: 'Template deleted successfully',
     });
   } catch (error: any) {
-    console.error('Delete template error:', error);
+    logger.error('Delete template error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete template',
@@ -1369,7 +1399,7 @@ router.get('/auto-replies', authenticate, async (req: AuthRequest, res: Response
       data: autoReplies,
     });
   } catch (error: any) {
-    console.error('Get auto-replies error:', error);
+    logger.error('Get auto-replies error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch auto-replies',
@@ -1404,7 +1434,7 @@ router.post('/auto-replies', authenticate, requireBusinessOwner, async (req: Aut
       data: autoReply,
     });
   } catch (error: any) {
-    console.error('Create auto-reply error:', error);
+    logger.error('Create auto-reply error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create auto-reply',
@@ -1447,7 +1477,7 @@ router.put('/auto-replies/:id', authenticate, requireBusinessOwner, async (req: 
       data: updated,
     });
   } catch (error: any) {
-    console.error('Update auto-reply error:', error);
+    logger.error('Update auto-reply error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update auto-reply',
@@ -1482,7 +1512,7 @@ router.delete('/auto-replies/:id', authenticate, requireBusinessOwner, async (re
       message: 'Auto-reply deleted successfully',
     });
   } catch (error: any) {
-    console.error('Delete auto-reply error:', error);
+    logger.error('Delete auto-reply error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete auto-reply',
@@ -1559,7 +1589,7 @@ router.post('/broadcast', authenticate, requireBusinessOwner, async (req: AuthRe
           hourStart = Date.now();
         }
         if (sentThisHour >= maxPerHour) {
-          console.log(`[Drip] Hourly limit reached (${maxPerHour}). Waiting 60s...`);
+          logger.info(`[Drip] Hourly limit reached (${maxPerHour}). Waiting 60s...`);
           await sleep(60000);
           sentThisHour = 0;
           hourStart = Date.now();
@@ -1582,7 +1612,7 @@ router.post('/broadcast', authenticate, requireBusinessOwner, async (req: AuthRe
 
         // Batch pause
         if (batchSize > 0 && (i + 1) % batchSize === 0 && i + 1 < contacts.length) {
-          console.log(`[Drip] Batch ${Math.floor(i / batchSize) + 1} complete. Pausing ${batchPauseMin}min...`);
+          logger.info(`[Drip] Batch ${Math.floor(i / batchSize) + 1} complete. Pausing ${batchPauseMin}min...`);
           await sleep(batchPauseMin * 60 * 1000);
         }
       }
@@ -1634,7 +1664,7 @@ router.post('/broadcast', authenticate, requireBusinessOwner, async (req: AuthRe
       },
     });
   } catch (error: any) {
-    console.error('Send broadcast error:', error);
+    logger.error('Send broadcast error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send broadcast',
@@ -1683,7 +1713,7 @@ router.get('/contacts', authenticate, async (req: AuthRequest, res: Response) =>
       },
     });
   } catch (error: any) {
-    console.error('Get contacts error:', error);
+    logger.error('Get contacts error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch contacts',
@@ -1714,7 +1744,7 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Get status error:', error);
+    logger.error('Get status error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get status',
@@ -1740,7 +1770,7 @@ router.post('/disconnect', authenticate, requireBusinessOwner, async (req: AuthR
       message: 'WhatsApp disconnected successfully',
     });
   } catch (error: any) {
-    console.error('Disconnect error:', error);
+    logger.error('Disconnect error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to disconnect WhatsApp',

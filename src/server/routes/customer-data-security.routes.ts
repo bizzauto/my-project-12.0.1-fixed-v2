@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { decryptFields, encryptFields, SENSITIVE_CONTACT_FIELDS, SENSITIVE_ADDRESS_FIELDS, generateExportToken } from '../services/data-encryption.service.js';
 import { maskPhone, maskEmail, deepMaskPII, anonymizeForAnalytics } from '../middleware/pii-masking.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -106,7 +107,7 @@ router.post('/export-data', async (req: Request, res: Response) => {
     
     res.json({ success: true, data: exportData });
   } catch (error: any) {
-    console.error('[CustomerSecurity] Data export failed:', error);
+    logger.error('[CustomerSecurity] Data export failed:', error);
     res.status(500).json({ success: false, error: 'Export failed' });
   }
 });
@@ -174,7 +175,7 @@ router.post('/delete-data', async (req: Request, res: Response) => {
       deletedAt: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[CustomerSecurity] Data deletion failed:', error);
+    logger.error('[CustomerSecurity] Data deletion failed:', error);
     res.status(500).json({ success: false, error: 'Deletion failed' });
   }
 });
@@ -212,7 +213,7 @@ router.post('/consent', async (req: Request, res: Response) => {
     
     res.json({ success: true, message: 'Consent preferences updated' });
   } catch (error: any) {
-    console.error('[CustomerSecurity] Consent update failed:', error);
+    logger.error('[CustomerSecurity] Consent update failed:', error);
     res.status(500).json({ success: false, error: 'Consent update failed' });
   }
 });
@@ -256,7 +257,7 @@ router.get('/access-log/:contactId', authenticate, async (req: Request, res: Res
 
     res.json({ success: true, data: accessLog });
   } catch (error: any) {
-    console.error('[CustomerSecurity] Access log failed:', error);
+    logger.error('[CustomerSecurity] Access log failed:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch access log' });
   }
 });
@@ -317,7 +318,7 @@ router.post('/anonymize-old', authenticate, async (req: Request, res: Response) 
       count: anonymizedCount,
     });
   } catch (error: any) {
-    console.error('[CustomerSecurity] Anonymization failed:', error);
+    logger.error('[CustomerSecurity] Anonymization failed:', error);
     res.status(500).json({ success: false, error: 'Anonymization failed' });
   }
 });
@@ -334,12 +335,12 @@ async function createAuditLog(data: {
   try {
     // You can create an AuditLog model in Prisma schema
     // For now, log to console
-    console.log('[AUDIT]', JSON.stringify({
+    logger.info('[AUDIT]', JSON.stringify({
       timestamp: new Date().toISOString(),
       ...data,
     }));
   } catch (error) {
-    console.error('[AuditLog] Failed to create audit log:', error);
+    logger.error('[AuditLog] Failed to create audit log:', error);
   }
 }
 

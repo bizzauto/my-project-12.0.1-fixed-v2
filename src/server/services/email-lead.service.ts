@@ -1,6 +1,7 @@
 import { simpleParser } from 'mailparser';
 import { prisma } from '../db.js';
 import { LeadCaptureService } from './lead-capture.service.js';
+import logger from '../utils/logger.js';
 
 export type Platform = 'indiamart' | 'justdial' | 'tradeindia';
 
@@ -169,11 +170,11 @@ export class EmailLeadService {
 
     // If we have at least phone or email, return the lead
     if (result.phone || result.email) {
-      console.log(`[IndiaMART Parser] Found: name=${result.name}, phone=${result.phone}, email=${result.email}, product=${result.product}, city=${result.city}`);
+      logger.info(`[IndiaMART Parser] Found: name=${result.name}, phone=${result.phone}, email=${result.email}, product=${result.product}, city=${result.city}`);
       return result;
     }
 
-    console.log(`[IndiaMART Parser] No phone/email found in email`);
+    logger.info(`[IndiaMART Parser] No phone/email found in email`);
     return null;
   }
 
@@ -389,11 +390,11 @@ export class EmailLeadService {
       const platformName = this.getPlatformName(platform);
       const searchDomains = this.getSearchDomains(platform);
 
-      console.log(`[${platformName}] Connecting to IMAP: ${emailConfig.imapHost}:${emailConfig.imapPort}`);
+      logger.info(`[${platformName}] Connecting to IMAP: ${emailConfig.imapHost}:${emailConfig.imapPort}`);
 
       await new Promise<void>((resolve, reject) => {
         imap.once('ready', () => {
-          console.log(`[${platformName}] IMAP connected successfully`);
+          logger.info(`[${platformName}] IMAP connected successfully`);
           imap.openBox('INBOX', true, async (err) => {
             if (err) {
               imap.end();
@@ -401,7 +402,7 @@ export class EmailLeadService {
               return;
             }
 
-            console.log(`[${platformName}] Searching emails since ${since.toISOString()}`);
+            logger.info(`[${platformName}] Searching emails since ${since.toISOString()}`);
 
             // Build OR query dynamically for ALL search domains (handles any number of domains)
             const searchQuery: any[] = [['SINCE', since]];
@@ -417,20 +418,20 @@ export class EmailLeadService {
 
             imap.search(searchQuery, async (err, results) => {
               if (err) {
-                console.error(`[${platformName}] Search error:`, err);
+                logger.error(`[${platformName}] Search error:`, err);
                 imap.end();
                 resolve();
                 return;
               }
 
               if (!results || results.length === 0) {
-                console.log(`[${platformName}] No emails found for ${platformName}`);
+                logger.info(`[${platformName}] No emails found for ${platformName}`);
                 imap.end();
                 resolve();
                 return;
               }
 
-              console.log(`[${platformName}] Found ${results.length} emails from ${platformName} domains`);
+              logger.info(`[${platformName}] Found ${results.length} emails from ${platformName} domains`);
 
               // FIX 2: Process ALL emails, not just last 100! (was `results.slice(-limit)` which missed Indiamart emails)
               const toFetch = results; // Process ALL matching emails
@@ -454,12 +455,12 @@ export class EmailLeadService {
                       // Check if this email is from the platform
                       const found = fromAddress.includes(platform);
                       if (!found) {
-                        console.log(`[${platformName}] Skipping non-platform email: ${fromAddress}`);
+                        logger.info(`[${platformName}] Skipping non-platform email: ${fromAddress}`);
                         return;
                       }
 
                       matchCount++;
-                      console.log(`[${platformName}] #${matchCount}: From: ${fromAddress}, Sub: ${(parsed as any).subject}`);
+                      logger.info(`[${platformName}] #${matchCount}: From: ${fromAddress}, Sub: ${(parsed as any).subject}`);
 
                       // CRITICAL: URL-decode email text (IndiaMART sends URL-encoded content)
                       const decodedText = this.decodeContent(emailText);
@@ -470,7 +471,7 @@ export class EmailLeadService {
                       
                       // If parsing fails, try HTML version (has rendered buyer data)
                       if (!leadData && decodedHtml) {
-                        console.log(`[${platformName}] Text parsing failed, trying HTML...`);
+                        logger.info(`[${platformName}] Text parsing failed, trying HTML...`);
                         leadData = this.parseEmail('', decodedHtml, platform);
                       }
                       
@@ -489,21 +490,21 @@ export class EmailLeadService {
                         const phoneMatch = decodedText.match(/(?:\+?91[\s.-]?)?([6-9]\d{9})/);
                         if (phoneMatch) {
                           phone = phoneMatch[1].slice(-10);
-                          console.log(`[${platformName}] Fallback phone extraction: ${phone}`);
+                          logger.info(`[${platformName}] Fallback phone extraction: ${phone}`);
                         }
                       }
                       if (!phone && decodedHtml) {
                         const phoneMatch = decodedHtml.match(/(?:\+?91[\s.-]?)?([6-9]\d{9})/);
                         if (phoneMatch) {
                           phone = phoneMatch[1].slice(-10);
-                          console.log(`[${platformName}] HTML fallback phone extraction: ${phone}`);
+                          logger.info(`[${platformName}] HTML fallback phone extraction: ${phone}`);
                         }
                       }
                       if (!phone) {
                         const phoneMatch = decodedText.match(/[6-9]\d{9}/);
                         if (phoneMatch) {
                           phone = phoneMatch[0];
-                          console.log(`[${platformName}] Loose phone extraction: ${phone}`);
+                          logger.info(`[${platformName}] Loose phone extraction: ${phone}`);
                         }
                       }
                       // Fallback email extraction (on decoded content)
@@ -511,7 +512,7 @@ export class EmailLeadService {
                         const emailMatch = decodedText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
                         if (emailMatch && !emailMatch[1].includes('indiamart.com') && !emailMatch[1].includes('buyershelp')) {
                           email = emailMatch[1];
-                          console.log(`[${platformName}] Fallback email extraction: ${email}`);
+                          logger.info(`[${platformName}] Fallback email extraction: ${email}`);
                         }
                       }
                       // Fallback email from HTML
@@ -519,7 +520,7 @@ export class EmailLeadService {
                         const emailMatch = decodedHtml.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
                         if (emailMatch && !emailMatch[1].includes('indiamart.com') && !emailMatch[1].includes('buyershelp')) {
                           email = emailMatch[1];
-                          console.log(`[${platformName}] HTML fallback email extraction: ${email}`);
+                          logger.info(`[${platformName}] HTML fallback email extraction: ${email}`);
                         }
                       }
 
@@ -539,7 +540,7 @@ export class EmailLeadService {
 
                         if (existing) {
                           result.skipped++;
-                          console.log(`[${platformName}] Duplicate: ${phone}`);
+                          logger.info(`[${platformName}] Duplicate: ${phone}`);
                           return;
                         }
 
@@ -585,15 +586,15 @@ export class EmailLeadService {
 
                         result.newLeads++;
                         result.leads.push(contact);
-                        console.log(`[${platformName}] New lead: ${name} ${phone}`);
+                        logger.info(`[${platformName}] New lead: ${name} ${phone}`);
                       } else {
-                        console.log(`[${platformName}] No phone/email in email from: ${fromAddress}`);
-                        console.log(`[${platformName}] RAW TEXT (first 300 chars):`, (emailText || '').substring(0, 300));
-                        console.log(`[${platformName}] DECODED TEXT (first 300 chars):`, (decodedText || '').substring(0, 300));
+                        logger.info(`[${platformName}] No phone/email in email from: ${fromAddress}`);
+                        logger.info(`[${platformName}] RAW TEXT (first 300 chars):`, (emailText || '').substring(0, 300));
+                        logger.info(`[${platformName}] DECODED TEXT (first 300 chars):`, (decodedText || '').substring(0, 300));
                       }
                     } catch (e: any) {
                       result.errors.push(`Parse error: ${e.message}`);
-                      console.error(`[${platformName}] Parse error:`, e.message);
+                      logger.error(`[${platformName}] Parse error:`, e.message);
                     }
                   })();
                   processPromises.push(p);
@@ -603,11 +604,11 @@ export class EmailLeadService {
               fetch.once('end', () => {
                 // FIX 4: Wait for ALL async operations to complete before resolving
                 Promise.all(processPromises).then(() => {
-                  console.log(`[${platformName}] Done. Processed: ${result.processed}, New: ${result.newLeads}`);
+                  logger.info(`[${platformName}] Done. Processed: ${result.processed}, New: ${result.newLeads}`);
                   imap.end();
                   resolve();
                 }).catch((err) => {
-                  console.error(`[${platformName}] Async error:`, err);
+                  logger.error(`[${platformName}] Async error:`, err);
                   imap.end();
                   resolve();
                 });
@@ -630,7 +631,7 @@ export class EmailLeadService {
       });
     } catch (e: any) {
       result.errors.push(`Process error: ${e.message}`);
-      console.error(`[${platform}] Error:`, e);
+      logger.error(`[${platform}] Error:`, e);
     }
 
     return result;

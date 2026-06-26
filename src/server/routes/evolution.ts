@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { EvolutionApiService } from '../services/evolution.service.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -253,7 +254,7 @@ router.post('/webhook/:businessId', async (req: any, res: any) => {
     await EvolutionApiService.processWebhook(businessId, req.body);
     res.json({ success: true });
   } catch (error: any) {
-    console.error('Evolution webhook error:', error.message);
+    logger.error('Evolution webhook error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -4,6 +4,7 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { cacheResponse } from '../middleware/cache.js';
 import { validate } from '../middleware/validate.js';
 import { updateDealStageSchema, updateDealSchema } from '../validations/crm-schemas.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -110,7 +111,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Get deals error:', error);
+    logger.error('Get deals error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch deals', details: error.message });
   }
 });
@@ -214,7 +215,7 @@ router.get('/stats', authenticate, cacheResponse(30), async (req: AuthRequest, r
       },
     });
   } catch (error: any) {
-    console.error('Get deal stats error:', error);
+    logger.error('Get deal stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch deal stats', details: error.message });
   }
 });
@@ -274,7 +275,7 @@ router.put('/:id/stage', authenticate, requireRole('OWNER', 'ADMIN'), validate(u
       },
     });
   } catch (error: any) {
-    console.error('Update deal stage error:', error);
+    logger.error('Update deal stage error:', error);
     res.status(500).json({ success: false, error: 'Failed to update deal stage', details: error.message });
   }
 });
@@ -307,7 +308,7 @@ router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateD
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    console.error('Update deal error:', error);
+    logger.error('Update deal error:', error);
     res.status(500).json({ success: false, error: 'Failed to update deal', details: error.message });
   }
 });

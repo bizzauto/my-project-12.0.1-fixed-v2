@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from '../utils/logger.js';
 
 /**
  * PII (Personally Identifiable Information) Masking Middleware
@@ -183,7 +184,7 @@ export function secureLog(message: string, data?: any): void {
   const maskedData = data ? deepMaskPII(data) : undefined;
   
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[SECURE] ${maskedMessage}`, maskedData || '');
+    logger.info(`[SECURE] ${maskedMessage}`, maskedData || '');
   }
   // In production, use your logging service with PII masking
 }

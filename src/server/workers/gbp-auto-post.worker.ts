@@ -2,12 +2,13 @@ import { Queue, Worker, Job } from 'bullmq';
 import { prisma } from '../db.js';
 import { GBPAutoPostService } from '../services/gbp-auto-post.service.js';
 import { createRedisConnection } from '../utils/redis-connection.js';
+import logger from '../utils/logger.js';
 
 // Redis connection
 const redisConnection = createRedisConnection();
 
 if (!redisConnection) {
-  console.log('[GBP Auto-Post] Redis not available — worker disabled');
+  logger.info('[GBP Auto-Post] Redis not available — worker disabled');
 }
 
 // Queue for GBP auto-posts (only if Redis available)
@@ -54,7 +55,7 @@ const gbpAutoPostWorker = redisConnection ? new Worker(
           const shouldPost = await GBPAutoPostService.shouldAutoPost(business.id);
 
           if (shouldPost) {
-            console.log(`⏰ Auto-post time for business: ${business.name} (${business.id})`);
+            logger.info(`⏰ Auto-post time for business: ${business.name} (${business.id})`);
             const result = await GBPAutoPostService.executeAutoPost(business.id);
             results.push({
               businessId: business.id,
@@ -63,13 +64,13 @@ const gbpAutoPostWorker = redisConnection ? new Worker(
             });
 
             if (result.success) {
-              console.log(`✅ Auto-post created for ${business.name}: ${result.postId}`);
+              logger.info(`✅ Auto-post created for ${business.name}: ${result.postId}`);
             } else {
-              console.log(`❌ Auto-post failed for ${business.name}: ${result.message}`);
+              logger.info(`❌ Auto-post failed for ${business.name}: ${result.message}`);
             }
           }
         } catch (error: any) {
-          console.error(`Error processing auto-post for business ${business.id}:`, error.message);
+          logger.error(`Error processing auto-post for business ${business.id}:`, error.message);
           results.push({
             businessId: business.id,
             businessName: business.name,
@@ -103,7 +104,7 @@ const gbpAutoPostWorker = redisConnection ? new Worker(
  */
 export async function startAutoPostScheduler() {
   if (!gbpAutoPostQueue) {
-    console.log('[GBP Auto-Post] Redis not available — scheduler disabled');
+    logger.info('[GBP Auto-Post] Redis not available — scheduler disabled');
     return;
   }
   // Add initial check job
@@ -118,7 +119,7 @@ export async function startAutoPostScheduler() {
     }
   );
 
-  console.log('📅 GBP Auto-Post Scheduler started (checks every minute)');
+  logger.info('📅 GBP Auto-Post Scheduler started (checks every minute)');
 }
 
 /**
@@ -130,18 +131,18 @@ export async function stopAutoPostScheduler() {
   for (const job of repeatableJobs) {
     await (gbpAutoPostQueue as any).removeRepeatable(job.key);
   }
-  console.log('📅 GBP Auto-Post Scheduler stopped');
+  logger.info('📅 GBP Auto-Post Scheduler stopped');
 }
 
 // Worker event handlers
 gbpAutoPostWorker?.on('completed', (job) => {
   if (job.data.type === 'check-and-post') {
-    console.log(`✅ Auto-post check completed: ${job.returnvalue?.posted || 0} posts created`);
+    logger.info(`✅ Auto-post check completed: ${job.returnvalue?.posted || 0} posts created`);
   }
 });
 
 gbpAutoPostWorker?.on('failed', (job, err) => {
-  console.error(`❌ Auto-post job failed:`, err.message);
+  logger.error(`❌ Auto-post job failed:`, err.message);
 });
 
 // Graceful shutdown

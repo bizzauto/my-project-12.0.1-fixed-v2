@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createSurveySchema, updateSurveySchema } from '../validations/remaining-schemas.js';
 import rateLimit from 'express-rate-limit';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { surveys } });
   } catch (err) {
-    console.error('Get surveys error:', err);
+    logger.error('Get surveys error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch surveys' });
   }
 });
@@ -42,7 +43,7 @@ router.post('/', async (req: Request, res: Response) => {
     });
     res.status(201).json({ success: true, data: { survey } });
   } catch (err) {
-    console.error('Create survey error:', err);
+    logger.error('Create survey error:', err);
     res.status(500).json({ success: false, error: 'Failed to create survey' });
   }
 });
@@ -67,7 +68,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { survey } });
   } catch (err) {
-    console.error('Update survey error:', err);
+    logger.error('Update survey error:', err);
     res.status(500).json({ success: false, error: 'Failed to update survey' });
   }
 });
@@ -83,7 +84,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await (prisma as any).surveys.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Survey deleted' });
   } catch (err) {
-    console.error('Delete survey error:', err);
+    logger.error('Delete survey error:', err);
     res.status(500).json({ success: false, error: 'Failed to delete survey' });
   }
 });
@@ -120,7 +121,7 @@ router.post('/:id/submit', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: { submission } });
   } catch (err) {
-    console.error('Submit survey error:', err);
+    logger.error('Submit survey error:', err);
     res.status(500).json({ success: false, error: 'Failed to submit survey' });
   }
 });
@@ -154,7 +155,7 @@ router.get('/:id/results', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: { survey, submissions, results } });
   } catch (err) {
-    console.error('Get survey results error:', err);
+    logger.error('Get survey results error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch survey results' });
   }
 });

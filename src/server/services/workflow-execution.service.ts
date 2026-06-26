@@ -1,5 +1,6 @@
 import { prisma } from '../db.js';
 import { EventEmitter } from 'events';
+import logger from '../utils/logger.js';
 
 const workflowEvents = new EventEmitter();
 workflowEvents.setMaxListeners(50);
@@ -100,7 +101,7 @@ async function executeNode(
 
         return { sent: false, error: 'No WhatsApp provider configured' };
       } catch (err: any) {
-        console.error(`[Workflow] WhatsApp send failed:`, err.message);
+        logger.error(`[Workflow] WhatsApp send failed:`, err.message);
         return { sent: false, error: err.message };
       }
     }
@@ -270,7 +271,7 @@ async function executeNode(
             }
           });
         } catch (err: any) {
-          console.warn('[Workflow] Lead score calculation failed:', err?.message);
+          logger.warn('[Workflow] Lead score calculation failed:', err?.message);
         }
         break;
 
@@ -466,7 +467,7 @@ export async function executeWorkflow(
         }
       }
     } catch (err: any) {
-      console.error(`[Workflow] Node ${nodeId} (${nodeType}) failed:`, err.message);
+      logger.error(`[Workflow] Node ${nodeId} (${nodeType}) failed:`, err.message);
       ctx.nodeResults[nodeId] = {
         nodeType,
         label: node.data?.label || nodeType,
@@ -545,7 +546,7 @@ export async function triggerWorkflows(
       const execution = await executeWorkflow(businessId, workflow.id, triggerData);
       results.push({ workflowId: workflow.id, workflowName: workflow.name, execution });
     } catch (err: any) {
-      console.error(`[Workflow] Failed to execute ${workflow.name}:`, err.message);
+      logger.error(`[Workflow] Failed to execute ${workflow.name}:`, err.message);
       results.push({ workflowId: workflow.id, workflowName: workflow.name, error: err.message });
     }
   }

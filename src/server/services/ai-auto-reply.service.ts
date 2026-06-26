@@ -1,5 +1,6 @@
 import { prisma } from '../db.js';
 import { triggerWorkflows } from './workflow-execution.service.js';
+import logger from '../utils/logger.js';
 
 interface AutoReplyResult {
   replied: boolean;
@@ -162,12 +163,12 @@ export async function handleIncomingMessage(
       const workflowResults = await triggerWorkflows(businessId, 'message_received', triggerData);
       result.workflowTriggered = workflowResults.length > 0;
     } catch (err: any) {
-      console.error('[AutoReply] Workflow trigger failed:', err.message);
+      logger.error('[AutoReply] Workflow trigger failed:', err.message);
     }
 
     return result;
   } catch (err: any) {
-    console.error('[AutoReply] Error:', err.message);
+    logger.error('[AutoReply] Error:', err.message);
     result.error = err.message;
     return result;
   }
@@ -216,7 +217,7 @@ async function generateAIResponse(
     const response = await (AIService as any).generateText(messages, { maxTokens: 300 });
     return response;
   } catch (err: any) {
-    console.error('[AutoReply] AI generation failed:', err.message);
+    logger.error('[AutoReply] AI generation failed:', err.message);
     return null;
   }
 }
@@ -315,7 +316,7 @@ async function sendAutoReply(
 
     return false;
   } catch (err: any) {
-    console.error('[AutoReply] Send failed:', err.message);
+    logger.error('[AutoReply] Send failed:', err.message);
     return false;
   }
 }
@@ -346,6 +347,6 @@ export async function handleLeadCapture(
       await sendAutoReply(businessId, leadData.phone, welcomeMsg, contactId);
     }
   } catch (err: any) {
-    console.error('[LeadCapture] Workflow trigger failed:', err.message);
+    logger.error('[LeadCapture] Workflow trigger failed:', err.message);
   }
 }

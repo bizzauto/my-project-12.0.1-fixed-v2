@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { AIService } from '../services/ai.service.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -72,7 +73,7 @@ router.get('/generated', authenticate, async (req: AuthRequest, res: Response) =
       },
     });
   } catch (error: any) {
-    console.error('List generated posters error:', error.message);
+    logger.error('List generated posters error:', error.message);
     res.status(500).json({ success: false, error: 'Failed to list generated posters', details: error.message });
   }
 });
@@ -93,7 +94,7 @@ router.delete('/generated/:id', authenticate, async (req: AuthRequest, res: Resp
     await prisma.wingsStore.delete({ where: { id } });
     res.json({ success: true, message: 'Poster deleted successfully' });
   } catch (error: any) {
-    console.error('Delete generated poster error:', error.message);
+    logger.error('Delete generated poster error:', error.message);
     res.status(500).json({ success: false, error: 'Failed to delete poster', details: error.message });
   }
 });
@@ -170,7 +171,7 @@ router.post('/generate-image', authenticate, async (req: AuthRequest, res: Respo
       const checkRes = await fetch(imageUrl, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(30000) });
       if (!checkRes.ok) throw new Error(`Pollinations returned ${checkRes.status}`);
     } catch (pollErr: any) {
-      console.warn('Pollinations.ai failed, trying OpenRouter:', pollErr.message);
+      logger.warn('Pollinations.ai failed, trying OpenRouter:', pollErr.message);
       imageUrl = '';
     }
 
@@ -181,7 +182,7 @@ router.post('/generate-image', authenticate, async (req: AuthRequest, res: Respo
           size: format === 'story' ? '1024x1792' : format === 'landscape' ? '1792x1024' : '1024x1024',
         });
       } catch (orErr: any) {
-        console.warn('OpenRouter image gen failed:', orErr.message);
+        logger.warn('OpenRouter image gen failed:', orErr.message);
       }
     }
 
@@ -210,12 +211,12 @@ router.post('/generate-image', authenticate, async (req: AuthRequest, res: Respo
         },
       });
     } catch (storeErr: any) {
-      console.warn('Failed to store AI poster:', storeErr.message);
+      logger.warn('Failed to store AI poster:', storeErr.message);
     }
 
     res.json({ success: true, data: { url: imageUrl } });
   } catch (error: any) {
-    console.error('AI image generation error:', error.message);
+    logger.error('AI image generation error:', error.message);
     res.status(500).json({ success: false, error: 'Failed to generate AI image', details: error.message });
   }
 });
@@ -289,7 +290,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
     // Deduct AI credit atomically
     const creditUsed = await AIService.useCredit(businessId);
     if (!creditUsed) {
-      console.warn(`[Posters] Credit deduction failed for business ${businessId} after generation`);
+      logger.warn(`[Posters] Credit deduction failed for business ${businessId} after generation`);
     }
 
     // Store generated poster in WingsStore for persistence
@@ -322,7 +323,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       },
     });
   } catch (error: any) {
-    console.error('Poster generation error:', error.message);
+    logger.error('Poster generation error:', error.message);
     res.status(500).json({ success: false, error: 'Failed to generate poster', details: error.message });
   }
 });
@@ -384,7 +385,7 @@ router.get('/:id/download', authenticate, async (req: AuthRequest, res: Response
     // Deduct AI credit atomically
     const creditUsed = await AIService.useCredit(businessId);
     if (!creditUsed) {
-      console.warn(`[Posters] Credit deduction failed for business ${businessId} after download`);
+      logger.warn(`[Posters] Credit deduction failed for business ${businessId} after download`);
     }
 
     res.json({
@@ -395,7 +396,7 @@ router.get('/:id/download', authenticate, async (req: AuthRequest, res: Response
       },
     });
   } catch (error: any) {
-    console.error('Poster download error:', error.message);
+    logger.error('Poster download error:', error.message);
     res.status(500).json({ success: false, error: 'Failed to download poster', details: error.message });
   }
 });

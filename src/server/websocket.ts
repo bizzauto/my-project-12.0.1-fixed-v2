@@ -4,11 +4,12 @@ import jwt from 'jsonwebtoken';
 import { default as redisClient } from './services/redis.service.js';
 import { checkConnectionLimit, checkMessageLimit, cleanupSocketLimits, startRateLimitCleanup } from './middleware/websocket-rate-limit.js';
 import { getJwtSecret } from './utils/auth.js';
+import logger from './utils/logger.js';
 
 export function setupWebSocket(httpServer: HttpServer) {
   const io = new SocketServer(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL || '*',
+      origin: process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'https://bizzautoai.com',
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -48,7 +49,7 @@ export function setupWebSocket(httpServer: HttpServer) {
   });
 
   io.on('connection', async (socket: Socket) => {
-    console.log(`🔌 User connected: ${socket.userId} (Business: ${socket.businessId})`);
+    logger.info(`🔌 User connected: ${socket.userId} (Business: ${socket.businessId})`);
 
     // Join user's business room
     if (socket.businessId) {
@@ -145,7 +146,7 @@ export function setupWebSocket(httpServer: HttpServer) {
 
     // Handle disconnect
     socket.on('disconnect', async () => {
-      console.log(`🔌 User disconnected: ${socket.userId}`);
+      logger.info(`🔌 User disconnected: ${socket.userId}`);
       cleanupSocketLimits(socket.id);
       if (redisClient) {
         await redisClient?.hdel(`socket:${socket.userId}`, 'socketId');

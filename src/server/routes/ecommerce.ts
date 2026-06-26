@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import crypto from 'crypto';
+import logger from '../utils/logger.js';
 
 const router = Router();
 router.use(authenticate);
@@ -731,7 +732,7 @@ router.post('/checkout', async (req: AuthRequest, res: Response) => {
           data: { gatewayData: razorpayOrder as any },
         });
       } catch (err: any) {
-        console.error('Razorpay order creation failed:', err.message);
+        logger.error('Razorpay order creation failed:', err.message);
       }
     }
 

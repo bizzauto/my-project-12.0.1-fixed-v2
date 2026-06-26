@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import axios from 'axios';
 import { prisma } from '../db.js';
+import logger from '../utils/logger.js';
 
 // AI Provider Configuration — lazy init to avoid crash when env vars are missing
 
@@ -90,7 +91,7 @@ export class AIService {
         temperature,
       });
     } catch (error: any) {
-      console.warn('Nvidia NIM failed, trying OpenRouter:', error.message);
+      logger.warn('Nvidia NIM failed, trying OpenRouter:', error.message);
     }
 
     // 2) Fallback: OpenRouter
@@ -101,7 +102,7 @@ export class AIService {
         temperature,
       });
     } catch (error: any) {
-      console.warn('OpenRouter failed, trying Ollama:', error.message);
+      logger.warn('OpenRouter failed, trying Ollama:', error.message);
       
       try {
         // 3) Fallback: Ollama (local)
@@ -111,7 +112,7 @@ export class AIService {
           temperature,
         });
       } catch (ollamaError: any) {
-        console.error('Ollama also failed:', ollamaError.message);
+        logger.error('Ollama also failed:', ollamaError.message);
         throw new Error('AI generation failed: All providers unavailable');
       }
     }
@@ -133,14 +134,14 @@ export class AIService {
       // Try OpenRouter first (image generation via Stable Diffusion)
       return await this.tryOpenRouterImage(prompt, { size, style });
     } catch (error: any) {
-      console.warn('OpenRouter image failed:', error.message);
+      logger.warn('OpenRouter image failed:', error.message);
     }
 
     try {
       // Fallback: Replicate
       return await this.tryReplicateImage(prompt, { size, style });
     } catch (error: any) {
-      console.warn('Replicate also failed:', error.message);
+      logger.warn('Replicate also failed:', error.message);
       throw new Error('Image generation failed: All providers unavailable');
     }
   }
@@ -366,7 +367,7 @@ export class AIService {
         return true;
       });
     } catch (error) {
-      console.error('[AI] Atomic credit deduction failed:', error);
+      logger.error('[AI] Atomic credit deduction failed:', error);
       return false;
     }
   }
@@ -387,7 +388,7 @@ export class AIService {
       const totalCredits = business.aiCreditsLimit + business.aiCreditsPurchased;
       return business.aiCreditsUsed < totalCredits;
     } catch (error) {
-      console.error('[AI] Credit check failed:', error);
+      logger.error('[AI] Credit check failed:', error);
       return false;
     }
   }

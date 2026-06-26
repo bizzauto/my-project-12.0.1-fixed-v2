@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { cacheResponse } from '../middleware/cache.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -174,7 +175,7 @@ router.get('/dashboard', authenticate, cacheResponse(30), async (req: any, res: 
       },
     });
   } catch (error: any) {
-    console.error('Get dashboard analytics error:', error);
+    logger.error('Get dashboard analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch dashboard analytics',
@@ -275,7 +276,7 @@ router.get('/', authenticate, cacheResponse(60), async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Get analytics error:', error);
+    logger.error('Get analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch analytics',
@@ -367,7 +368,7 @@ router.get('/messages', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('Get messages analytics error:', error);
+    logger.error('Get messages analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch messages analytics',
@@ -399,7 +400,7 @@ router.get('/campaigns', authenticate, cacheResponse(30), async (req: any, res: 
       },
     });
   } catch (error: any) {
-    console.error('Get campaigns analytics error:', error);
+    logger.error('Get campaigns analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch campaigns analytics',
@@ -448,7 +449,7 @@ router.get('/social', authenticate, cacheResponse(60), async (req: any, res: any
       },
     });
   } catch (error: any) {
-    console.error('Get social analytics error:', error);
+    logger.error('Get social analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch social analytics',
@@ -527,7 +528,7 @@ router.get('/roi', authenticate, cacheResponse(60), async (req: any, res: any) =
       data: roiData,
     });
   } catch (error: any) {
-    console.error('Get ROI analytics error:', error);
+    logger.error('Get ROI analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch ROI analytics',
@@ -600,7 +601,7 @@ router.get('/funnel', authenticate, cacheResponse(60), async (req: any, res: any
       },
     });
   } catch (error: any) {
-    console.error('Get funnel analytics error:', error);
+    logger.error('Get funnel analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch funnel analytics',
@@ -644,7 +645,7 @@ router.get('/contacts', authenticate, cacheResponse(60), async (req: any, res: a
       },
     });
   } catch (error: any) {
-    console.error('Get contacts analytics error:', error);
+    logger.error('Get contacts analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch contacts analytics',

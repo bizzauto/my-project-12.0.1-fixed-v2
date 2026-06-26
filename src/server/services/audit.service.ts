@@ -1,5 +1,6 @@
 import { prisma } from '../db.js';
 import { Request } from 'express';
+import logger from '../utils/logger.js';
 
 /**
  * Centralized Audit Log Service
@@ -42,7 +43,7 @@ export async function auditLog(
     const businessId = entry.businessId || authReq?.user?.businessId;
     if (!businessId) {
       // Can't write audit log without a business context
-      console.warn('Audit log skipped: no businessId available');
+      logger.warn('Audit log skipped: no businessId available');
       return;
     }
 
@@ -68,7 +69,7 @@ export async function auditLog(
     });
   } catch (error: any) {
     // Audit log is non-critical — never block the request
-    console.error('Audit log write failed:', error.message);
+    logger.error('Audit log write failed:', error.message);
   }
 }
 

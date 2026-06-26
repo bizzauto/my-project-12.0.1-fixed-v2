@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { prisma } from '../db.js';
 import { encrypt, decrypt } from '../utils/auth.js';
 import { createRedisConnection } from '../utils/redis-connection.js';
+import logger from '../utils/logger.js';
 
 /**
  * Google Sheets Integration Service
@@ -280,7 +281,7 @@ export class GoogleSheetsService {
 
         imported++;
       } catch (error: any) {
-        console.error(`Failed to import row:`, error.message);
+        logger.error(`Failed to import row:`, error.message);
         skipped++;
       }
     }

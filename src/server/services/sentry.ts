@@ -1,8 +1,9 @@
 import * as Sentry from '@sentry/node';
+import logger from '../utils/logger.js';
 
 export function initSentry() {
   if (!process.env.SENTRY_DSN) {
-    console.log('⚠️ Sentry DSN not configured - skipping monitoring setup');
+    logger.info('⚠️ Sentry DSN not configured - skipping monitoring setup');
     return;
   }
 
@@ -38,7 +39,7 @@ export function initSentry() {
     },
   });
 
-  console.log('✅ Sentry monitoring initialized');
+  logger.info('✅ Sentry monitoring initialized');
 }
 
 export function captureError(error: Error, context?: Record<string, any>) {

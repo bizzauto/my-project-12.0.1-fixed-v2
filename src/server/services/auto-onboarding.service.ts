@@ -1,6 +1,7 @@
 import { prisma } from '../db.js';
 import { WhatsAppService } from './whatsapp.service.js';
 import { EmailService } from './email.service.js';
+import logger from '../utils/logger.js';
 
 /**
  * Auto-Onboarding Service
@@ -36,35 +37,35 @@ export class AutoOnboardingService {
     message: string;
   }> {
     try {
-      console.log(`[AutoOnboarding] Processing payment: ${paymentData.razorpayPaymentId}`);
+      logger.info(`[AutoOnboarding] Processing payment: ${paymentData.razorpayPaymentId}`);
 
       // Step 1: Find or create contact
       const contact = await this.findOrCreateContact(paymentData);
-      console.log(`[AutoOnboarding] Contact: ${contact.id} - ${contact.name}`);
+      logger.info(`[AutoOnboarding] Contact: ${contact.id} - ${contact.name}`);
 
       // Step 2: Update deal stage to "Paid"
       const deal = await this.createOrUpdateDeal(contact.id, paymentData);
-      console.log(`[AutoOnboarding] Deal: ${deal.id}`);
+      logger.info(`[AutoOnboarding] Deal: ${deal.id}`);
 
       // Step 3: Generate invoice
       const invoice = await this.generateInvoice(contact.id, paymentData);
-      console.log(`[AutoOnboarding] Invoice: ${invoice.id}`);
+      logger.info(`[AutoOnboarding] Invoice: ${invoice.id}`);
 
       // Step 4: Send welcome message via WhatsApp
       if (contact.phone) {
         await this.sendWhatsAppWelcome(contact, paymentData);
-        console.log(`[AutoOnboarding] WhatsApp welcome sent`);
+        logger.info(`[AutoOnboarding] WhatsApp welcome sent`);
       }
 
       // Step 5: Send welcome email
       if (contact.email) {
         await this.sendEmailWelcome(contact, paymentData);
-        console.log(`[AutoOnboarding] Email welcome sent`);
+        logger.info(`[AutoOnboarding] Email welcome sent`);
       }
 
       // Step 6: Create onboarding tasks
       await this.createOnboardingTasks(contact.id, paymentData);
-      console.log(`[AutoOnboarding] Tasks created`);
+      logger.info(`[AutoOnboarding] Tasks created`);
 
       // Step 7: Create activity log
       await this.logActivity(contact.id, paymentData);
@@ -77,7 +78,7 @@ export class AutoOnboardingService {
         message: `Onboarding complete for ${contact.name}`,
       };
     } catch (error: any) {
-      console.error(`[AutoOnboarding] Error:`, error);
+      logger.error(`[AutoOnboarding] Error:`, error);
       return {
         success: false,
         message: `Onboarding failed: ${error.message}`,
@@ -234,7 +235,7 @@ Thank you for choosing BizzAuto! 🙏`;
     try {
       await WhatsAppService.sendTextMessage('default', contact.phone, message);
     } catch (error: any) {
-      console.error(`[AutoOnboarding] WhatsApp error:`, error.message);
+      logger.error(`[AutoOnboarding] WhatsApp error:`, error.message);
     }
   }
 
@@ -279,7 +280,7 @@ Thank you for choosing BizzAuto! 🙏`;
         html
       );
     } catch (error: any) {
-      console.error(`[AutoOnboarding] Email error:`, error.message);
+      logger.error(`[AutoOnboarding] Email error:`, error.message);
     }
   }
 

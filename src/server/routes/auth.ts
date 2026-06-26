@@ -12,6 +12,7 @@ import { validate } from '../middleware/validate.js';
 import { registerSchema, loginSchema, changePasswordSchema } from '../validations/schemas.js';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.get('/google/url', (req: Request, res: Response) => {
   const frontendUrl = (req.query.redirect as string) || `${process.env.FRONTEND_URL || 'https://bizzautoai.com'}`;
 
   if (!clientId) {
-    console.warn('[WARN] GOOGLE_CLIENT_ID is not set — Google OAuth login will not work.');
+    logger.warn('[WARN] GOOGLE_CLIENT_ID is not set — Google OAuth login will not work.');
     return res.redirect(`${frontendUrl}/login?error=google_not_configured`);
   }
 
@@ -101,7 +102,7 @@ router.get('/google/link-url', authenticate, (req: AuthRequest, res: Response) =
   const frontendUrl = (req.query.redirect as string) || `${process.env.FRONTEND_URL || 'https://bizzautoai.com'}`;
 
   if (!clientId) {
-    console.warn('[WARN] GOOGLE_CLIENT_ID is not set — Google OAuth linking will not work.');
+    logger.warn('[WARN] GOOGLE_CLIENT_ID is not set — Google OAuth linking will not work.');
     return res.status(400).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env file.' });
   }
 
@@ -142,7 +143,7 @@ router.post('/google/unlink', authenticate, async (req: AuthRequest, res: Respon
 
 // GET /api/auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', async (req: Request, res: Response) => {
-  console.log('[DEBUG] Google callback hit, state:', (req.query.state as string)?.substring(0, 50));
+  logger.info('[DEBUG] Google callback hit, state:', (req.query.state as string)?.substring(0, 50));
   const stateRaw = req.query.state as string || '';
   const frontendUrlDefault = process.env.FRONTEND_URL || 'https://bizzautoai.com';
   let frontendUrl: string = frontendUrlDefault;
@@ -188,7 +189,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
 
     const tokenData: any = await tokenRes.json();
     if (!tokenData.id_token) {
-      console.error('Google token exchange failed:', tokenData);
+      logger.error('Google token exchange failed:', tokenData);
       return res.redirect(`${frontendUrl}/login?error=token_exchange_failed`);
     }
 
@@ -298,7 +299,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
 
     res.redirect(`${frontendUrl}/auth/callback?${params.toString()}`);
   } catch (error: any) {
-    console.error('Google OAuth callback error:', error);
+    logger.error('Google OAuth callback error:', error);
     res.redirect(`${frontendUrl}/login?error=auth_failed`);
   }
 });
@@ -468,7 +469,7 @@ router.post('/apple', socialAuthLimiter, async (req: Request, res: Response) => 
       },
     });
   } catch (error: any) {
-    console.error('Apple auth error:', error);
+    logger.error('Apple auth error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to authenticate with Apple',
@@ -646,7 +647,7 @@ router.post('/google', socialAuthLimiter, async (req: Request, res: Response) =>
       },
     });
   } catch (error: any) {
-    console.error('Google auth error:', error);
+    logger.error('Google auth error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to authenticate with Google',
@@ -727,7 +728,7 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req: 
       },
     });
   } catch (error: any) {
-    console.error('Registration error:', error);
+    logger.error('Registration error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to register user',
@@ -830,7 +831,7 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req: Request, 
       },
     });
   } catch (error: any) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to login',
@@ -878,7 +879,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Get user error:', error);
+    logger.error('Get user error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get user',
@@ -913,7 +914,7 @@ router.put('/profile', authenticate, async (req: AuthRequest, res: Response) => 
       },
     });
   } catch (error: any) {
-    console.error('Update profile error:', error);
+    logger.error('Update profile error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update profile',
@@ -1051,7 +1052,7 @@ router.post('/create-super-admin', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Create super admin error:', error);
+    logger.error('Create super admin error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create super admin',
@@ -1100,7 +1101,7 @@ router.put('/role', authenticate, requireRole('SUPER_ADMIN', 'OWNER'), async (re
       data: { id: updatedUser.id, email: updatedUser.email, name: updatedUser.name, role: updatedUser.role },
     });
   } catch (error: any) {
-    console.error('Role change error:', error);
+    logger.error('Role change error:', error);
     res.status(500).json({ success: false, error: 'Failed to change role', details: error.message });
   }
 });
@@ -1125,7 +1126,7 @@ router.get('/users', authenticate, requireRole('SUPER_ADMIN', 'OWNER', 'ADMIN'),
 
     res.json({ success: true, data: { users } });
   } catch (error: any) {
-    console.error('List users error:', error);
+    logger.error('List users error:', error);
     res.status(500).json({ success: false, error: 'Failed to list users' });
   }
 });
@@ -1170,7 +1171,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req: Request, res:
         `<h2>Password Reset</h2><p>Your OTP for password reset is: <strong>${otp}</strong></p><p>This OTP expires in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`
       );
     } catch (emailErr: any) {
-      console.error('Failed to send OTP email:', emailErr.message);
+      logger.error('Failed to send OTP email:', emailErr.message);
     }
 
     // Log the request for audit trail
@@ -1323,7 +1324,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Token refresh error:', error);
+    logger.error('Token refresh error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to refresh token',
@@ -1368,7 +1369,7 @@ router.post('/send-verification', authenticate, async (req: AuthRequest, res: Re
 
     res.json({ success: true, message: 'Verification email sent' });
   } catch (error: any) {
-    console.error('Send verification error:', error);
+    logger.error('Send verification error:', error);
     res.status(500).json({ success: false, error: 'Failed to send verification email' });
   }
 });
@@ -1405,7 +1406,7 @@ router.get('/verify-email', async (req: Request, res: Response) => {
 
     res.json({ success: true, message: 'Email verified successfully' });
   } catch (error: any) {
-    console.error('Verify email error:', error);
+    logger.error('Verify email error:', error);
     res.status(500).json({ success: false, error: 'Failed to verify email' });
   }
 });

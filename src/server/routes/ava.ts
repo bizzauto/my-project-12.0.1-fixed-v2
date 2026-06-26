@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { avaIntelligence } from '../services/ava-intelligence.service.js';
 import { AIService } from '../services/ai.service.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get('/briefing', authenticate, async (req: any, res: Response) => {
       data: briefing
     });
   } catch (error: any) {
-    console.error('Ava briefing error:', error);
+    logger.error('Ava briefing error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to generate briefing',
@@ -41,7 +42,7 @@ router.get('/insights', authenticate, async (req: any, res: Response) => {
       data: { context }
     });
   } catch (error: any) {
-    console.error('Ava insights error:', error);
+    logger.error('Ava insights error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch insights',
@@ -141,7 +142,7 @@ RULES:
         responseText = data.choices[0]?.message?.content || '';
       }
     } catch (e) {
-      console.log('Nvidia NIM failed, trying OpenRouter');
+      logger.info('Nvidia NIM failed, trying OpenRouter');
     }
 
     // Fallback to OpenRouter (FREE)
@@ -168,7 +169,7 @@ RULES:
           responseText = data.choices[0]?.message?.content || '';
         }
       } catch (e) {
-        console.log('OpenRouter also failed');
+        logger.info('OpenRouter also failed');
       }
     }
 
@@ -186,7 +187,7 @@ RULES:
       }
     });
   } catch (error: any) {
-    console.error('Ava chat error:', error);
+    logger.error('Ava chat error:', error);
     res.status(500).json({
       success: false,
       error: 'Chat failed',
@@ -247,7 +248,7 @@ router.post('/command', authenticate, async (req: any, res: Response) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('Ava command error:', error);
+    logger.error('Ava command error:', error);
     res.status(500).json({
       success: false,
       error: 'Command execution failed',

@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { GBPAutoPostService } from '../services/gbp-auto-post.service.js';
 import { encrypt, decrypt } from '../utils/auth.js';
 import axios from 'axios';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ async function refreshGBPToken(businessId: string): Promise<string | null> {
     }
 
     // Token expired or about to expire — refresh it
-    console.log('[GBP] Refreshing expired access token for business:', businessId);
+    logger.info('[GBP] Refreshing expired access token for business:', businessId);
     const refreshToken = decrypt(business.gbpRefreshToken);
     const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
       client_id: process.env.GOOGLE_CLIENT_ID,
@@ -46,10 +47,10 @@ async function refreshGBPToken(businessId: string): Promise<string | null> {
         gbpTokenExpiry: new Date(Date.now() + expires_in * 1000),
       },
     });
-    console.log('[GBP] Token refreshed successfully');
+    logger.info('[GBP] Token refreshed successfully');
     return access_token;
   } catch (err: any) {
-    console.error('[GBP] Token refresh failed:', err?.message);
+    logger.error('[GBP] Token refresh failed:', err?.message);
     return null;
   }
 }
@@ -101,7 +102,7 @@ router.get('/auth/url', authenticate, async (req: AuthRequest, res: Response) =>
 
     res.json({ success: true, data: { url: authUrl.toString() } });
   } catch (error: any) {
-    console.error('GBP auth URL error:', error);
+    logger.error('GBP auth URL error:', error);
     res.status(500).json({ success: false, error: 'Failed to generate auth URL' });
   }
 });
@@ -127,7 +128,7 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
         const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
         if (decoded.businessId && decoded.timestamp && Date.now() - decoded.timestamp < 30 * 60 * 1000) {
           stateData = { businessId: decoded.businessId, expiresAt: Date.now() + 10 * 60 * 1000 };
-          console.log('[GBP] State recovered from decoded token:', stateData.businessId);
+          logger.info('[GBP] State recovered from decoded token:', stateData.businessId);
         }
       } catch {}
     }
@@ -161,9 +162,9 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
     } catch (apiErr: any) {
       const status = apiErr.response?.status;
       const errorBody = apiErr.response?.data?.error;
-      console.error(`[GBP] Accounts API error: ${status}`, errorBody ? JSON.stringify(errorBody) : apiErr.message);
+      logger.error(`[GBP] Accounts API error: ${status}`, errorBody ? JSON.stringify(errorBody) : apiErr.message);
       if (status === 403) {
-        console.error('[GBP] 403 — Google Business Profile API may need approval. Visit: https://developers.google.com/my-business/content/basic-setup');
+        logger.error('[GBP] 403 — Google Business Profile API may need approval. Visit: https://developers.google.com/my-business/content/basic-setup');
         return res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=api_not_enabled`);
       }
       if (status === 401) {
@@ -193,7 +194,7 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
         locationId = locations[0].name?.replace(`accounts/${accountId}/locations/`, '') || locations[0].locationId;
       }
     } catch (locErr) {
-      console.warn('Could not fetch locations:', locErr);
+      logger.warn('Could not fetch locations:', locErr);
     }
 
     // Save to database
@@ -211,9 +212,9 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
     // Redirect to frontend with success
     res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?connected=true`);
   } catch (error: any) {
-    console.error('GBP callback error:', error?.message || error);
-    console.error('GBP callback error stack:', error?.stack);
-    console.error('GBP callback query:', JSON.stringify(req.query));
+    logger.error('GBP callback error:', error?.message || error);
+    logger.error('GBP callback error stack:', error?.stack);
+    logger.error('GBP callback query:', JSON.stringify(req.query));
     if (error?.response?.status === 403) {
       res.redirect(`${process.env.FRONTEND_URL || 'https://bizzautoai.com'}/google-business?error=api_not_enabled`);
     } else if (error?.response?.status === 401) {
@@ -321,7 +322,7 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('GBP status error:', error);
+    logger.error('GBP status error:', error);
     res.status(500).json({ success: false, error: 'Failed to get status', details: error.message });
   }
 });
@@ -354,7 +355,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       message: 'Google Business Profile connected successfully',
     });
   } catch (error: any) {
-    console.error('GBP connect error:', error);
+    logger.error('GBP connect error:', error);
     res.status(500).json({ success: false, error: 'Failed to connect', details: error.message });
   }
 });
@@ -376,7 +377,7 @@ router.post('/disconnect', authenticate, async (req: AuthRequest, res: Response)
       message: 'Google Business Profile disconnected successfully',
     });
   } catch (error: any) {
-    console.error('GBP disconnect error:', error);
+    logger.error('GBP disconnect error:', error);
     res.status(500).json({ success: false, error: 'Failed to disconnect', details: error.message });
   }
 });
@@ -402,7 +403,7 @@ router.get('/locations', authenticate, async (req: AuthRequest, res: Response) =
 
     res.json({ success: true, data: response.data.locations || [] });
   } catch (error: any) {
-    console.error('GBP locations fetch error:', error?.response?.status, error?.message);
+    logger.error('GBP locations fetch error:', error?.response?.status, error?.message);
     res.status(500).json({ success: false, error: 'Failed to fetch locations', details: error.message });
   }
 });
@@ -430,7 +431,7 @@ router.get('/reviews', authenticate, async (req: AuthRequest, res: Response) => 
       );
       reviews = response.data.reviews || [];
     } catch (newApiErr: any) {
-      console.log('[GBP] New reviews API failed, trying v4:', newApiErr?.response?.status);
+      logger.info('[GBP] New reviews API failed, trying v4:', newApiErr?.response?.status);
       const response = await axios.get(
         `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/reviews`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -440,7 +441,7 @@ router.get('/reviews', authenticate, async (req: AuthRequest, res: Response) => 
 
     res.json({ success: true, data: reviews });
   } catch (error: any) {
-    console.error('GBP reviews fetch error:', error?.response?.status, error?.response?.data || error?.message);
+    logger.error('GBP reviews fetch error:', error?.response?.status, error?.response?.data || error?.message);
     const status = error?.response?.status;
     if (status === 403) {
       res.status(400).json({ success: false, error: 'Google Business Profile API not enabled. Please enable APIs in Google Cloud Console.' });
@@ -475,7 +476,7 @@ router.post('/reviews/:reviewId/reply', authenticate, async (req: AuthRequest, r
 
     res.json({ success: true, message: 'Reply posted' });
   } catch (error: any) {
-    console.error('GBP review reply error:', error?.response?.status, error?.response?.data || error?.message);
+    logger.error('GBP review reply error:', error?.response?.status, error?.response?.data || error?.message);
     const status = error?.response?.status;
     if (status === 403) {
       res.status(400).json({ success: false, error: 'API not enabled. Please enable Google Business Profile APIs in Cloud Console.' });
@@ -525,7 +526,7 @@ router.post('/posts', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: response.data });
   } catch (error: any) {
-    console.error('GBP post creation error:', error?.response?.status, error?.response?.data || error?.message);
+    logger.error('GBP post creation error:', error?.response?.status, error?.response?.data || error?.message);
     const status = error?.response?.status;
     if (status === 403) {
       res.status(400).json({ success: false, error: 'API not enabled. Please enable Google Business Profile APIs in Cloud Console.' });
@@ -556,7 +557,7 @@ router.get('/posts', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: response.data.localPosts || [] });
   } catch (error: any) {
-    console.error('GBP posts fetch error:', error?.response?.status, error?.response?.data || error?.message);
+    logger.error('GBP posts fetch error:', error?.response?.status, error?.response?.data || error?.message);
     res.status(500).json({ success: false, error: 'Failed to fetch posts', details: error.message });
   }
 });
@@ -582,7 +583,7 @@ router.delete('/posts/:id', authenticate, async (req: AuthRequest, res: Response
 
     res.json({ success: true, message: 'Post deleted successfully' });
   } catch (error: any) {
-    console.error('GBP post delete error:', error?.response?.status, error?.message);
+    logger.error('GBP post delete error:', error?.response?.status, error?.message);
     res.status(500).json({ success: false, error: 'Failed to delete post', details: error.message });
   }
 });
@@ -608,7 +609,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: response.data || {} });
   } catch (error: any) {
-    console.error('GBP stats fetch error:', error?.response?.status, error?.message);
+    logger.error('GBP stats fetch error:', error?.response?.status, error?.message);
     res.status(500).json({ success: false, error: 'Failed to fetch statistics', details: error.message });
   }
 });
@@ -621,7 +622,7 @@ router.get('/auto-post/config', authenticate, async (req: AuthRequest, res: Resp
     const config = await GBPAutoPostService.getConfig(req.user.businessId);
     res.json({ success: true, data: config });
   } catch (error: any) {
-    console.error('GBP auto-post config error:', error);
+    logger.error('GBP auto-post config error:', error);
     res.status(500).json({ success: false, error: 'Failed to get config', details: error.message });
   }
 });
@@ -638,7 +639,7 @@ router.put('/auto-post/config', authenticate, async (req: AuthRequest, res: Resp
     });
     res.json({ success: true, data: config });
   } catch (error: any) {
-    console.error('GBP auto-post config update error:', error);
+    logger.error('GBP auto-post config update error:', error);
     res.status(500).json({ success: false, error: 'Failed to update config', details: error.message });
   }
 });
@@ -649,7 +650,7 @@ router.get('/auto-post/templates', authenticate, async (req: AuthRequest, res: R
     const config = await GBPAutoPostService.getConfig(req.user.businessId);
     res.json({ success: true, data: config.templates });
   } catch (error: any) {
-    console.error('GBP auto-post templates error:', error);
+    logger.error('GBP auto-post templates error:', error);
     res.status(500).json({ success: false, error: 'Failed to get templates', details: error.message });
   }
 });
@@ -676,7 +677,7 @@ router.post('/auto-post/templates', authenticate, async (req: AuthRequest, res: 
 
     res.json({ success: true, data: template });
   } catch (error: any) {
-    console.error('GBP auto-post template add error:', error);
+    logger.error('GBP auto-post template add error:', error);
     res.status(500).json({ success: false, error: 'Failed to add template', details: error.message });
   }
 });
@@ -692,7 +693,7 @@ router.put('/auto-post/templates/:templateId', authenticate, async (req: AuthReq
     );
     res.json({ success: true, data: template });
   } catch (error: any) {
-    console.error('GBP auto-post template update error:', error);
+    logger.error('GBP auto-post template update error:', error);
     res.status(500).json({ success: false, error: 'Failed to update template', details: error.message });
   }
 });
@@ -703,7 +704,7 @@ router.delete('/auto-post/templates/:templateId', authenticate, async (req: Auth
     await GBPAutoPostService.deleteTemplate(req.user.businessId, req.params.templateId);
     res.json({ success: true, message: 'Template deleted successfully' });
   } catch (error: any) {
-    console.error('GBP auto-post template delete error:', error);
+    logger.error('GBP auto-post template delete error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete template', details: error.message });
   }
 });
@@ -714,7 +715,7 @@ router.post('/auto-post/trigger', authenticate, async (req: AuthRequest, res: Re
     const result = await GBPAutoPostService.executeAutoPost(req.user.businessId);
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error('GBP auto-post trigger error:', error);
+    logger.error('GBP auto-post trigger error:', error);
     res.status(500).json({ success: false, error: 'Failed to trigger auto-post', details: error.message });
   }
 });
@@ -740,7 +741,7 @@ router.get('/auto-post/status', authenticate, async (req: AuthRequest, res: Resp
       },
     });
   } catch (error: any) {
-    console.error('GBP auto-post status error:', error);
+    logger.error('GBP auto-post status error:', error);
     res.status(500).json({ success: false, error: 'Failed to get status', details: error.message });
   }
 });

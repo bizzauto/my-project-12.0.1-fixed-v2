@@ -2,6 +2,7 @@ import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import axios from 'axios';
 import express, { Request, Response } from 'express';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -50,7 +51,7 @@ router.post('/generate', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    console.error('AI generation error:', error);
+    logger.error('AI generation error:', error);
     res.status(500).json({ success: false, error: 'AI generation failed', details: error.message });
   }
 });
@@ -200,7 +201,7 @@ async function callAIProvider(model: any, prompt: string) {
 
     throw new Error('Unknown provider');
   } catch (error: any) {
-    console.error('AI provider error:', error.response?.data || error.message);
+    logger.error('AI provider error:', error.response?.data || error.message);
     throw error;
   }
 }

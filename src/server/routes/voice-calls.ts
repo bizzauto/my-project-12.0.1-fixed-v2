@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { dograhService } from '../services/dograh.service.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -45,7 +46,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Error fetching voice calls:', error);
+    logger.error('Error fetching voice calls:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch calls', details: error.message });
   }
 });
@@ -94,7 +95,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Error fetching call stats:', error);
+    logger.error('Error fetching call stats:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch stats', details: error.message });
   }
 });
@@ -110,7 +111,7 @@ router.get('/agents', authenticate, async (req: AuthRequest, res: Response) => {
     const agents = await dograhService.listAgents(config);
     res.json({ success: true, data: agents });
   } catch (error: any) {
-    console.error('Error fetching agents:', error);
+    logger.error('Error fetching agents:', error);
     res.json({ success: true, data: [] });
   }
 });
@@ -276,7 +277,7 @@ router.post('/dial', authenticate, async (req: AuthRequest, res: Response) => {
       });
     }
   } catch (error: any) {
-    console.error('Error dialing:', error);
+    logger.error('Error dialing:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

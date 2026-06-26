@@ -69,11 +69,12 @@ const CONCURRENCY = 5;
 // ==================== REDIS CONNECTION ====================
 
 import { createRedisConnection } from '../utils/redis-connection.js';
+import logger from '../utils/logger.js';
 const redisConnection = createRedisConnection();
 const redisAvailable = redisConnection !== null;
 
 if (!redisAvailable) {
-  console.log('[WebhookRetry] Redis not available — webhook retry queue disabled');
+  logger.info('[WebhookRetry] Redis not available — webhook retry queue disabled');
 }
 
 // ==================== QUEUE ====================
@@ -106,7 +107,7 @@ export async function enqueueDelivery(
   options?: { delay?: number; idempotencyKey?: string }
 ): Promise<Job<WebhookDeliveryPayload> | null> {
   if (!webhookDeliveryQueue) {
-    console.warn('[WebhookRetry] Redis not available — cannot enqueue delivery');
+    logger.warn('[WebhookRetry] Redis not available — cannot enqueue delivery');
     return null;
   }
 
@@ -119,7 +120,7 @@ export async function enqueueDelivery(
   if (existing) {
     const state = await existing.getState().catch(() => 'unknown');
     if (state === 'completed') {
-      console.log(`[WebhookRetry] Duplicate webhook ${idempotencyKey} skipped (already completed)`);
+      logger.info(`[WebhookRetry] Duplicate webhook ${idempotencyKey} skipped (already completed)`);
       return existing;
     }
   }
@@ -225,7 +226,7 @@ async function deliverWebhook(
   // SSRF protection: validate URL before making request
   const urlCheck = isSafeWebhookUrl(webhook.url);
   if (!urlCheck.safe) {
-    console.error(`[WebhookRetry] SSRF blocked: ${webhook.url} — ${urlCheck.reason}`);
+    logger.error(`[WebhookRetry] SSRF blocked: ${webhook.url} — ${urlCheck.reason}`);
     throw new Error(`SSRF blocked: ${urlCheck.reason}`);
   }
 
@@ -271,19 +272,19 @@ const webhookWorker = redisAvailable ? new Worker<WebhookDeliveryPayload>(
     // Fetch webhook config
     const webhook = await prisma.webhook.findUnique({ where: { id: webhookId } });
     if (!webhook) {
-      console.warn(`[WebhookRetry] Webhook ${webhookId} not found — skipping delivery`);
+      logger.warn(`[WebhookRetry] Webhook ${webhookId} not found — skipping delivery`);
       return { success: false, attempt, error: 'Webhook not found' };
     }
 
     if (!webhook.isActive) {
-      console.warn(`[WebhookRetry] Webhook ${webhookId} is inactive — skipping delivery`);
+      logger.warn(`[WebhookRetry] Webhook ${webhookId} is inactive — skipping delivery`);
       return { success: false, attempt, error: 'Webhook inactive' };
     }
 
     try {
       const result = await deliverWebhook(webhook, event, payload);
 
-      console.log(
+      logger.info(
         `[WebhookRetry] ✓ Delivered ${event} to ${webhook.url} (attempt ${attempt + 1}, status ${result.statusCode})`
       );
 
@@ -311,7 +312,7 @@ const webhookWorker = redisAvailable ? new Worker<WebhookDeliveryPayload>(
       if (isRetryable && nextAttempt < MAX_RETRIES) {
         const delayMs = RETRY_DELAYS_MS[nextAttempt] || RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
 
-        console.warn(
+        logger.warn(
           `[WebhookRetry] ✗ Delivery failed (attempt ${nextAttempt}/${MAX_RETRIES}): ${errorMessage}${statusCode ? ` [${statusCode}]` : ''} — retrying in ${delayMs / 1000}s`
         );
 
@@ -337,7 +338,7 @@ const webhookWorker = redisAvailable ? new Worker<WebhookDeliveryPayload>(
       }
 
       // Max retries exceeded or non-retryable error (4xx except 429)
-      console.error(
+      logger.error(
         `[WebhookRetry] ✗✗ Delivery permanently failed after ${nextAttempt} attempts: ${errorMessage}${statusCode ? ` [${statusCode}]` : ''}`
       );
 
@@ -379,7 +380,7 @@ webhookWorker?.on('completed', (job, result) => {
 });
 
 webhookWorker?.on('failed', (job, error) => {
-  console.error(
+  logger.error(
     `[WebhookRetry] Worker error for job ${job?.id}: ${error.message}`
   );
 });
@@ -461,7 +462,7 @@ export async function triggerWebhookDelivery(
       }
     }
   } catch (error: any) {
-    console.error(`[WebhookRetry] Failed to trigger deliveries for ${event}: ${error.message}`);
+    logger.error(`[WebhookRetry] Failed to trigger deliveries for ${event}: ${error.message}`);
   }
 }
 
@@ -469,9 +470,9 @@ export async function triggerWebhookDelivery(
 
 export async function shutdownWebhookWorker(): Promise<void> {
   if (!webhookWorker) return;
-  console.log('[WebhookRetry] Shutting down worker...');
+  logger.info('[WebhookRetry] Shutting down worker...');
   await webhookWorker.close();
-  console.log('[WebhookRetry] Worker shut down');
+  logger.info('[WebhookRetry] Worker shut down');
 }
 
 export default {

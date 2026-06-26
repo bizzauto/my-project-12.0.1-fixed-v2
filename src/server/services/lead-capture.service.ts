@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { WhatsAppService } from './whatsapp.service.js';
 import { EmailService } from './email.service.js';
 import { handleLeadCapture as triggerLeadWorkflows } from './ai-auto-reply.service.js';
+import logger from '../utils/logger.js';
 
 /**
  * Lead Capture Service
@@ -58,7 +59,7 @@ export class LeadCaptureService {
         messageId: contact.id,
       });
     } catch (error: any) {
-      console.error('Failed to send WhatsApp welcome message:', error.message);
+      logger.error('Failed to send WhatsApp welcome message:', error.message);
     }
 
     // Send email if available
@@ -77,7 +78,7 @@ export class LeadCaptureService {
           `
         );
       } catch (error: any) {
-        console.error('Failed to send email:', error.message);
+        logger.error('Failed to send email:', error.message);
       }
     }
 
@@ -150,7 +151,7 @@ export class LeadCaptureService {
         messageId: contact.id,
       });
     } catch (error: any) {
-      console.error('Failed to send WhatsApp message:', error.message);
+      logger.error('Failed to send WhatsApp message:', error.message);
     }
 
     await prisma.activity.create({
@@ -221,7 +222,7 @@ export class LeadCaptureService {
           messageId: contact.id,
         });
       } catch (error: any) {
-        console.error('Failed to send WhatsApp:', error.message);
+        logger.error('Failed to send WhatsApp:', error.message);
       }
     }
 
@@ -291,7 +292,7 @@ export class LeadCaptureService {
           messageId: contact.id,
         });
       } catch (error: any) {
-        console.error('Failed to send WhatsApp:', error.message);
+        logger.error('Failed to send WhatsApp:', error.message);
       }
     }
 
@@ -482,14 +483,14 @@ export class LeadCaptureService {
               lead: leadData,
               timestamp: new Date().toISOString(),
             }, { timeout: 10000 });
-            console.log(`[N8N] Triggered workflow ${(rule as any).n8nWorkflowId} for lead`);
+            logger.info(`[N8N] Triggered workflow ${(rule as any).n8nWorkflowId} for lead`);
           } catch (e: any) {
-            console.error(`[N8N] Failed to trigger workflow:`, e.message);
+            logger.error(`[N8N] Failed to trigger workflow:`, e.message);
           }
         }
       }
     } catch (error: any) {
-      console.error(`[N8N] Error triggering workflows:`, error.message);
+      logger.error(`[N8N] Error triggering workflows:`, error.message);
     }
   }
 }

@@ -1,5 +1,6 @@
 import { prisma } from '../db.js';
 import { encrypt, decrypt } from '../utils/auth.js';
+import logger from '../utils/logger.js';
 
 export interface GBPAutoPostTemplate {
   id: string;
@@ -221,7 +222,7 @@ export class GBPAutoPostService {
 
       return { success: true, postId: response.data.name };
     } catch (error: any) {
-      console.error('GBP auto-post error:', error);
+      logger.error('GBP auto-post error:', error);
       return { success: false, error: error.message };
     }
   }

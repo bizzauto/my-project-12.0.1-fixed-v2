@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { prisma } from '../db.js';
+import logger from '../utils/logger.js';
 
 interface DograhConfig {
   apiUrl: string;
@@ -44,7 +45,7 @@ class DograhService {
       });
       return res.data ?? [];
     } catch (error: any) {
-      console.error('Dograh listAgents error:', error.message);
+      logger.error('Dograh listAgents error:', error.message);
       return [];
     }
   }
@@ -57,7 +58,7 @@ class DograhService {
       });
       return res.data ?? null;
     } catch (error: any) {
-      console.error('Dograh getAgent error:', error.message);
+      logger.error('Dograh getAgent error:', error.message);
       return null;
     }
   }
@@ -90,7 +91,7 @@ class DograhService {
       });
       return res.data ?? null;
     } catch (error: any) {
-      console.error('Dograh getRun error:', error.message);
+      logger.error('Dograh getRun error:', error.message);
       return null;
     }
   }
@@ -108,7 +109,7 @@ class DograhService {
       });
       return res.data ?? [];
     } catch (error: any) {
-      console.error('Dograh listRuns error:', error.message);
+      logger.error('Dograh listRuns error:', error.message);
       return [];
     }
   }

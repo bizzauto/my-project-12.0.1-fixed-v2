@@ -1,4 +1,5 @@
 import IORedis from 'ioredis';
+import logger from '../utils/logger.js';
 
 let redisClient: IORedis | null = null;
 let isConnected = false;
@@ -13,23 +14,23 @@ export async function initRedis(): Promise<IORedis | null> {
   const redisUrl = process.env.REDIS_URL;
   const password = process.env.REDIS_PASSWORD || undefined;
 
-  console.log(`[Redis Service] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${password ? 'SET' : 'NOT SET'}`);
+  logger.info(`[Redis Service] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${password ? 'SET' : 'NOT SET'}`);
 
   // Same nuclear check as redis-connection.ts
   if (!password && !process.env.REDIS_ENABLED) {
-    console.log('[Redis Service] No REDIS_PASSWORD or REDIS_ENABLED — Redis disabled.');
+    logger.info('[Redis Service] No REDIS_PASSWORD or REDIS_ENABLED — Redis disabled.');
     redisDisabled = true;
     return null;
   }
 
   if (!redisUrl && !password) {
-    console.log('[Redis Service] No credentials - skipping');
+    logger.info('[Redis Service] No credentials - skipping');
     redisDisabled = true;
     return null;
   }
 
   if (redisUrl && !redisUrl.includes('@')) {
-    console.log('[Redis Service] REDIS_URL has no password (no @) — Redis disabled');
+    logger.info('[Redis Service] REDIS_URL has no password (no @) — Redis disabled');
     redisDisabled = true;
     return null;
   }
@@ -38,14 +39,14 @@ export async function initRedis(): Promise<IORedis | null> {
     const schemeFree = redisUrl.replace(/^rediss?:\/\//, '');
     const passwordPart = schemeFree.split('@')[0];
     if (!passwordPart || passwordPart === ':' || passwordPart === '') {
-      console.log('[Redis Service] REDIS_URL has empty password — Redis disabled');
+      logger.info('[Redis Service] REDIS_URL has empty password — Redis disabled');
       redisDisabled = true;
       return null;
     }
   }
 
   if (!redisUrl && !process.env.REDIS_HOST) {
-    console.log('[Redis Service] No URL or host — Redis disabled');
+    logger.info('[Redis Service] No URL or host — Redis disabled');
     redisDisabled = true;
     return null;
   }
@@ -55,7 +56,7 @@ export async function initRedis(): Promise<IORedis | null> {
     const port = process.env.REDIS_PORT || '6379';
 
     const finalUrl = redisUrl || `redis://:${password}@${host}:${port}`;
-    console.log(`[Redis Service] Connecting to ${host}:${port}...`);
+    logger.info(`[Redis Service] Connecting to ${host}:${port}...`);
 
     redisClient = new IORedis(finalUrl, {
       maxRetriesPerRequest: null,
@@ -71,19 +72,19 @@ export async function initRedis(): Promise<IORedis | null> {
 
     redisClient.on('error', (err: any) => {
       if (err.message?.includes('NOAUTH') || err.message?.includes('AUTH')) {
-        console.error('[Redis Service] NOAUTH — credentials rejected. Redis permanently disabled.');
+        logger.error('[Redis Service] NOAUTH — credentials rejected. Redis permanently disabled.');
         redisDisabled = true;
         isConnected = false;
         try { redisClient?.destroy(); } catch {}
         redisClient = null;
         return;
       }
-      console.error(`[Redis Service] Error: ${err.message}`);
+      logger.error(`[Redis Service] Error: ${err.message}`);
       isConnected = false;
     });
 
     redisClient.on('connect', () => {
-      console.log('[Redis Service] Connected');
+      logger.info('[Redis Service] Connected');
       isConnected = true;
     });
 
@@ -97,10 +98,10 @@ export async function initRedis(): Promise<IORedis | null> {
 
     redisClient.connect().catch((err: any) => {
       if (err.message?.includes('NOAUTH') || err.message?.includes('AUTH')) {
-        console.error('[Redis Service] NOAUTH on connect — Redis permanently disabled.');
+        logger.error('[Redis Service] NOAUTH on connect — Redis permanently disabled.');
         redisDisabled = true;
       } else {
-        console.error(`[Redis Service] Connect failed: ${err.message}`);
+        logger.error(`[Redis Service] Connect failed: ${err.message}`);
       }
       isConnected = false;
       try { redisClient?.destroy(); } catch {}
@@ -109,7 +110,7 @@ export async function initRedis(): Promise<IORedis | null> {
 
     return redisClient;
   } catch (err: any) {
-    console.error(`[Redis Service] Failed: ${err.message}`);
+    logger.error(`[Redis Service] Failed: ${err.message}`);
     redisDisabled = true;
     return null;
   }
@@ -143,7 +144,7 @@ export const cacheHelpers = {
       }
       return data;
     } catch (error) {
-      console.error('Cache error:', error);
+      logger.error('Cache error:', error);
       return callback();
     }
   },
@@ -156,10 +157,10 @@ export const cacheHelpers = {
       const keys = await redisClient.keys(pattern);
       if (keys.length > 0) {
         await redisClient.del(...keys);
-        console.log(`🗑️ Invalidated ${keys.length} cache keys matching: ${pattern}`);
+        logger.info(`🗑️ Invalidated ${keys.length} cache keys matching: ${pattern}`);
       }
     } catch (error) {
-      console.error('Cache invalidation error:', error);
+      logger.error('Cache invalidation error:', error);
     }
   },
 
@@ -170,7 +171,7 @@ export const cacheHelpers = {
     try {
       await redisClient.setex(`user:${userId}:${key}`, ttl, JSON.stringify(data));
     } catch (error) {
-      console.error('User cache error:', error);
+      logger.error('User cache error:', error);
     }
   },
 
@@ -181,7 +182,7 @@ export const cacheHelpers = {
       const data = await redisClient.get(`user:${userId}:${key}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('User cache get error:', error);
+      logger.error('User cache get error:', error);
       return null;
     }
   },
@@ -193,7 +194,7 @@ export const cacheHelpers = {
     try {
       await redisClient.setex(`business:${businessId}:${key}`, ttl, JSON.stringify(data));
     } catch (error) {
-      console.error('Business cache error:', error);
+      logger.error('Business cache error:', error);
     }
   },
 
@@ -204,7 +205,7 @@ export const cacheHelpers = {
       const data = await redisClient.get(`business:${businessId}:${key}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Business cache get error:', error);
+      logger.error('Business cache get error:', error);
       return null;
     }
   },
@@ -220,7 +221,7 @@ export const cacheHelpers = {
       }
       return current <= limit;
     } catch (error) {
-      console.error('Rate limit check error:', error);
+      logger.error('Rate limit check error:', error);
       return true;
     }
   },
