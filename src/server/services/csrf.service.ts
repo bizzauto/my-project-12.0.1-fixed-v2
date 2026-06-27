@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import crypto, { randomBytes, timingSafeEqual } from 'crypto';
 import { prisma } from '../db.js';
 
 /**
@@ -43,7 +43,7 @@ export class CSRFService {
     }
 
     // Constant time comparison to prevent timing attacks
-    return crypto.timingSafeEqual(
+    return timingSafeEqual(
       Buffer.from(user.csrfToken),
       Buffer.from(token)
     );

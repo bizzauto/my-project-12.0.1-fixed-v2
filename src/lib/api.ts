@@ -18,12 +18,22 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor - Add auth token
+// Request interceptor - Add auth token + CSRF token for state-changing methods
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Add CSRF token for state-changing requests (POST, PUT, PATCH, DELETE)
+  const method = config.method?.toUpperCase() || 'GET';
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const csrfToken = localStorage.getItem('csrfToken');
+    if (csrfToken) {
+      config.headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
+  
   return config;
 });
 
@@ -41,6 +51,12 @@ const processQueue = (error: any, token: string | null = null) => {
 
 apiClient.interceptors.response.use(
   (response) => {
+    // Store CSRF token from response headers
+    const csrfToken = response.headers['x-csrf-token'];
+    if (csrfToken) {
+      localStorage.setItem('csrfToken', csrfToken);
+    }
+    
     // Check if server signals token needs refresh
     if (response.headers['x-token-needs-refresh'] === 'true') {
       const refreshToken = localStorage.getItem('refreshToken');
