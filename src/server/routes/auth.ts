@@ -144,7 +144,7 @@ router.post('/google/unlink', authenticate, async (req: AuthRequest, res: Respon
 
 // GET /api/auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', async (req: Request, res: Response) => {
-  console.log('[DEBUG] Google callback hit, state:', (req.query.state as string)?.substring(0, 50));
+  console.warn('[Auth] Google callback hit, state:', (req.query.state as string)?.substring(0, 50));
   const stateRaw = req.query.state as string || '';
   const frontendUrlDefault = process.env.FRONTEND_URL || 'https://bizzautoai.com';
   let frontendUrl: string = frontendUrlDefault;

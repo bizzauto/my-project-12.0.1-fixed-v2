@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
 
 /**
  * Data Encryption Service
@@ -10,8 +12,26 @@ const IV_LENGTH = 16;
 const TAG_LENGTH = 16;
 const SALT_LENGTH = 64;
 
-// Use environment variable or generate a secure key
-const ENCRYPTION_KEY = process.env.DATA_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+// Use ENCRYPTION_KEY env var (same as auth.ts).
+// In dev, persist to .encryption.key so encrypted data survives restarts.
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || getDevEncryptionKey();
+
+function getDevEncryptionKey(): string {
+  const keyFile = path.resolve(process.cwd(), '.encryption.key');
+  try {
+    if (fs.existsSync(keyFile)) {
+      const existing = fs.readFileSync(keyFile, 'utf8').trim();
+      if (existing.length === 64) {
+        return existing;
+      }
+    }
+  } catch {}
+  const newKey = crypto.randomBytes(32).toString('hex');
+  try {
+    fs.writeFileSync(keyFile, newKey, 'utf8');
+  } catch {}
+  return newKey;
+}
 
 /**
  * Encrypt sensitive data (phone, email, address, etc.)

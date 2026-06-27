@@ -19,6 +19,15 @@ const leadCaptureLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Stricter rate limiter for unauthenticated capture attempts
+const publicLeadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { success: false, error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 /**
  * POST /api/leads/indiamart/:businessId
  * Capture lead from IndiaMART webhook
@@ -649,11 +658,12 @@ router.get('/webhook-secret', authenticate, async (req: AuthRequest, res: Respon
 /**
  * POST /api/leads/capture/:businessId
  * Public lead capture endpoint for website forms
- * No authentication required - rate limited
+ * Requires x-webhook-secret header for security
  */
-router.post('/capture/:businessId', leadCaptureLimiter, async (req: Request, res: Response) => {
+router.post('/capture/:businessId', publicLeadLimiter, validateWebhook, async (req: Request, res: Response) => {
   try {
     const { businessId } = req.params as { businessId: string };
+
     const { name, phone, email, company, product, requirement, city, supplier, source: src } = req.body;
 
     if (!phone && !email) {

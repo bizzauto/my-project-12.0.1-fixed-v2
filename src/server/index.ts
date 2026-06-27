@@ -152,9 +152,14 @@ initSentry();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const app = express();
-const PORT = process.env.PORT || 3000;
+// In production, NODE_ENV must be set explicitly by Coolify/Docker
+const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || '0.0.0.0';
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const NODE_ENV = process.env.NODE_ENV;
+if (!NODE_ENV) {
+  console.error('CRITICAL: NODE_ENV is not set. Must be "production" or "development".');
+  process.exit(1);
+}
 
 // Initialize Prisma with optimized connection pool
 // connection_limit defaults to num_cpus * 2 + 1; pool_timeout controls wait time
@@ -259,11 +264,12 @@ app.use('/api', auditMiddleware);
 // API Security Headers
 app.use('/api', apiSecurityHeaders);
 
-// Global API Rate Limiter (100 requests per 15 minutes per IP — matching rateLimiters.ts globalRateLimiter)
-// NOTE: This was previously 1000 req/15min which was 10x more permissive
+// Global API Rate Limiter (500 requests per 15 minutes per IP — real-world friendly)
+// NOTE: Was 100 req/15min — too strict for real users browsing multiple pages.
+// Auth endpoints use stricter separate limiters already.
 const globalApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500,
   message: { success: false, error: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -272,10 +278,10 @@ const globalApiLimiter = rateLimit({
 });
 app.use('/api', globalApiLimiter);
 
-// Stricter rate limiter for write/mutation endpoints (100 requests per 15 minutes per IP)
+// Write/mutation rate limiter (200 requests per 15 minutes per IP)
 const writeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 200,
   message: { success: false, error: 'Too many write requests. Please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,

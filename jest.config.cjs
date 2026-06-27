@@ -14,4 +14,6 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setupTests.ts'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '/mobile-app/'],
+  // Prevent memory crashes with jsdom + React tests
+  maxWorkers: 2,
 };

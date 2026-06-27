@@ -141,7 +141,7 @@ RULES:
         responseText = data.choices[0]?.message?.content || '';
       }
     } catch (e) {
-      console.log('Nvidia NIM failed, trying OpenRouter');
+      console.warn('[Ava] Nvidia NIM failed, trying OpenRouter fallback');
     }
 
     // Fallback to OpenRouter (FREE)
@@ -168,7 +168,7 @@ RULES:
           responseText = data.choices[0]?.message?.content || '';
         }
       } catch (e) {
-        console.log('OpenRouter also failed');
+        console.warn('[Ava] OpenRouter fallback also failed');
       }
     }
 

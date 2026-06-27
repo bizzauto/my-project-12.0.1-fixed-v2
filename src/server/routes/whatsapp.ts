@@ -5,6 +5,7 @@ import { authenticate, requireBusinessOwner, AuthRequest } from '../middleware/a
 import { checkMessageLimit } from '../middleware/planLimits.js';
 import axios from 'axios';
 import { encrypt, decrypt } from '../utils/auth.js';
+import { WhatsAppService } from '../services/whatsapp.service.js';
 
 const router = Router();
 
@@ -86,11 +87,32 @@ router.post('/webhook/:businessId', async (req: Request, res: Response) => {
       return res.status(403).send('Verification failed');
     }
 
-    // For POST (incoming messages), verify webhook secret via query param or header
-    const requestSecret = (req.query['secret'] as string) || (req.headers['x-webhook-secret'] as string);
-    if (requestSecret && requestSecret !== business.waWebhookSecret) {
-      console.warn(`[WhatsApp] Rejected webhook with invalid secret for business ${businessId}`);
-      return res.status(403).json({ error: 'Invalid webhook secret' });
+    // Authentication: Check Meta signature first (takes priority over custom secret)
+    const metaSignature = req.headers['x-hub-signature-256'] as string;
+    const metaAppSecret = process.env.META_APP_SECRET;
+
+    if (metaSignature && metaAppSecret) {
+      // Verify Meta HMAC-SHA256 signature via WhatsAppService (mocked in tests)
+      const { rawBody } = req as any;
+      const payload = rawBody || JSON.stringify(body);
+      const isValid = WhatsAppService.verifyWebhookSignature(payload, metaSignature, metaAppSecret);
+      if (isValid) {
+        console.log(`[WhatsApp] Webhook authenticated via Meta signature for business ${businessId}`);
+      } else {
+        console.warn(`[WhatsApp] Rejected webhook: invalid Meta signature for business ${businessId}`);
+        return res.status(403).json({ error: 'Invalid webhook signature' });
+      }
+    } else {
+      // Fallback: Custom webhook secret via query param or header
+      const requestSecret = (req.query['secret'] as string) || (req.headers['x-webhook-secret'] as string);
+      if (!requestSecret) {
+        console.warn(`[WhatsApp] Rejected webhook: no auth method provided for business ${businessId}`);
+        return res.status(401).json({ error: 'Missing webhook authentication' });
+      }
+      if (requestSecret !== business.waWebhookSecret) {
+        console.warn(`[WhatsApp] Rejected webhook with invalid secret for business ${businessId}`);
+        return res.status(403).json({ error: 'Invalid webhook secret' });
+      }
     }
 
     // Process incoming messages
