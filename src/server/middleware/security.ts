@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
-import logger from '../utils/logger.js';
 
 /**
  * Security Headers using Helmet.js
@@ -13,8 +12,7 @@ export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://checkout.razorpay.com", "https://cdn.razorpay.com", "https://fonts.googleapis.com", "https://accounts.google.com", "https://apis.google.com"],
-      scriptSrcAttr: ["'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://checkout.razorpay.com", "https://cdn.razorpay.com", "https://fonts.googleapis.com", "https://accounts.google.com", "https://apis.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://accounts.google.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
@@ -29,7 +27,7 @@ export const securityHeaders = helmet({
   },
   
   // Allow Google OAuth iframes while preventing clickjacking
-  frameguard: false,
+  frameguard: { action: 'sameorigin' },
   
   // Prevent MIME type sniffing
   noSniff: true,
@@ -126,18 +124,11 @@ export const corsOptions = {
  * Cleans user input to prevent injection attacks
  */
 export const inputSanitizer = (req: Request, res: Response, next: NextFunction) => {
-  const sensitiveFields = ['password', 'token', 'secret', 'key', 'apiKey'];
-  
   const sanitizeObject = (obj: any): any => {
     if (!obj || typeof obj !== 'object') return obj;
     
     for (const key of Object.keys(obj)) {
       const value = obj[key];
-      
-      // Skip sensitive fields
-      if (sensitiveFields.some(f => key.toLowerCase().includes(f))) {
-        continue;
-      }
       
       if (typeof value === 'string') {
         // Remove potential script tags
@@ -175,7 +166,7 @@ export const sqlInjectionHeaders = (req: Request, res: Response, next: NextFunct
   const checkString = (str: string) => {
     for (const pattern of suspiciousPatterns) {
       if (pattern.test(str)) {
-        logger.warn(`[Security] Suspicious pattern detected: ${pattern} in ${str}`);
+        console.warn(`[Security] Suspicious pattern detected: ${pattern} in ${str}`);
         return false;
       }
     }
@@ -219,7 +210,7 @@ export const securityMonitor = (req: Request, res: Response, next: NextFunction)
     for (const check of checks) {
       for (const indicator of suspiciousIndicators) {
         if (indicator.pattern.test(check)) {
-          logger.warn(`[Security Alert] ${indicator.name} detected from IP: ${req.ip}`);
+          console.warn(`[Security Alert] ${indicator.name} detected from IP: ${req.ip}`);
           // Log for admin review but don't block immediately
           return false;
         }
@@ -239,7 +230,7 @@ export const securityMonitor = (req: Request, res: Response, next: NextFunction)
 export const requestTimeout = (req: Request, res: Response, next: NextFunction) => {
   // Set timeout to 30 seconds
   req.setTimeout(30000, () => {
-    logger.warn(`[Security] Request timeout: ${req.path} from ${req.ip}`);
+    console.warn(`[Security] Request timeout: ${req.path} from ${req.ip}`);
     res.status(408).json({
       success: false,
       error: 'Request timeout',

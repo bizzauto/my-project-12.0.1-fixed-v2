@@ -4,60 +4,69 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createSurveySchema, updateSurveySchema } from '../validations/remaining-schemas.js';
 import rateLimit from 'express-rate-limit';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
 // GET /api/surveys - List all surveys
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
-    const surveys = await (prisma as any).surveys.findMany({
+    const businessId = req.user.businessId;
+    const surveys = await prisma.survey.findMany({
       where: { businessId },
       orderBy: { createdAt: 'desc' },
     });
     res.json({ success: true, data: { surveys } });
   } catch (err) {
-    logger.error('Get surveys error:', err);
+    console.error('Get surveys error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch surveys' });
   }
 });
 
 // POST /api/surveys - Create new survey
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
+    const businessId = req.user.businessId;
     const { name, description, questions } = req.body;
     if (!name) return res.status(400).json({ success: false, error: 'Name is required' });
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ success: false, error: 'At least one question is required' });
     }
 
-    const survey = await (prisma as any).surveys.create({
+    const survey = await prisma.survey.create({
       data: {
         businessId,
         name,
         description: description || '',
-        questions,
+        isPublished: true,
+        questions: {
+          create: (questions || []).map((q: any) => ({
+            type: q.type || 'text',
+            label: q.label || q.question || '',
+            placeholder: q.placeholder || '',
+            required: q.required || false,
+            options: q.options || undefined,
+          })),
+        },
       },
+      include: { questions: true },
     });
     res.status(201).json({ success: true, data: { survey } });
   } catch (err) {
-    logger.error('Create survey error:', err);
+    console.error('Create survey error:', err);
     res.status(500).json({ success: false, error: 'Failed to create survey' });
   }
 });
 
 // PUT /api/surveys/:id - Update survey
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
+    const businessId = req.user.businessId;
     const { name, description, questions, status } = req.body;
 
-    const existing = await (prisma as any).surveys.findFirst({ where: { id: req.params.id, businessId } });
+    const existing = await prisma.survey.findFirst({ where: { id: req.params.id, businessId } });
     if (!existing) return res.status(404).json({ success: false, error: 'Survey not found' });
 
-    const survey = await (prisma as any).surveys.update({
+    const survey = await prisma.survey.update({
       where: { id: req.params.id },
       data: {
         ...(name !== undefined && { name }),
@@ -68,23 +77,23 @@ router.put('/:id', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { survey } });
   } catch (err) {
-    logger.error('Update survey error:', err);
+    console.error('Update survey error:', err);
     res.status(500).json({ success: false, error: 'Failed to update survey' });
   }
 });
 
 // DELETE /api/surveys/:id - Delete survey
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
-    const existing = await (prisma as any).surveys.findFirst({ where: { id: req.params.id, businessId } });
+    const businessId = req.user.businessId;
+    const existing = await prisma.survey.findFirst({ where: { id: req.params.id, businessId } });
     if (!existing) return res.status(404).json({ success: false, error: 'Survey not found' });
 
-    await (prisma as any).surveySubmissions.deleteMany({ where: { surveyId: req.params.id } });
-    await (prisma as any).surveys.delete({ where: { id: req.params.id } });
+    await prisma.surveyResponse.deleteMany({ where: { surveyId: req.params.id } });
+    await prisma.survey.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Survey deleted' });
   } catch (err) {
-    logger.error('Delete survey error:', err);
+    console.error('Delete survey error:', err);
     res.status(500).json({ success: false, error: 'Failed to delete survey' });
   }
 });
@@ -97,45 +106,45 @@ router.post('/:id/submit', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Answers are required' });
     }
 
-    const survey = await (prisma as any).surveys.findUnique({ where: { id: req.params.id } });
+    const survey = await prisma.survey.findUnique({ where: { id: req.params.id }, include: { questions: true } });
     if (!survey) return res.status(404).json({ success: false, error: 'Survey not found' });
-    if (survey.status !== 'active') return res.status(400).json({ success: false, error: 'Survey is not accepting responses' });
+    if (!survey.isActive) return res.status(400).json({ success: false, error: 'Survey is not accepting responses' });
 
-    const submission = await (prisma as any).surveySubmissions.create({
+    const submission = await prisma.surveyResponse.create({
       data: {
         surveyId: req.params.id,
-        answers,
-        respondent: respondent || null,
+        businessId: survey.businessId,
+        answers: answers,
+        metadata: respondent ? { respondent } : undefined,
       },
     });
 
-    // Update submission count and completion rate
-    const totalSubmissions = await (prisma as any).surveySubmissions.count({ where: { surveyId: req.params.id } });
-    await (prisma as any).surveys.update({
+    // Update submission count
+    const totalSubmissions = await prisma.surveyResponse.count({ where: { surveyId: req.params.id } });
+    await prisma.survey.update({
       where: { id: req.params.id },
       data: {
         submissionCount: totalSubmissions,
-        completionRate: totalSubmissions > 0 ? (totalSubmissions / totalSubmissions) * 100 : 0,
       },
     });
 
     res.status(201).json({ success: true, data: { submission } });
   } catch (err) {
-    logger.error('Submit survey error:', err);
+    console.error('Submit survey error:', err);
     res.status(500).json({ success: false, error: 'Failed to submit survey' });
   }
 });
 
 // GET /api/surveys/:id/results - Get survey results
-router.get('/:id/results', async (req: Request, res: Response) => {
+router.get('/:id/results', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
-    const survey = await (prisma as any).surveys.findFirst({ where: { id: req.params.id, businessId } });
+    const businessId = req.user.businessId;
+    const survey = await prisma.survey.findFirst({ where: { id: req.params.id, businessId }, include: { questions: true } });
     if (!survey) return res.status(404).json({ success: false, error: 'Survey not found' });
 
-    const submissions = await (prisma as any).surveySubmissions.findMany({
+    const submissions = await prisma.surveyResponse.findMany({
       where: { surveyId: req.params.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { submittedAt: 'desc' },
     });
 
     // Aggregate results per question
@@ -155,7 +164,7 @@ router.get('/:id/results', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: { survey, submissions, results } });
   } catch (err) {
-    logger.error('Get survey results error:', err);
+    console.error('Get survey results error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch survey results' });
   }
 });
@@ -163,8 +172,8 @@ router.get('/:id/results', async (req: Request, res: Response) => {
 // GET /api/surveys/public/:id - Public survey view
 router.get('/public/:id', async (req: Request, res: Response) => {
   try {
-    const survey = await (prisma as any).surveys.findUnique({ where: { id: req.params.id } });
-    if (!survey || survey.status !== 'active') {
+    const survey = await prisma.survey.findUnique({ where: { id: req.params.id }, include: { questions: true } });
+    if (!survey || !survey.isActive) {
       return res.status(404).json({ success: false, error: 'Survey not found' });
     }
     res.json({ success: true, data: { survey } });
@@ -174,22 +183,18 @@ router.get('/public/:id', async (req: Request, res: Response) => {
 });
 
 // GET /api/surveys/stats - Survey statistics
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
-    const surveys = await (prisma as any).surveys.findMany({ where: { businessId } });
-    const totalSubmissions = surveys.reduce((a: number, b: any) => a + b.submissionCount, 0);
-    const avgCompletion = surveys.length > 0
-      ? surveys.reduce((a: number, b: any) => a + b.completionRate, 0) / surveys.length
-      : 0;
+    const businessId = req.user.businessId;
+    const surveys = await prisma.survey.findMany({ where: { businessId } });
+    const totalSubmissions = surveys.reduce((a: number, b: any) => a + (b.submissionCount || 0), 0);
 
     res.json({
       success: true,
       data: {
         total: surveys.length,
-        active: surveys.filter((s: any) => s.status === 'active').length,
+        active: surveys.filter((s: any) => s.isActive).length,
         totalSubmissions,
-        avgCompletion: Math.round(avgCompletion),
       },
     });
   } catch (err) {

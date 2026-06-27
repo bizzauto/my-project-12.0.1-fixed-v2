@@ -1,6 +1,7 @@
 import { prisma } from '../db.js';
 import { triggerWorkflows } from './workflow-execution.service.js';
-import logger from '../utils/logger.js';
+
+const autoReplyRateMap = new Map<string, number[]>();
 
 interface AutoReplyResult {
   replied: boolean;
@@ -15,9 +16,23 @@ export async function handleIncomingMessage(
   businessId: string,
   senderPhone: string,
   messageText: string,
-  messageId?: string
+  messageId?: string,
+  metadata?: Record<string, any>
 ): Promise<AutoReplyResult> {
   const result: AutoReplyResult = { replied: false, workflowTriggered: false };
+
+  if (metadata?.autoReply) {
+    return result;
+  }
+
+  const rateKey = `${businessId}:${senderPhone}`;
+  const now = Date.now();
+  const recentReplies = autoReplyRateMap.get(rateKey) || [];
+  const recentHour = recentReplies.filter((t) => now - t < 3600000);
+  if (recentHour.length >= 5) {
+    result.error = 'Auto-reply rate limit exceeded for this contact';
+    return result;
+  }
 
   try {
     // Find or create contact
@@ -89,6 +104,9 @@ export async function handleIncomingMessage(
       result.replied = true;
       result.response = keywordReply.response;
       result.channel = 'keyword';
+      const timestamps = autoReplyRateMap.get(rateKey) || [];
+      timestamps.push(Date.now());
+      autoReplyRateMap.set(rateKey, timestamps.filter((t) => Date.now() - t < 3600000));
       return result;
     }
 
@@ -104,6 +122,9 @@ export async function handleIncomingMessage(
           result.replied = true;
           result.response = afterHoursMsg;
           result.channel = 'after_hours';
+          const timestamps = autoReplyRateMap.get(rateKey) || [];
+          timestamps.push(Date.now());
+          autoReplyRateMap.set(rateKey, timestamps.filter((t) => Date.now() - t < 3600000));
         }
         return result;
       }
@@ -163,12 +184,18 @@ export async function handleIncomingMessage(
       const workflowResults = await triggerWorkflows(businessId, 'message_received', triggerData);
       result.workflowTriggered = workflowResults.length > 0;
     } catch (err: any) {
-      logger.error('[AutoReply] Workflow trigger failed:', err.message);
+      console.error('[AutoReply] Workflow trigger failed:', err.message);
+    }
+
+    if (result.replied) {
+      const timestamps = autoReplyRateMap.get(rateKey) || [];
+      timestamps.push(Date.now());
+      autoReplyRateMap.set(rateKey, timestamps.filter((t) => Date.now() - t < 3600000));
     }
 
     return result;
   } catch (err: any) {
-    logger.error('[AutoReply] Error:', err.message);
+    console.error('[AutoReply] Error:', err.message);
     result.error = err.message;
     return result;
   }
@@ -183,6 +210,12 @@ async function generateAIResponse(
 ): Promise<string | null> {
   try {
     const { AIService } = await import('./ai.service.js');
+
+    const hasCredits = await AIService.checkCredits(businessId);
+    if (!hasCredits) {
+      return 'Thank you for your message. Our team will get back to you shortly.';
+    }
+    await AIService.useCredit(businessId, 1);
 
     const business = await prisma.business.findUnique({ where: { id: businessId } });
     const tone = autopilot?.aiTone || 'professional';
@@ -217,7 +250,7 @@ async function generateAIResponse(
     const response = await (AIService as any).generateText(messages, { maxTokens: 300 });
     return response;
   } catch (err: any) {
-    logger.error('[AutoReply] AI generation failed:', err.message);
+    console.error('[AutoReply] AI generation failed:', err.message);
     return null;
   }
 }
@@ -316,7 +349,7 @@ async function sendAutoReply(
 
     return false;
   } catch (err: any) {
-    logger.error('[AutoReply] Send failed:', err.message);
+    console.error('[AutoReply] Send failed:', err.message);
     return false;
   }
 }
@@ -347,6 +380,6 @@ export async function handleLeadCapture(
       await sendAutoReply(businessId, leadData.phone, welcomeMsg, contactId);
     }
   } catch (err: any) {
-    logger.error('[LeadCapture] Workflow trigger failed:', err.message);
+    console.error('[LeadCapture] Workflow trigger failed:', err.message);
   }
 }

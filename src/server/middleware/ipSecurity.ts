@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger.js';
 
 /**
  * IP Whitelist - Allow only specific IPs (for admin panel)
@@ -13,7 +12,7 @@ export const ipWhitelist = (req: Request, res: Response, next: NextFunction) => 
     return next();
   }
   
-  const clientIP = req.ip || req.socket.remoteAddress;
+  const clientIP = req.ip || req.socket.remoteAddress || '';
   
   if (whitelist.includes(clientIP)) {
     return next();
@@ -28,7 +27,7 @@ export const ipWhitelist = (req: Request, res: Response, next: NextFunction) => 
     }
   }
   
-  logger.warn(`[Security] Blocked request from non-whitelisted IP: ${clientIP}`);
+  console.warn(`[Security] Blocked request from non-whitelisted IP: ${clientIP}`);
   
   res.status(403).json({
     success: false,
@@ -77,11 +76,11 @@ class IPBlocker {
   
   cleanup() {
     const now = Date.now();
-    for (const [ip, record] of this.blockedIPs) {
+    this.blockedIPs.forEach((record, ip) => {
       if (record.blockedUntil < now) {
         this.blockedIPs.delete(ip);
       }
-    }
+    });
   }
 }
 
@@ -94,7 +93,7 @@ setInterval(() => ipBlocker.cleanup(), 5 * 60 * 1000);
  * IP Blocking Middleware
  */
 export const ipBlockMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const ip = req.ip || req.socket.remoteAddress;
+  const ip = req.ip || req.socket.remoteAddress || '';
   
   if (ipBlocker.isBlocked(ip)) {
     return res.status(403).json({
@@ -116,10 +115,10 @@ export const adminRouteProtection = (req: Request, res: Response, next: NextFunc
   // In production, ensure this is actually an admin
   if (process.env.NODE_ENV === 'production') {
     const adminIPs = process.env.ADMIN_IP_WHITELIST?.split(',') || [];
-    const clientIP = req.ip;
+    const clientIP = req.ip || '';
     
     if (adminIPs.length > 0 && !adminIPs.includes(clientIP)) {
-      logger.warn(`[Security] Admin route accessed from non-admin IP: ${clientIP}`);
+      console.warn(`[Security] Admin route accessed from non-admin IP: ${clientIP}`);
       // Don't block, but log for monitoring
     }
   }

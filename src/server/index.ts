@@ -8,7 +8,9 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
+import winston from 'winston';
 import path from 'path';
 import { prisma } from './db.js';
 
@@ -106,6 +108,7 @@ import jimiTtsRoutes from './routes/jimi-tts.js';
 import avaRoutes from './routes/ava.js';
 import { apiSecurityHeaders } from './middleware/security.js';
 import { validateCSRF } from './middleware/csrf.js';
+import { authenticatedCsrf } from './middleware/authenticated-csrf.js';
 import { sanitizeInput } from './middleware/sanitize.js';
 import { apiVersioning } from './middleware/api-versioning.js';
 import { requestCounting } from './middleware/request-counting.js';
@@ -122,6 +125,7 @@ import { startSlowQueryLogger } from './middleware/slow-query-logger.js';
 import { requestTimeout } from './middleware/request-timeout.js';
 import { circuitBreaker } from './services/circuit-breaker.service.js';
 import { shutdownWebhookWorker } from './services/webhook-retry.service.js';
+import { shutdownAllWorkers } from './workers/index.js';
 import { startAuditPruneCron, stopAuditPruneCron } from './services/audit-prune.service.js';
 import adminInfrastructureRoutes from './routes/admin-infrastructure.js';
 import appointmentRemindersRoutes from './routes/appointment-reminders.js';
@@ -131,16 +135,19 @@ import aiOutreachRoutes from './routes/ai-outreach.js';
 import whiteLabelRoutes from './routes/white-label.js';
 import vcardRoutes from './routes/vcard.js';
 import websiteRoutes from './routes/websites.js';
-// surveyRoutes removed — duplicate of surveysRoutes above
+import surveyRoutes from './routes/surveys.js';
 import ssoRoutes from './routes/sso.js';
 import landingPagesRoutes from './routes/landing-pages.js';
 import customRolesRoutes from './routes/custom-roles.js';
 import uploadRoutes from './routes/upload.js';
 import { razorpayWebhook, verifyPayment as verifyPaymentHandler } from './services/whatsapp-payment.service.js';
 import { authenticate } from './middleware/auth.js';
-import logger from './utils/logger.js';
 
 dotenv.config();
+
+// Initialize Sentry error tracking BEFORE any other imports
+import { initSentry } from './services/sentry.js';
+initSentry();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -152,7 +159,24 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // Initialize Prisma with optimized connection pool
 // connection_limit defaults to num_cpus * 2 + 1; pool_timeout controls wait time
 
+// Winston Logger
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' }),
+  ],
+});
 
+if (NODE_ENV !== 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.simple(),
+  }));
+}
 
 // Trust proxy — required when behind a reverse proxy (Nginx, Coolify, Cloudflare)
 // so that rate-limiter and req.ip use the real client IP from X-Forwarded-For
@@ -235,10 +259,11 @@ app.use('/api', auditMiddleware);
 // API Security Headers
 app.use('/api', apiSecurityHeaders);
 
-// Global API Rate Limiter (1000 requests per 15 minutes per IP)
+// Global API Rate Limiter (100 requests per 15 minutes per IP — matching rateLimiters.ts globalRateLimiter)
+// NOTE: This was previously 1000 req/15min which was 10x more permissive
 const globalApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 100,
   message: { success: false, error: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -270,53 +295,34 @@ app.use((req, res, next) => {
 
 // API Routes
 
-// CSRF validation for authenticated state-changing routes
-// Applied globally — each route that needs CSRF will check X-CSRF-Token header
-// GET/HEAD/OPTIONS are always allowed (safe methods)
-app.use('/api', (req, res, next) => {
-  // Skip CSRF for safe methods (GET, HEAD, OPTIONS)
-  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
-    return next();
-  }
-  // Skip CSRF for public endpoints (no auth needed)
-  const publicPaths = ['/api/store', '/api/auth', '/api/health'];
-  if (publicPaths.some(p => req.path.startsWith(p.replace('/api', '')))) {
-    return next();
-  }
-  // Skip CSRF for webhook endpoints (they use webhook-secret validation instead)
-  const webhookPaths = ['/dograh/webhook', '/payments/webhook', '/payments/verify'];
-  if (webhookPaths.some(p => req.path.startsWith(p))) {
-    return next();
-  }
-  // Apply CSRF validation to all other POST/PUT/PATCH/DELETE requests
-  validateCSRF(req, res, next);
-});
+// CSRF validation is now per-route via authenticatedCsrf middleware
+// (Global CSRF was broken — it ran before authenticate, so req.user was always undefined)
 
 // Public store routes (no auth required)
 app.use('/api/store', storePublicRoutes);
 app.use('/api/auth', authRateLimiter);
 app.use('/api/auth/login', loginRateLimiter);
 app.use('/api/auth', authRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/referrals', referralRoutes);
+app.use('/api/user', authenticatedCsrf, userRoutes);
+app.use('/api/referrals', authenticatedCsrf, referralRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
-app.use('/api/automation', automationRoutes);
-app.use('/api/business', businessRoutes);
-app.use('/api/campaigns', campaignsRoutes);
+app.use('/api/automation', authenticatedCsrf, automationRoutes);
+app.use('/api/business', authenticatedCsrf, businessRoutes);
+app.use('/api/campaigns', authenticatedCsrf, campaignsRoutes);
 app.use('/api/chatbot', chatbotRoutes);
-app.use('/api/contacts', contactsRoutes);
+app.use('/api/contacts', authenticatedCsrf, contactsRoutes);
 app.use('/api/customer-security', customerDataSecurityRoutes);
-app.use('/api/documents', documentsRoutes);
-app.use('/api/ecommerce', ecommerceRoutes);
-app.use('/api/email', emailRoutes);
+app.use('/api/documents', authenticatedCsrf, documentsRoutes);
+app.use('/api/ecommerce', authenticatedCsrf, ecommerceRoutes);
+app.use('/api/email', authenticatedCsrf, emailRoutes);
 app.use('/api/evolution', evolutionRoutes);
 app.use('/api/google-business', googleBusinessRoutes);
 app.use('/api/indiamart-email', indiamartEmailRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/intelligence', intelligenceRoutes);
-app.use('/api/leads', leadsRoutes);
+app.use('/api/leads', authenticatedCsrf, leadsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/posters', postersRoutes);
 app.use('/api/posts', postsRoutes);
@@ -324,18 +330,18 @@ app.use('/api/instagram', instagramRoutes);
 app.use('/api/qwen-preview', qwenPreviewRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/reviews', reviewsRoutes);
-app.use('/api/settings', settingsRoutes);
+app.use('/api/settings', authenticatedCsrf, settingsRoutes);
 app.use('/api/social-accounts', socialAccountsRoutes);
 app.use('/api/surveys', surveysRoutes);
-app.use('/api/subscriptions', subscriptionsRoutes);
-app.use('/api/super-admin', superAdminRoutes);
-app.use('/api/team', teamRoutes);
+app.use('/api/subscriptions', authenticatedCsrf, subscriptionsRoutes);
+app.use('/api/super-admin', authenticatedCsrf, superAdminRoutes);
+app.use('/api/team', authenticatedCsrf, teamRoutes);
 app.use('/api/two-factor', twoFactorRoutes);
 app.use('/api/webhooks', webhooksRoutes);
-app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/whatsapp', authenticatedCsrf, whatsappRoutes);
 app.use('/api/whatsapp-media/cleanup', whatsappMediaCleanupRoutes);
 app.use('/api/whatsapp-catalog', whatsappCatalogRoutes);
-app.use('/api/workflows', workflowRoutes);
+app.use('/api/workflows', authenticatedCsrf, workflowRoutes);
 app.use('/api/payment-links', paymentLinksRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/client-portal', clientPortalRoutes);
@@ -376,7 +382,7 @@ app.use('/api/outreach', aiOutreachRoutes);
 app.use('/api/wl', whiteLabelRoutes);
 app.use('/api/vcard', vcardRoutes);
 app.use('/api/websites', websiteRoutes);
-// Duplicate /api/surveys removed — already registered above with surveysRoutes
+app.use('/api/surveys', surveyRoutes);
 app.use('/api/sso', ssoRoutes);
 app.use('/api/landing-pages', landingPagesRoutes);
 app.use('/api/custom-roles', customRolesRoutes);
@@ -432,7 +438,7 @@ app.get('/cache-stats', (_req, res) => {
 app.post('/api/security/csp-report', express.json({ limit: '10kb' }), (req, res) => {
   const report = req.body?.['csp-report'] || req.body;
   if (report) {
-    logger.warn('[CSP Violation]', JSON.stringify({
+    console.warn('[CSP Violation]', JSON.stringify({
       'document-uri': report['document-uri'],
       'blocked-uri': report['blocked-uri'],
       'violated-directive': report['violated-directive'],
@@ -446,7 +452,18 @@ app.post('/api/security/csp-report', express.json({ limit: '10kb' }), (req, res)
 });
 
 // Health check - comprehensive
-app.get('/health', async (req, res) => {
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: NODE_ENV,
+    version: '12.0.1',
+    buildTime: process.env.BUILD_TIME || new Date().toISOString(),
+  });
+});
+
+// Full detailed health check (includes DB query — use sparingly)
+app.get('/health/details', async (req, res) => {
   try {
     const { getHealthCheck } = await import('./utils/healthCheck.js');
     const health = await getHealthCheck();
@@ -455,13 +472,7 @@ app.get('/health', async (req, res) => {
     const statusCode = health.status === 'unhealthy' ? 503 : 200;
     res.status(statusCode).json(health);
   } catch {
-    res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      environment: NODE_ENV,
-      version: '12.0.1',
-      buildTime: process.env.BUILD_TIME || new Date().toISOString(),
-    });
+    res.json({ status: 'error', message: 'Health check failed' });
   }
 });
 
@@ -479,14 +490,46 @@ app.get('/health/live', (req, res) => {
 app.get('/health/ready', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
+    // Check Redis if enabled
+    const redisEnabled = process.env.REDIS_ENABLED === 'true';
+    if (redisEnabled) {
+      try {
+        const { default: redisClient } = await import('./services/redis.service.js');
+        // redisClient may be null if not initialized — that's fine
+      } catch {
+        // Redis import failed — non-critical, continue
+      }
+    }
     res.json({ status: 'ready', timestamp: new Date().toISOString() });
   } catch {
     res.status(503).json({ status: 'not ready', timestamp: new Date().toISOString() });
   }
 });
 
-// Serve uploads directory (always)
-app.use('/uploads', express.static(path.join(__dirname, '..', '..', 'uploads')));
+// Serve uploads directory — with business ownership check when JWT is present
+app.use('/uploads', (req, res, next) => {
+  // Extract businessId from URL path: /uploads/{businessId}/{category}/{filename}
+  const pathParts = req.path.split('/').filter(Boolean);
+  if (pathParts.length < 1) return next();
+
+  const requestBusinessId = pathParts[0];
+
+  // If a Bearer token is present, verify business ownership
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.replace('Bearer ', '');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+      if (decoded.businessId && decoded.businessId !== requestBusinessId && decoded.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+    } catch {
+      // Invalid token — still serve the file (browser image loads don't send tokens)
+    }
+  }
+
+  next();
+}, express.static(path.join(__dirname, '..', '..', 'uploads')));
 
 // Serve frontend in production
 if (NODE_ENV === 'production') {
@@ -513,7 +556,8 @@ if (NODE_ENV === 'production') {
     printValidationResult(result);
 
     if (!result.valid && NODE_ENV === 'production') {
-      logger.error('CRITICAL: Environment validation failed. Server starting in degraded mode.');
+      console.error('CRITICAL: Environment validation failed. Cannot start in production.');
+      process.exit(1);
     }
   } catch (e) {
     // Fallback basic check
@@ -523,6 +567,7 @@ if (NODE_ENV === 'production') {
     if (missing.length > 0) {
       const msg = `CRITICAL: Missing required environment variables: ${missing.join(', ')}`;
       logger.warn(msg);
+      console.warn(`WARNING: ${msg}`);
     }
   }
 })();
@@ -552,50 +597,20 @@ app.use((req, res) => {
 });
 
 // Graceful shutdown
-process.on('unhandledRejection', (error: any) => {
-  logger.error('UNHANDLED REJECTION:', error);
+process.on('unhandledRejection', (reason: any) => {
+  console.error('UNHANDLED REJECTION:', reason);
+  console.error('Stack:', reason?.stack);
+  logger.error('Unhandled Rejection:', reason);
+  setTimeout(() => process.exit(1), 5000);
 });
 
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  try {
-    stopAuditPruneCron();
-    circuitBreaker.destroy();
-    await shutdownWebhookWorker();
-    await prisma.$disconnect();
-  } catch (e) {
-    // ignore disconnect errors during shutdown
-  }
-  logger.on('finish', () => process.exit(0));
-  logger.end();
-  // Give up to 30s for in-flight transactions to complete before force-exit
-  setTimeout(() => {
-    logger.warn('[Shutdown] Force exit after 30s timeout');
-    process.exit(0);
-  }, 30000); // Increased from 5000ms to 30000ms
-});
-
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  try {
-    stopAuditPruneCron();
-    circuitBreaker.destroy();
-    await shutdownWebhookWorker();
-    await prisma.$disconnect();
-  } catch (e) {
-    // ignore
-  }
-  logger.on('finish', () => process.exit(0));
-  logger.end();
-  // Give up to 30s for in-flight transactions to complete before force-exit
-  setTimeout(() => {
-    logger.warn('[Shutdown] Force exit after 30s timeout');
-    process.exit(0);
-  }, 30000); // Increased from 5000ms to 30000ms
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 process.on('uncaughtException', async (error) => {
-  logger.error('UNCAUGHT EXCEPTION:', error);
+  console.error('UNCAUGHT EXCEPTION:', error);
+  console.error('Stack:', error.stack);
+  logger.error('Uncaught Exception:', error);
   // Exit after uncaught exception - process is in undefined state
   setTimeout(() => process.exit(1), 1000);
 });
@@ -607,10 +622,49 @@ startSlowQueryLogger();
 startAuditPruneCron();
 
 // Start server
-logger.info(`Starting server on ${HOST}:${PORT} in ${NODE_ENV} mode`);
-app.listen(Number(PORT), () => {
+console.log(`Starting server on ${HOST}:${PORT} in ${NODE_ENV} mode`);
+const httpServer = app.listen(Number(PORT), () => {
+  console.log(`Server running on port ${PORT} in ${NODE_ENV} mode`);
   logger.info(`Server running on port ${PORT} in ${NODE_ENV} mode`);
 });
+
+// Graceful shutdown helper
+function gracefulShutdown(signal: string) {
+  logger.info(`${signal} received, shutting down gracefully`);
+
+  // Wait for in-flight requests to finish (up to 25s)
+  const serverClosed = new Promise<void>((resolve) => {
+    httpServer.close(() => resolve());
+  });
+
+  // Cleanup in parallel, then force exit
+  const forceExitTimeout = setTimeout(() => {
+    console.warn('[Shutdown] Force exit after 30s timeout');
+    process.exit(0);
+  }, 30000);
+
+  // Unref so it doesn't keep process alive
+  forceExitTimeout.unref();
+
+  (async () => {
+    await Promise.race([serverClosed, new Promise(r => setTimeout(r, 25000))]);
+    logger.info('HTTP server closed, no new connections accepted');
+
+    try {
+      stopAuditPruneCron();
+      circuitBreaker.destroy();
+      await Promise.allSettled([
+        shutdownAllWorkers(),
+        shutdownWebhookWorker(),
+      ]);
+    } catch (e) { /* ignore */ }
+    try {
+      await prisma.$disconnect();
+    } catch (e) { /* ignore */ }
+    clearTimeout(forceExitTimeout);
+    process.exit(0);
+  })();
+}
 
 // Export authenticate middleware for use in routes
 export { authenticate } from './middleware/auth.js';

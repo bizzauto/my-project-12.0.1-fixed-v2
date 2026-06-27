@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { decryptFields, encryptFields, SENSITIVE_CONTACT_FIELDS, SENSITIVE_ADDRESS_FIELDS, generateExportToken } from '../services/data-encryption.service.js';
 import { maskPhone, maskEmail, deepMaskPII, anonymizeForAnalytics } from '../middleware/pii-masking.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -19,14 +18,15 @@ const prisma = new PrismaClient();
  * POST /api/customer-security/export-data
  * Customer requests export of their personal data (GDPR Right to Portability)
  */
-router.post('/export-data', async (req: Request, res: Response) => {
+router.post('/export-data', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { phone, email, contactId, businessId } = req.body;
+    const { phone, email, contactId } = req.body;
+    const businessId = req.user.businessId;
     
-    // Find contact by phone, email, or ID
+    // Find contact by phone, email, or ID — always scoped to business
     let contact;
     if (contactId) {
-      contact = await prisma.contact.findUnique({ where: { id: contactId } });
+      contact = await prisma.contact.findFirst({ where: { id: contactId, businessId } });
     } else if (phone) {
       contact = await prisma.contact.findFirst({ where: { phone, businessId } });
     } else if (email) {
@@ -107,7 +107,7 @@ router.post('/export-data', async (req: Request, res: Response) => {
     
     res.json({ success: true, data: exportData });
   } catch (error: any) {
-    logger.error('[CustomerSecurity] Data export failed:', error);
+    console.error('[CustomerSecurity] Data export failed:', error);
     res.status(500).json({ success: false, error: 'Export failed' });
   }
 });
@@ -118,14 +118,15 @@ router.post('/export-data', async (req: Request, res: Response) => {
  * POST /api/customer-security/delete-data
  * Customer requests deletion of their personal data (GDPR Right to Erasure)
  */
-router.post('/delete-data', async (req: Request, res: Response) => {
+router.post('/delete-data', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { phone, email, contactId, businessId, reason } = req.body;
+    const { phone, email, contactId, reason } = req.body;
+    const businessId = req.user.businessId;
     
-    // Find contact
+    // Find contact — always scoped to business
     let contact;
     if (contactId) {
-      contact = await prisma.contact.findUnique({ where: { id: contactId } });
+      contact = await prisma.contact.findFirst({ where: { id: contactId, businessId } });
     } else if (phone) {
       contact = await prisma.contact.findFirst({ where: { phone, businessId } });
     } else if (email) {
@@ -175,7 +176,7 @@ router.post('/delete-data', async (req: Request, res: Response) => {
       deletedAt: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('[CustomerSecurity] Data deletion failed:', error);
+    console.error('[CustomerSecurity] Data deletion failed:', error);
     res.status(500).json({ success: false, error: 'Deletion failed' });
   }
 });
@@ -186,12 +187,19 @@ router.post('/delete-data', async (req: Request, res: Response) => {
  * POST /api/customer-security/consent
  * Update customer consent preferences
  */
-router.post('/consent', async (req: Request, res: Response) => {
+router.post('/consent', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { contactId, whatsappOptIn, emailOptIn, businessId } = req.body;
+    const { contactId, whatsappOptIn, emailOptIn } = req.body;
+    const businessId = req.user.businessId;
     
     if (!contactId) {
       return res.status(400).json({ success: false, error: 'Contact ID required' });
+    }
+    
+    // Verify contact belongs to this business
+    const contact = await prisma.contact.findFirst({ where: { id: contactId, businessId } });
+    if (!contact) {
+      return res.status(404).json({ success: false, error: 'Contact not found' });
     }
     
     await prisma.contact.update({
@@ -213,7 +221,7 @@ router.post('/consent', async (req: Request, res: Response) => {
     
     res.json({ success: true, message: 'Consent preferences updated' });
   } catch (error: any) {
-    logger.error('[CustomerSecurity] Consent update failed:', error);
+    console.error('[CustomerSecurity] Consent update failed:', error);
     res.status(500).json({ success: false, error: 'Consent update failed' });
   }
 });
@@ -257,7 +265,7 @@ router.get('/access-log/:contactId', authenticate, async (req: Request, res: Res
 
     res.json({ success: true, data: accessLog });
   } catch (error: any) {
-    logger.error('[CustomerSecurity] Access log failed:', error);
+    console.error('[CustomerSecurity] Access log failed:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch access log' });
   }
 });
@@ -269,9 +277,10 @@ router.get('/access-log/:contactId', authenticate, async (req: Request, res: Res
  * Anonymize old customer data (for data retention compliance)
  * Run this as a scheduled job
  */
-router.post('/anonymize-old', authenticate, async (req: Request, res: Response) => {
+router.post('/anonymize-old', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { businessId, retentionDays = 365 } = req.body;
+    const { retentionDays = 365 } = req.body;
+    const businessId = req.user.businessId;
     
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
@@ -318,7 +327,7 @@ router.post('/anonymize-old', authenticate, async (req: Request, res: Response) 
       count: anonymizedCount,
     });
   } catch (error: any) {
-    logger.error('[CustomerSecurity] Anonymization failed:', error);
+    console.error('[CustomerSecurity] Anonymization failed:', error);
     res.status(500).json({ success: false, error: 'Anonymization failed' });
   }
 });
@@ -335,12 +344,12 @@ async function createAuditLog(data: {
   try {
     // You can create an AuditLog model in Prisma schema
     // For now, log to console
-    logger.info('[AUDIT]', JSON.stringify({
+    console.log('[AUDIT]', JSON.stringify({
       timestamp: new Date().toISOString(),
       ...data,
     }));
   } catch (error) {
-    logger.error('[AuditLog] Failed to create audit log:', error);
+    console.error('[AuditLog] Failed to create audit log:', error);
   }
 }
 

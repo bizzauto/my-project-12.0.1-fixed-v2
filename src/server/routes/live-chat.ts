@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -25,7 +24,7 @@ router.get('/widget', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: widget });
   } catch (error: any) {
-    logger.error('Get widget error:', error);
+    console.error('Get widget error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch widget', details: error.message });
   }
 });
@@ -57,7 +56,7 @@ router.post('/sessions', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: session });
   } catch (error: any) {
-    logger.error('Create session error:', error);
+    console.error('Create session error:', error);
     res.status(500).json({ success: false, error: 'Failed to create session', details: error.message });
   }
 });
@@ -102,7 +101,7 @@ router.post('/sessions/:id/messages', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: message });
   } catch (error: any) {
-    logger.error('Add message error:', error);
+    console.error('Add message error:', error);
     res.status(500).json({ success: false, error: 'Failed to add message', details: error.message });
   }
 });
@@ -172,7 +171,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('List sessions error:', error);
+    console.error('List sessions error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch sessions', details: error.message });
   }
 });
@@ -223,7 +222,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Chat stats error:', error);
+    console.error('Chat stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch chat stats', details: error.message });
   }
 });
@@ -249,7 +248,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: session });
   } catch (error: any) {
-    logger.error('Get session error:', error);
+    console.error('Get session error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch session', details: error.message });
   }
 });
@@ -283,7 +282,7 @@ router.patch('/:id/assign', authenticate, async (req: AuthRequest, res: Response
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    logger.error('Assign session error:', error);
+    console.error('Assign session error:', error);
     res.status(500).json({ success: false, error: 'Failed to assign session', details: error.message });
   }
 });
@@ -316,7 +315,7 @@ router.patch('/:id/close', authenticate, async (req: AuthRequest, res: Response)
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    logger.error('Close session error:', error);
+    console.error('Close session error:', error);
     res.status(500).json({ success: false, error: 'Failed to close session', details: error.message });
   }
 });
@@ -349,7 +348,7 @@ router.patch('/:id/rate', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    logger.error('Rate session error:', error);
+    console.error('Rate session error:', error);
     res.status(500).json({ success: false, error: 'Failed to rate session', details: error.message });
   }
 });
@@ -408,7 +407,7 @@ router.post('/widget', authenticate, requireRole('OWNER', 'ADMIN'), async (req: 
 
     res.json({ success: true, data: widget });
   } catch (error: any) {
-    logger.error('Upsert widget error:', error);
+    console.error('Upsert widget error:', error);
     res.status(500).json({ success: false, error: 'Failed to save widget config', details: error.message });
   }
 });
@@ -494,7 +493,7 @@ router.post('/bot-reply', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: message });
   } catch (error: any) {
-    logger.error('Bot reply error:', error);
+    console.error('Bot reply error:', error);
     res.status(500).json({ success: false, error: 'Failed to generate bot reply', details: error.message });
   }
 });

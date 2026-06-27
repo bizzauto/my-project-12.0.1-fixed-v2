@@ -20,7 +20,6 @@
  */
 
 import { prisma } from '../db.js';
-import logger from '../utils/logger.js';
 
 // ==================== CONFIG ====================
 
@@ -82,13 +81,13 @@ export async function pruneAuditLogs(options?: {
   let totalDeleted = 0;
   let batches = 0;
 
-  logger.info(
+  console.log(
     `[AuditPrune] ${dryRun ? 'DRY RUN — ' : ''}Starting prune: retention=${retentionDays}d, batch=${batchSize}, max=${maxDeletes}, cutoff=${cutoff.toISOString()}`
   );
 
   // Count total entries first
   const totalCount = await countOldEntries(retentionDays);
-  logger.info(`[AuditPrune] Found ${totalCount} entries older than ${retentionDays} days`);
+  console.log(`[AuditPrune] Found ${totalCount} entries older than ${retentionDays} days`);
 
   if (totalCount === 0) {
     return { deleted: 0, durationMs: Date.now() - startTime, batches: 0 };
@@ -104,7 +103,7 @@ export async function pruneAuditLogs(options?: {
       const wouldDelete = Math.min(currentBatch, totalCount - totalDeleted);
       totalDeleted += wouldDelete;
       batches++;
-      logger.info(`[AuditPrune] Dry run batch ${batches}: would delete ${wouldDelete} rows`);
+      console.log(`[AuditPrune] Dry run batch ${batches}: would delete ${wouldDelete} rows`);
       break; // One batch is enough for dry run count
     }
 
@@ -130,7 +129,7 @@ export async function pruneAuditLogs(options?: {
     totalDeleted += deletedInBatch;
     batches++;
 
-    logger.info(
+    console.log(
       `[AuditPrune] Batch ${batches}: deleted ${deletedInBatch} rows (${totalDeleted}/${totalCount} total)`
     );
 
@@ -145,7 +144,7 @@ export async function pruneAuditLogs(options?: {
 
   const durationMs = Date.now() - startTime;
 
-  logger.info(
+  console.log(
     `[AuditPrune] ${dryRun ? 'DRY RUN — ' : ''}Completed: deleted ${totalDeleted} rows in ${batches} batches (${durationMs}ms)`
   );
 
@@ -205,22 +204,22 @@ export async function getRetentionStats(businessId?: string): Promise<{
  */
 export function startAuditPruneCron(): void {
   if (cronTimer) {
-    logger.info('[AuditPrune] Cron already running');
+    console.log('[AuditPrune] Cron already running');
     return;
   }
 
   const intervalMinutes = Math.round(CRON_INTERVAL_MS / 60_000);
-  logger.info(
+  console.log(
     `[AuditPrune] Starting cron job (every ${intervalMinutes} minutes, retention: ${DEFAULT_RETENTION_DAYS} days, batch: ${BATCH_SIZE})`
   );
 
   // Run once on startup (after a short delay to let the server stabilize)
   setTimeout(async () => {
     try {
-      logger.info('[AuditPrune] Running initial prune on startup...');
+      console.log('[AuditPrune] Running initial prune on startup...');
       await runPruneCycle();
     } catch (error: any) {
-      logger.error('[AuditPrune] Initial prune failed:', error.message);
+      console.error('[AuditPrune] Initial prune failed:', error.message);
     }
   }, 30_000); // 30s delay on startup
 
@@ -237,7 +236,7 @@ export function stopAuditPruneCron(): void {
   if (cronTimer) {
     clearInterval(cronTimer);
     cronTimer = null;
-    logger.info('[AuditPrune] Cron job stopped');
+    console.log('[AuditPrune] Cron job stopped');
   }
 }
 
@@ -246,7 +245,7 @@ export function stopAuditPruneCron(): void {
  */
 async function runPruneCycle(): Promise<void> {
   if (isRunning) {
-    logger.info('[AuditPrune] Previous cycle still running — skipping');
+    console.log('[AuditPrune] Previous cycle still running — skipping');
     return;
   }
 
@@ -266,11 +265,11 @@ async function runPruneCycle(): Promise<void> {
     lastRunDurationMs = result.durationMs;
 
     // Log completion
-    logger.info(
+    console.log(
       `[AuditPrune] Cycle complete: ${result.deleted} entries pruned in ${result.durationMs}ms (${result.batches} batches)`
     );
   } catch (error: any) {
-    logger.error('[AuditPrune] Prune cycle failed:', error.message);
+    console.error('[AuditPrune] Prune cycle failed:', error.message);
   } finally {
     isRunning = false;
   }
@@ -317,9 +316,7 @@ export async function manualPrune(retentionDays?: number): Promise<{
   });
 }
 
-// Handle process shutdown
-process.on('SIGTERM', stopAuditPruneCron);
-process.on('SIGINT', stopAuditPruneCron);
+// Shutdown is handled by the main server gracefulShutdown() which calls stopAuditPruneCron()
 
 export default {
   startAuditPruneCron,

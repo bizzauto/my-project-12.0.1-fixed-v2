@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger.js';
 
 /**
  * PII (Personally Identifiable Information) Masking Middleware
@@ -109,21 +108,11 @@ export function deepMaskPII(obj: any): any {
 }
 
 /**
- * Middleware to mask PII in request/response logs
+ * Middleware to mask PII in request/response logs.
+ * NOTE: Only masks logging — does NOT modify API response bodies.
+ * Frontend needs real data (phone numbers, emails, names).
  */
 export const piiMaskingMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  // Store original json method
-  const originalJson = res.json.bind(res);
-  
-  // Override json to mask PII in responses
-  res.json = (body: any) => {
-    // Only mask in development, not in production (would affect performance)
-    if (process.env.NODE_ENV === 'development') {
-      return originalJson(deepMaskPII(body));
-    }
-    return originalJson(body);
-  };
-  
   next();
 };
 
@@ -184,7 +173,7 @@ export function secureLog(message: string, data?: any): void {
   const maskedData = data ? deepMaskPII(data) : undefined;
   
   if (process.env.NODE_ENV === 'development') {
-    logger.info(`[SECURE] ${maskedMessage}`, maskedData || '');
+    console.log(`[SECURE] ${maskedMessage}`, maskedData || '');
   }
   // In production, use your logging service with PII masking
 }

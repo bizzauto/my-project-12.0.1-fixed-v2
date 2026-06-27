@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import logger from '../utils/logger.js';
 
 interface ZapierWebhook {
   id: string;
@@ -150,7 +149,7 @@ class ZapierService {
       return { success: false, error: 'Unknown action' };
     }
 
-    logger.info(`⚡ Executing Zapier action: ${action.name}`);
+    console.log(`⚡ Executing Zapier action: ${action.name}`);
 
     // Simulate action execution
     switch (actionId) {
@@ -176,7 +175,7 @@ class ZapierService {
     for (const webhook of matchingWebhooks) {
       try {
         // In production, send actual HTTP request
-        logger.info(`📤 Triggering webhook ${webhook.name} for event ${event}`);
+        console.log(`📤 Triggering webhook ${webhook.name} for event ${event}`);
         
         // Simulate webhook call
         // await fetch(webhook.url, {
@@ -185,7 +184,7 @@ class ZapierService {
         //   body: JSON.stringify({ event, data }),
         // });
       } catch (error) {
-        logger.error(`Webhook error for ${webhook.name}:`, error);
+        console.error(`Webhook error for ${webhook.name}:`, error);
       }
     }
   }

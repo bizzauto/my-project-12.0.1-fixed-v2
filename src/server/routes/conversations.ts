@@ -3,7 +3,6 @@ import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import axios from 'axios';
 import { decrypt } from '../utils/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -87,7 +86,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get inbox stats error:', error);
+    console.error('Get inbox stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch inbox stats', details: error.message });
   }
 });
@@ -148,6 +147,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
         const unreadCount = await prisma.message.count({
           where: {
             contactId: contact.id,
+            businessId,
             direction: 'incoming',
             status: 'received',
           },
@@ -242,7 +242,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get conversations error:', error);
+    console.error('Get conversations error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch conversations', details: error.message });
   }
 });
@@ -354,7 +354,7 @@ router.get('/:contactId', authenticate, async (req: AuthRequest, res: Response) 
       },
     });
   } catch (error: any) {
-    logger.error('Get conversation error:', error);
+    console.error('Get conversation error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch conversation', details: error.message });
   }
 });
@@ -433,7 +433,7 @@ router.post('/:contactId/reply', authenticate, async (req: AuthRequest, res: Res
         const { EmailService } = await import('../services/email.service.js');
         await EmailService.sendEmail(contact.email, `Re: Conversation`, content);
       } catch (emailErr: any) {
-        logger.error('Email send failed:', emailErr.message);
+        console.error('Email send failed:', emailErr.message);
       }
 
       const message = await prisma.message.create({
@@ -533,7 +533,7 @@ router.post('/:contactId/reply', authenticate, async (req: AuthRequest, res: Res
 
     res.json({ success: true, data: message });
   } catch (error: any) {
-    logger.error('Reply error:', error);
+    console.error('Reply error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send reply',
@@ -589,7 +589,7 @@ router.patch('/:contactId/read', authenticate, async (req: AuthRequest, res: Res
 
     res.json({ success: true, data: { markedRead: updated.count } });
   } catch (error: any) {
-    logger.error('Mark read error:', error);
+    console.error('Mark read error:', error);
     res.status(500).json({ success: false, error: 'Failed to mark as read', details: error.message });
   }
 });
@@ -654,7 +654,7 @@ router.post('/archive', authenticate, async (req: AuthRequest, res: Response) =>
       },
     });
   } catch (error: any) {
-    logger.error('Archive conversations error:', error);
+    console.error('Archive conversations error:', error);
     res.status(500).json({ success: false, error: 'Failed to archive conversations', details: error.message });
   }
 });

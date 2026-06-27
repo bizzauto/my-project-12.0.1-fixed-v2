@@ -1,5 +1,4 @@
 import { prisma } from '../db.js';
-import logger from '../utils/logger.js';
 
 /**
  * Slow Query Logger
@@ -38,11 +37,11 @@ export function startSlowQueryLogger(): void {
   const enabled = process.env.SLOW_QUERY_LOG_ENABLED !== 'false';
 
   if (!enabled) {
-    logger.info('Slow query logger disabled via SLOW_QUERY_LOG_ENABLED=false');
+    console.log('Slow query logger disabled via SLOW_QUERY_LOG_ENABLED=false');
     return;
   }
 
-  logger.info(`Slow query logger started (threshold: ${thresholdMs}ms)`);
+  console.log(`Slow query logger started (threshold: ${thresholdMs}ms)`);
 
   (prisma as any).$on('query', (event: any) => {
     queryCount++;
@@ -65,9 +64,9 @@ export function startSlowQueryLogger(): void {
 
       // Log to console in development, structured in production
       if (process.env.NODE_ENV !== 'production') {
-        logger.warn(`🐌 SLOW QUERY (${Math.round(duration)}ms):`, event.query?.substring(0, 200));
+        console.warn(`🐌 SLOW QUERY (${Math.round(duration)}ms):`, event.query?.substring(0, 200));
       } else {
-        logger.warn(JSON.stringify({
+        console.warn(JSON.stringify({
           level: 'warn',
           message: 'slow_query',
           duration: Math.round(duration),

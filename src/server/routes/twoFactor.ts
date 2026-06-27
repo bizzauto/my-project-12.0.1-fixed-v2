@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { TwoFactorService } from '../services/twoFactor.service.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -25,7 +24,7 @@ router.post('/setup', authenticate, async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('2FA setup error:', error);
+    console.error('2FA setup error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -60,7 +59,7 @@ router.post('/verify', authenticate, async (req: any, res: Response) => {
       });
     }
   } catch (error: any) {
-    logger.error('2FA verify error:', error);
+    console.error('2FA verify error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -91,7 +90,7 @@ router.post('/verify-login', async (req: Request, res: Response) => {
       });
     }
   } catch (error: any) {
-    logger.error('2FA login verify error:', error);
+    console.error('2FA login verify error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -110,7 +109,7 @@ router.get('/status', authenticate, async (req: any, res: Response) => {
       data: status,
     });
   } catch (error: any) {
-    logger.error('2FA status error:', error);
+    console.error('2FA status error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -132,7 +131,7 @@ router.delete('/disable', authenticate, async (req: any, res: Response) => {
     }
 
     // Verify password first
-    const { prisma } = await import('../index.js');
+    const { prisma } = await import('../db.js');
     const { comparePassword } = await import('../utils/auth.js');
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -154,7 +153,7 @@ router.delete('/disable', authenticate, async (req: any, res: Response) => {
       message: 'Two-factor authentication disabled',
     });
   } catch (error: any) {
-    logger.error('2FA disable error:', error);
+    console.error('2FA disable error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

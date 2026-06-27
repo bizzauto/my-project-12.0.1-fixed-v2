@@ -1,7 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -46,7 +45,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get review requests error:', error);
+    console.error('Get review requests error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch review requests',
@@ -95,7 +94,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get review request stats error:', error);
+    console.error('Get review request stats error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch review request stats',
@@ -134,7 +133,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       data: { ...request, contact },
     });
   } catch (error: any) {
-    logger.error('Get review request error:', error);
+    console.error('Get review request error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch review request',
@@ -220,7 +219,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         }
       }
     } catch (sendError: any) {
-      logger.error('Failed to send review request:', sendError);
+      console.error('Failed to send review request:', sendError);
       await prisma.reviewRequest.update({
         where: { id: request.id },
         data: { status: 'failed', errorMessage: sendError.message },
@@ -236,7 +235,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       data: { ...updated, contact: { id: contact.id, name: contact.name, phone: contact.phone, email: contact.email } },
     });
   } catch (error: any) {
-    logger.error('Send review request error:', error);
+    console.error('Send review request error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send review request',
@@ -355,7 +354,7 @@ router.post('/bulk', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Bulk send review requests error:', error);
+    console.error('Bulk send review requests error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send bulk review requests',
@@ -395,7 +394,7 @@ router.get('/campaigns', authenticate, async (req: AuthRequest, res: Response) =
       },
     });
   } catch (error: any) {
-    logger.error('Get review campaigns error:', error);
+    console.error('Get review campaigns error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch review campaigns',
@@ -450,7 +449,7 @@ router.post('/campaigns', authenticate, async (req: AuthRequest, res: Response) 
       data: campaign,
     });
   } catch (error: any) {
-    logger.error('Create review campaign error:', error);
+    console.error('Create review campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create review campaign',
@@ -509,7 +508,7 @@ router.put('/campaigns/:id', authenticate, async (req: AuthRequest, res: Respons
       data: updated,
     });
   } catch (error: any) {
-    logger.error('Update review campaign error:', error);
+    console.error('Update review campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update review campaign',
@@ -545,7 +544,7 @@ router.patch('/campaigns/:id/toggle', authenticate, async (req: AuthRequest, res
       data: updated,
     });
   } catch (error: any) {
-    logger.error('Toggle review campaign error:', error);
+    console.error('Toggle review campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to toggle review campaign',
@@ -580,7 +579,7 @@ router.delete('/campaigns/:id', authenticate, async (req: AuthRequest, res: Resp
       message: 'Campaign deleted successfully',
     });
   } catch (error: any) {
-    logger.error('Delete review campaign error:', error);
+    console.error('Delete review campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete review campaign',
@@ -677,7 +676,7 @@ router.post('/campaigns/:id/trigger', authenticate, async (req: AuthRequest, res
         data: { sentCount: { increment: 1 } },
       });
     } catch (sendError: any) {
-      logger.error('Failed to send triggered review request:', sendError);
+      console.error('Failed to send triggered review request:', sendError);
       await prisma.reviewRequest.update({
         where: { id: request.id },
         data: { status: 'failed', errorMessage: sendError.message },
@@ -693,7 +692,7 @@ router.post('/campaigns/:id/trigger', authenticate, async (req: AuthRequest, res
       data: { ...updated, contact: { id: contact.id, name: contact.name, phone: contact.phone, email: contact.email } },
     });
   } catch (error: any) {
-    logger.error('Trigger review campaign error:', error);
+    console.error('Trigger review campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to trigger review campaign',
@@ -777,7 +776,7 @@ router.post('/webhook/review-submitted', async (req: any, res: Response) => {
       message: 'Review submission processed',
     });
   } catch (error: any) {
-    logger.error('Review webhook error:', error);
+    console.error('Review webhook error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to process review webhook',

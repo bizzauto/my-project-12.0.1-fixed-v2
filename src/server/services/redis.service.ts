@@ -1,5 +1,4 @@
 import IORedis from 'ioredis';
-import logger from '../utils/logger.js';
 
 let redisClient: IORedis | null = null;
 let isConnected = false;
@@ -13,40 +12,56 @@ export async function initRedis(): Promise<IORedis | null> {
 
   const redisUrl = process.env.REDIS_URL;
   const password = process.env.REDIS_PASSWORD || undefined;
+  const redisEnabled = process.env.REDIS_ENABLED;
+  // Coolify sometimes injects the full Redis URL into REDIS_USERNAME by mistake
+  const redisUsername = process.env.REDIS_USERNAME;
 
-  logger.info(`[Redis Service] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${password ? 'SET' : 'NOT SET'}`);
+  console.log(`[Redis Service] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${password ? 'SET' : 'NOT SET'}, REDIS_ENABLED: ${redisEnabled || 'NOT SET'}`);
 
-  // Same nuclear check as redis-connection.ts
-  if (!password && !process.env.REDIS_ENABLED) {
-    logger.info('[Redis Service] No REDIS_PASSWORD or REDIS_ENABLED — Redis disabled.');
+  // NUCLEAR: Redis is completely disabled unless REDIS_ENABLED=true
+  // This prevents Coolify auto-injected env vars from causing connection timeouts
+  if (!redisEnabled) {
+    console.log('[Redis Service] REDIS_ENABLED not set to true — Redis disabled entirely. Set REDIS_ENABLED=true in env to enable.');
     redisDisabled = true;
     return null;
   }
 
-  if (!redisUrl && !password) {
-    logger.info('[Redis Service] No credentials - skipping');
+  // Check if REDIS_USERNAME contains a full Redis URL (Coolify quirk)
+  const effectiveUrl = (redisUrl && redisUrl.includes('@')) ? redisUrl
+    : (redisUsername && redisUsername.startsWith('redis://')) ? redisUsername
+    : null;
+
+  // Require credentials for security
+  if (!password && !effectiveUrl && !process.env.REDIS_HOST) {
+    console.log('[Redis Service] REDIS_ENABLED but no Redis credentials provided.');
     redisDisabled = true;
     return null;
   }
 
-  if (redisUrl && !redisUrl.includes('@')) {
-    logger.info('[Redis Service] REDIS_URL has no password (no @) — Redis disabled');
+  if (!effectiveUrl && !password) {
+    console.log('[Redis Service] No credentials - skipping');
     redisDisabled = true;
     return null;
   }
 
-  if (redisUrl) {
-    const schemeFree = redisUrl.replace(/^rediss?:\/\//, '');
+  if (effectiveUrl && !effectiveUrl.includes('@')) {
+    console.log('[Redis Service] REDIS_URL has no password (no @) — Redis disabled');
+    redisDisabled = true;
+    return null;
+  }
+
+  if (effectiveUrl) {
+    const schemeFree = effectiveUrl.replace(/^rediss?:\/\//, '');
     const passwordPart = schemeFree.split('@')[0];
     if (!passwordPart || passwordPart === ':' || passwordPart === '') {
-      logger.info('[Redis Service] REDIS_URL has empty password — Redis disabled');
+      console.log('[Redis Service] REDIS_URL has empty password — Redis disabled');
       redisDisabled = true;
       return null;
     }
   }
 
   if (!redisUrl && !process.env.REDIS_HOST) {
-    logger.info('[Redis Service] No URL or host — Redis disabled');
+    console.log('[Redis Service] No URL or host — Redis disabled');
     redisDisabled = true;
     return null;
   }
@@ -55,14 +70,14 @@ export async function initRedis(): Promise<IORedis | null> {
     const host = process.env.REDIS_HOST || 'coolify-redis';
     const port = process.env.REDIS_PORT || '6379';
 
-    const finalUrl = redisUrl || `redis://:${password}@${host}:${port}`;
-    logger.info(`[Redis Service] Connecting to ${host}:${port}...`);
+    const finalUrl = effectiveUrl || `redis://:${password}@${host}:${port}`;
+    console.log(`[Redis Service] Connecting to ${host}:${port}...`);
 
     redisClient = new IORedis(finalUrl, {
       maxRetriesPerRequest: null,
       retryStrategy(times: number) {
-        if (redisDisabled || times > 3) return null;
-        return Math.min(times * 200, 2000);
+        if (redisDisabled || times > 10) return null;
+        return Math.min(times * 200, 5000);
       },
       enableOfflineQueue: false,
       connectTimeout: 5000,
@@ -72,19 +87,19 @@ export async function initRedis(): Promise<IORedis | null> {
 
     redisClient.on('error', (err: any) => {
       if (err.message?.includes('NOAUTH') || err.message?.includes('AUTH')) {
-        logger.error('[Redis Service] NOAUTH — credentials rejected. Redis permanently disabled.');
+        console.error('[Redis Service] NOAUTH — credentials rejected. Redis permanently disabled.');
         redisDisabled = true;
         isConnected = false;
         try { redisClient?.destroy(); } catch {}
         redisClient = null;
         return;
       }
-      logger.error(`[Redis Service] Error: ${err.message}`);
+      console.error(`[Redis Service] Error: ${err.message}`);
       isConnected = false;
     });
 
     redisClient.on('connect', () => {
-      logger.info('[Redis Service] Connected');
+      console.log('[Redis Service] Connected');
       isConnected = true;
     });
 
@@ -98,10 +113,10 @@ export async function initRedis(): Promise<IORedis | null> {
 
     redisClient.connect().catch((err: any) => {
       if (err.message?.includes('NOAUTH') || err.message?.includes('AUTH')) {
-        logger.error('[Redis Service] NOAUTH on connect — Redis permanently disabled.');
+        console.error('[Redis Service] NOAUTH on connect — Redis permanently disabled.');
         redisDisabled = true;
       } else {
-        logger.error(`[Redis Service] Connect failed: ${err.message}`);
+        console.error(`[Redis Service] Connect failed: ${err.message}`);
       }
       isConnected = false;
       try { redisClient?.destroy(); } catch {}
@@ -110,7 +125,7 @@ export async function initRedis(): Promise<IORedis | null> {
 
     return redisClient;
   } catch (err: any) {
-    logger.error(`[Redis Service] Failed: ${err.message}`);
+    console.error(`[Redis Service] Failed: ${err.message}`);
     redisDisabled = true;
     return null;
   }
@@ -144,7 +159,7 @@ export const cacheHelpers = {
       }
       return data;
     } catch (error) {
-      logger.error('Cache error:', error);
+      console.error('Cache error:', error);
       return callback();
     }
   },
@@ -157,10 +172,10 @@ export const cacheHelpers = {
       const keys = await redisClient.keys(pattern);
       if (keys.length > 0) {
         await redisClient.del(...keys);
-        logger.info(`🗑️ Invalidated ${keys.length} cache keys matching: ${pattern}`);
+        console.log(`🗑️ Invalidated ${keys.length} cache keys matching: ${pattern}`);
       }
     } catch (error) {
-      logger.error('Cache invalidation error:', error);
+      console.error('Cache invalidation error:', error);
     }
   },
 
@@ -171,7 +186,7 @@ export const cacheHelpers = {
     try {
       await redisClient.setex(`user:${userId}:${key}`, ttl, JSON.stringify(data));
     } catch (error) {
-      logger.error('User cache error:', error);
+      console.error('User cache error:', error);
     }
   },
 
@@ -182,7 +197,7 @@ export const cacheHelpers = {
       const data = await redisClient.get(`user:${userId}:${key}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      logger.error('User cache get error:', error);
+      console.error('User cache get error:', error);
       return null;
     }
   },
@@ -194,7 +209,7 @@ export const cacheHelpers = {
     try {
       await redisClient.setex(`business:${businessId}:${key}`, ttl, JSON.stringify(data));
     } catch (error) {
-      logger.error('Business cache error:', error);
+      console.error('Business cache error:', error);
     }
   },
 
@@ -205,7 +220,7 @@ export const cacheHelpers = {
       const data = await redisClient.get(`business:${businessId}:${key}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      logger.error('Business cache get error:', error);
+      console.error('Business cache get error:', error);
       return null;
     }
   },
@@ -221,7 +236,7 @@ export const cacheHelpers = {
       }
       return current <= limit;
     } catch (error) {
-      logger.error('Rate limit check error:', error);
+      console.error('Rate limit check error:', error);
       return true;
     }
   },

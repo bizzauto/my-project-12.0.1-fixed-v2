@@ -18,7 +18,6 @@
  */
 
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import logger from '../utils/logger.js';
 
 // ==================== TYPES ====================
 
@@ -220,7 +219,7 @@ class CircuitBreakerService {
       circuit.consecutiveFailures = 0;
       circuit.halfOpenAttempts = 0;
       circuit.lastStateChange = Date.now();
-      logger.info(`[CircuitBreaker] ${service} manually reset to CLOSED`);
+      console.log(`[CircuitBreaker] ${service} manually reset to CLOSED`);
     }
   }
 
@@ -263,7 +262,7 @@ class CircuitBreakerService {
         circuit.state = 'HALF_OPEN';
         circuit.halfOpenAttempts = 0;
         circuit.lastStateChange = now;
-        logger.info(`[CircuitBreaker] ${service} → HALF_OPEN (cooldown expired)`);
+        console.log(`[CircuitBreaker] ${service} → HALF_OPEN (cooldown expired)`);
       }
     }
   }
@@ -284,7 +283,7 @@ class CircuitBreakerService {
         circuit.consecutiveFailures = 0;
         circuit.halfOpenAttempts = 0;
         circuit.lastStateChange = Date.now();
-        logger.info(`[CircuitBreaker] ${service} → CLOSED (recovered)`);
+        console.log(`[CircuitBreaker] ${service} → CLOSED (recovered)`);
       }
     } else {
       // In CLOSED state, reset consecutive failures on success
@@ -306,13 +305,13 @@ class CircuitBreakerService {
       circuit.state = 'OPEN';
       circuit.lastStateChange = Date.now();
       circuit.halfOpenAttempts = 0;
-      logger.info(`[CircuitBreaker] ${service} → OPEN (probe failed: ${reason})`);
+      console.log(`[CircuitBreaker] ${service} → OPEN (probe failed: ${reason})`);
     } else if (circuit.consecutiveFailures >= config.failureThreshold) {
       // CLOSED → OPEN after threshold
       circuit.state = 'OPEN';
       circuit.lastStateChange = Date.now();
       const isExtended = circuit.consecutiveFailures >= config.maxConsecutiveFailures;
-      logger.info(
+      console.log(
         `[CircuitBreaker] ${service} → OPEN (failures: ${circuit.consecutiveFailures}${isExtended ? ', EXTENDED cooldown' : ''}: ${reason})`
       );
     }

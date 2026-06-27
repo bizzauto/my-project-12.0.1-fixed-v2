@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -65,7 +64,7 @@ router.get('/campaigns', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get SMS campaigns error:', error);
+    console.error('Get SMS campaigns error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch SMS campaigns',
@@ -102,7 +101,7 @@ router.get('/campaigns/:id', authenticate, async (req: any, res: any) => {
       data: campaign,
     });
   } catch (error: any) {
-    logger.error('Get SMS campaign error:', error);
+    console.error('Get SMS campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch SMS campaign',
@@ -139,7 +138,7 @@ router.post('/campaigns', authenticate, async (req: any, res: any) => {
       data: campaign,
     });
   } catch (error: any) {
-    logger.error('Create SMS campaign error:', error);
+    console.error('Create SMS campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create SMS campaign',
@@ -192,7 +191,7 @@ router.put('/campaigns/:id', authenticate, async (req: any, res: any) => {
       data: updated,
     });
   } catch (error: any) {
-    logger.error('Update SMS campaign error:', error);
+    console.error('Update SMS campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update SMS campaign',
@@ -239,7 +238,7 @@ router.delete('/campaigns/:id', authenticate, async (req: any, res: any) => {
       message: 'Campaign deleted successfully',
     });
   } catch (error: any) {
-    logger.error('Delete SMS campaign error:', error);
+    console.error('Delete SMS campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete SMS campaign',
@@ -353,7 +352,7 @@ router.post('/campaigns/:id/send', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Send SMS campaign error:', error);
+    console.error('Send SMS campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send SMS campaign',
@@ -408,7 +407,7 @@ router.post('/send', authenticate, async (req: any, res: any) => {
       data: updated,
     });
   } catch (error: any) {
-    logger.error('Send SMS error:', error);
+    console.error('Send SMS error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send SMS',
@@ -462,7 +461,7 @@ router.get('/messages', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get SMS messages error:', error);
+    console.error('Get SMS messages error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch SMS messages',
@@ -542,7 +541,7 @@ router.get('/stats', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get SMS stats error:', error);
+    console.error('Get SMS stats error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch SMS statistics',

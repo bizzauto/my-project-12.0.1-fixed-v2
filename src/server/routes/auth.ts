@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../db.js';
-import { hashPassword, comparePassword, generateToken, verifyRefreshToken, getJwtSecret, verifyToken } from '../utils/auth.js';
+import { hashPassword, comparePassword, generateToken, verifyToken, verifyRefreshToken, getJwtSecret } from '../utils/auth.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { generateRefreshToken } from '../utils/auth.js';
 import speakeasy from 'speakeasy';
@@ -12,7 +12,8 @@ import { validate } from '../middleware/validate.js';
 import { registerSchema, loginSchema, changePasswordSchema } from '../validations/schemas.js';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
-import logger from '../utils/logger.js';
+import { revokeAllUserTokens } from '../services/token-blacklist.service.js';
+import { recordFailedLoginAttempt, clearFailedLoginAttempts, getLockoutStatus } from '../services/account-lockout.service.js';
 
 const router = Router();
 
@@ -78,7 +79,7 @@ router.get('/google/url', (req: Request, res: Response) => {
   const frontendUrl = (req.query.redirect as string) || `${process.env.FRONTEND_URL || 'https://bizzautoai.com'}`;
 
   if (!clientId) {
-    logger.warn('[WARN] GOOGLE_CLIENT_ID is not set — Google OAuth login will not work.');
+    console.warn('[WARN] GOOGLE_CLIENT_ID is not set — Google OAuth login will not work.');
     return res.redirect(`${frontendUrl}/login?error=google_not_configured`);
   }
 
@@ -102,7 +103,7 @@ router.get('/google/link-url', authenticate, (req: AuthRequest, res: Response) =
   const frontendUrl = (req.query.redirect as string) || `${process.env.FRONTEND_URL || 'https://bizzautoai.com'}`;
 
   if (!clientId) {
-    logger.warn('[WARN] GOOGLE_CLIENT_ID is not set — Google OAuth linking will not work.');
+    console.warn('[WARN] GOOGLE_CLIENT_ID is not set — Google OAuth linking will not work.');
     return res.status(400).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env file.' });
   }
 
@@ -143,7 +144,7 @@ router.post('/google/unlink', authenticate, async (req: AuthRequest, res: Respon
 
 // GET /api/auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', async (req: Request, res: Response) => {
-  logger.info('[DEBUG] Google callback hit, state:', (req.query.state as string)?.substring(0, 50));
+  console.log('[DEBUG] Google callback hit, state:', (req.query.state as string)?.substring(0, 50));
   const stateRaw = req.query.state as string || '';
   const frontendUrlDefault = process.env.FRONTEND_URL || 'https://bizzautoai.com';
   let frontendUrl: string = frontendUrlDefault;
@@ -156,7 +157,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
     if (decoded.mode === 'link' && decoded.token) {
       isLinkMode = true;
       frontendUrl = decoded.redirect || frontendUrlDefault;
-      const jwtPayload = verifyToken(decoded.token) as any;
+      const jwtPayload = jwt.verify(decoded.token, getJwtSecret()) as any;
       linkUserId = jwtPayload.userId;
     }
   } catch {
@@ -189,7 +190,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
 
     const tokenData: any = await tokenRes.json();
     if (!tokenData.id_token) {
-      logger.error('Google token exchange failed:', tokenData);
+      console.error('Google token exchange failed:', tokenData);
       return res.redirect(`${frontendUrl}/login?error=token_exchange_failed`);
     }
 
@@ -276,15 +277,25 @@ router.get('/google/callback', async (req: Request, res: Response) => {
         },
       });
       user = await prisma.user.update({
-        where: { id: user.id },
+        where: { id: user!.id },
         data: { businessId: business.id },
         include: { business: true },
       });
     }
 
     // Generate JWT
-    const token = generateToken({ userId: user.id, role: user.role });
-    const refreshToken = generateRefreshToken({ userId: user.id });
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      businessId: user.businessId || 'super-admin',
+      role: user.role,
+    });
+    const refreshToken = generateRefreshToken({
+      id: user.id,
+      email: user.email,
+      businessId: user.businessId || 'super-admin',
+      role: user.role,
+    });
 
     // Redirect to frontend with tokens
     const params = new URLSearchParams({
@@ -299,7 +310,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
 
     res.redirect(`${frontendUrl}/auth/callback?${params.toString()}`);
   } catch (error: any) {
-    logger.error('Google OAuth callback error:', error);
+    console.error('Google OAuth callback error:', error);
     res.redirect(`${frontendUrl}/login?error=auth_failed`);
   }
 });
@@ -469,7 +480,7 @@ router.post('/apple', socialAuthLimiter, async (req: Request, res: Response) => 
       },
     });
   } catch (error: any) {
-    logger.error('Apple auth error:', error);
+    console.error('Apple auth error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to authenticate with Apple',
@@ -647,7 +658,7 @@ router.post('/google', socialAuthLimiter, async (req: Request, res: Response) =>
       },
     });
   } catch (error: any) {
-    logger.error('Google auth error:', error);
+    console.error('Google auth error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to authenticate with Google',
@@ -728,7 +739,7 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req: 
       },
     });
   } catch (error: any) {
-    logger.error('Registration error:', error);
+    console.error('Registration error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to register user',
@@ -742,6 +753,16 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req: Request, 
   try {
     const { email, password, twoFactorToken } = req.body;
     const { TwoFactorService } = await import('../services/twoFactor.service.js');
+
+    // Check if account is locked
+    const lockStatus = await getLockoutStatus(email);
+    if (lockStatus.locked) {
+      return res.status(423).json({
+        success: false,
+        error: `Account temporarily locked. Try again after ${Math.ceil((lockStatus.lockedUntil! - Date.now()) / 60000)} minutes.`,
+        code: 'ACCOUNT_LOCKED',
+      });
+    }
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -760,11 +781,18 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req: Request, 
     const isValid = await comparePassword(password, user.password);
 
     if (!isValid) {
+      const lockout = await recordFailedLoginAttempt(email);
       return res.status(401).json({
         success: false,
-        error: 'Invalid email or password',
+        error: lockout.locked
+          ? `Account temporarily locked. Try again after ${Math.ceil((lockout.lockedUntil! - Date.now()) / 60000)} minutes.`
+          : 'Invalid email or password',
+        attemptsRemaining: lockout.attemptsRemaining,
       });
     }
+
+    // Clear failed attempts on successful password verify
+    await clearFailedLoginAttempts(email);
 
     // Check if 2FA is enabled
     if (user.twoFactorEnabled) {
@@ -780,12 +808,17 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req: Request, 
       // Verify 2FA token
       const verified = await TwoFactorService.verifyToken(user.id, twoFactorToken);
       if (!verified) {
+        const lockout = await recordFailedLoginAttempt(email);
         return res.status(401).json({
           success: false,
           error: 'Invalid two-factor authentication code',
+          attemptsRemaining: lockout.attemptsRemaining,
         });
       }
     }
+
+    // Clear failed attempts on full success
+    await clearFailedLoginAttempts(email);
 
     // Generate token
     const token = generateToken({
@@ -819,23 +852,23 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req: Request, 
           role: user.role,
           businessId: user.businessId,
           twoFactorEnabled: user.twoFactorEnabled,
+          onboardingCompleted: user.business?.onboardingCompleted ?? false,
+          admissionCompleted: user.business?.admissionCompleted ?? false,
         },
-        business: {
+        business: user.business ? {
           id: user.business.id,
           name: user.business.name,
           type: user.business.type,
           plan: user.business.plan,
-        },
+        } : undefined,
         token,
         refreshToken,
       },
     });
   } catch (error: any) {
-    logger.error('Login error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to login',
-      details: error.message,
     });
   }
 });
@@ -867,7 +900,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
           businessId: user.businessId,
           image: user.image,
         },
-        business: {
+        business: user.business ? {
           id: user.business.id,
           name: user.business.name,
           type: user.business.type,
@@ -875,11 +908,11 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
           plan: user.business.plan,
           aiCreditsUsed: user.business.aiCreditsUsed,
           aiCreditsLimit: user.business.aiCreditsLimit,
-        },
+        } : null,
       },
     });
   } catch (error: any) {
-    logger.error('Get user error:', error);
+    console.error('Get user error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get user',
@@ -914,7 +947,7 @@ router.put('/profile', authenticate, async (req: AuthRequest, res: Response) => 
       },
     });
   } catch (error: any) {
-    logger.error('Update profile error:', error);
+    console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update profile',
@@ -956,9 +989,11 @@ router.put('/change-password', authenticate, validate(changePasswordSchema), asy
       data: { password: hashedPassword },
     });
 
+    await revokeAllUserTokens(req.user.id);
+
     res.json({
       success: true,
-      message: 'Password updated successfully',
+      message: 'Password updated successfully. All sessions have been invalidated.',
     });
   } catch (error: any) {
     res.status(500).json({
@@ -1052,7 +1087,7 @@ router.post('/create-super-admin', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Create super admin error:', error);
+    console.error('Create super admin error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create super admin',
@@ -1101,7 +1136,7 @@ router.put('/role', authenticate, requireRole('SUPER_ADMIN', 'OWNER'), async (re
       data: { id: updatedUser.id, email: updatedUser.email, name: updatedUser.name, role: updatedUser.role },
     });
   } catch (error: any) {
-    logger.error('Role change error:', error);
+    console.error('Role change error:', error);
     res.status(500).json({ success: false, error: 'Failed to change role', details: error.message });
   }
 });
@@ -1126,7 +1161,7 @@ router.get('/users', authenticate, requireRole('SUPER_ADMIN', 'OWNER', 'ADMIN'),
 
     res.json({ success: true, data: { users } });
   } catch (error: any) {
-    logger.error('List users error:', error);
+    console.error('List users error:', error);
     res.status(500).json({ success: false, error: 'Failed to list users' });
   }
 });
@@ -1158,6 +1193,14 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req: Request, res:
       }
     }
 
+    // Evict stale entries if store grows too large
+    if (otpStore.size > 10000) {
+      const now = Date.now();
+      for (const [key, val] of otpStore) {
+        if (now - val.expiresAt > 300000) otpStore.delete(key);
+      }
+    }
+
     const otp = crypto.randomInt(100000, 999999).toString();
     const attempts = (existing?.attempts || 0) + 1;
     otpStore.set(email, { otp, expiresAt: Date.now() + 10 * 60 * 1000, attempts });
@@ -1171,7 +1214,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req: Request, res:
         `<h2>Password Reset</h2><p>Your OTP for password reset is: <strong>${otp}</strong></p><p>This OTP expires in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`
       );
     } catch (emailErr: any) {
-      logger.error('Failed to send OTP email:', emailErr.message);
+      console.error('Failed to send OTP email:', emailErr.message);
     }
 
     // Log the request for audit trail
@@ -1202,7 +1245,13 @@ router.post('/verify-otp', verifyOtpLimiter, async (req: Request, res: Response)
     if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP are required' });
 
     const stored = otpStore.get(email);
-    if (!stored || stored.otp !== otp || stored.expiresAt < Date.now()) {
+    if (!stored || stored.expiresAt < Date.now()) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+    }
+    const otpBuf = Buffer.from(otp.padStart(6, '0').slice(0, 6));
+    const storedBuf = Buffer.from(stored.otp.padStart(6, '0').slice(0, 6));
+    const match = otpBuf.length === storedBuf.length && crypto.timingSafeEqual(otpBuf, storedBuf);
+    if (!match) {
       return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
     }
 
@@ -1219,7 +1268,13 @@ router.post('/reset-password', resetPasswordLimiter, async (req: Request, res: R
     if (newPassword.length < 8) return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
 
     const stored = otpStore.get(email);
-    if (!stored || stored.otp !== otp || stored.expiresAt < Date.now()) {
+    if (!stored || stored.expiresAt < Date.now()) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+    }
+    const otpBuf = Buffer.from(otp.padStart(6, '0').slice(0, 6));
+    const storedBuf = Buffer.from(stored.otp.padStart(6, '0').slice(0, 6));
+    const match = otpBuf.length === storedBuf.length && crypto.timingSafeEqual(otpBuf, storedBuf);
+    if (!match) {
       return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
     }
 
@@ -1301,6 +1356,25 @@ router.post('/refresh', async (req: Request, res: Response) => {
       });
     }
 
+    // Check if this refresh token has been revoked (token reuse detection)
+    try {
+      const { isRefreshTokenRevoked } = await import('../services/token-blacklist.service.js');
+      const revoked = await isRefreshTokenRevoked(user.id).catch(() => false);
+      if (revoked) {
+        return res.status(401).json({
+          success: false,
+          error: 'Refresh token reuse detected. Please log in again.',
+        });
+      }
+    } catch { /* Redis unavailable — skip check */ }
+
+    // Blacklist the old refresh token to prevent reuse (refresh token rotation)
+    try {
+      const { blacklistRefreshToken } = await import('../services/token-blacklist.service.js');
+      const expiresIn = (parseInt(process.env.JWT_REFRESH_EXPIRES_IN || '2592000', 10)) * 1000;
+      await blacklistRefreshToken(user.id, expiresIn).catch(() => {});
+    } catch { /* Redis unavailable — skip blacklist */ }
+
     // Issue new token pair (rotation)
     const newToken = generateToken({
       id: user.id,
@@ -1324,7 +1398,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Token refresh error:', error);
+    console.error('Token refresh error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to refresh token',
@@ -1369,7 +1443,7 @@ router.post('/send-verification', authenticate, async (req: AuthRequest, res: Re
 
     res.json({ success: true, message: 'Verification email sent' });
   } catch (error: any) {
-    logger.error('Send verification error:', error);
+    console.error('Send verification error:', error);
     res.status(500).json({ success: false, error: 'Failed to send verification email' });
   }
 });
@@ -1406,7 +1480,7 @@ router.get('/verify-email', async (req: Request, res: Response) => {
 
     res.json({ success: true, message: 'Email verified successfully' });
   } catch (error: any) {
-    logger.error('Verify email error:', error);
+    console.error('Verify email error:', error);
     res.status(500).json({ success: false, error: 'Failed to verify email' });
   }
 });
@@ -1434,6 +1508,34 @@ router.get('/verification-status', authenticate, async (req: AuthRequest, res: R
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'Failed to check verification status' });
+  }
+});
+
+// DIAGNOSTIC ENDPOINT - test JWT sign/verify in the same process
+router.get('/jwt-test', (req: Request, res: Response) => {
+  const secret = getJwtSecret();
+  const testPayload = { id: 'test-123', email: 'test@test.com', role: 'SUPER_ADMIN', businessId: 'test-biz' };
+  const token = generateToken(testPayload);
+  try {
+    const decoded = verifyToken(token);
+    res.json({
+      success: true,
+      data: {
+        secretLen: secret.length,
+        secretFirst4: secret.slice(0, 4),
+        tokenLen: token.length,
+        tokenParts: token.split('.').length,
+        payload: decoded,
+        match: decoded.id === 'test-123',
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      secretLen: secret.length,
+      secretFirst4: secret.slice(0, 4),
+    });
   }
 });
 

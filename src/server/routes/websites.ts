@@ -1,8 +1,16 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
-import logger from '../utils/logger.js';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
+
+// All website routes require authentication
+router.use(authenticate);
+// Bridge: copy businessId from req.user to req for route handlers
+router.use((req: AuthRequest, _res, next) => {
+  (req as any).businessId = req.user?.businessId;
+  next();
+});
 
 // GET /api/websites - List all websites for business
 router.get('/', async (req: Request, res: Response) => {
@@ -14,7 +22,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { websites } });
   } catch (err) {
-    logger.error('Get websites error:', err);
+    console.error('Get websites error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch websites' });
   }
 });
@@ -42,7 +50,7 @@ router.post('/', async (req: Request, res: Response) => {
     });
     res.status(201).json({ success: true, data: { website } });
   } catch (err) {
-    logger.error('Create website error:', err);
+    console.error('Create website error:', err);
     res.status(500).json({ success: false, error: 'Failed to create website' });
   }
 });
@@ -70,7 +78,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { website } });
   } catch (err) {
-    logger.error('Update website error:', err);
+    console.error('Update website error:', err);
     res.status(500).json({ success: false, error: 'Failed to update website' });
   }
 });
@@ -85,7 +93,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await (prisma as any).websites.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Website deleted' });
   } catch (err) {
-    logger.error('Delete website error:', err);
+    console.error('Delete website error:', err);
     res.status(500).json({ success: false, error: 'Failed to delete website' });
   }
 });
@@ -103,7 +111,7 @@ router.post('/:id/publish', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { website } });
   } catch (err) {
-    logger.error('Publish website error:', err);
+    console.error('Publish website error:', err);
     res.status(500).json({ success: false, error: 'Failed to publish website' });
   }
 });

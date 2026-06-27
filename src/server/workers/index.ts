@@ -7,27 +7,41 @@ import { GBPAutoPostService } from '../services/gbp-auto-post.service.js';
 import { webhookDeliveryQueue, shutdownWebhookWorker } from '../services/webhook-retry.service.js';
 import { prisma } from '../db.js';
 import { createRedisConnection } from '../utils/redis-connection.js';
-import logger from '../utils/logger.js';
 
 // Redis connection
 const redisConnection = createRedisConnection();
-const redisAvailable = redisConnection !== null;
+const redisAvailable = redisConnection !== null && redisConnection.status === 'ready';
 
 if (!redisAvailable) {
-  logger.info('[Workers] Redis not available — background jobs disabled. App will run without queues.');
+  console.log('[Workers] Redis not available — background jobs disabled. App will run without queues.');
 }
+
+const DEFAULT_JOB_OPTS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 5000 },
+  removeOnComplete: { age: 86400, count: 1000 },
+  removeOnFail: { age: 604800, count: 5000 },
+};
 
 // Queues (only created if Redis is available)
 export const queues = redisAvailable ? {
-  whatsappMessages: new Queue('whatsapp-messages', { connection: redisConnection }),
-  emails: new Queue('emails', { connection: redisConnection }),
-  socialPublish: new Queue('social-publish', { connection: redisConnection }),
-  googleSheetsSync: new Queue('google-sheets-sync', { connection: redisConnection }),
-  leadProcessing: new Queue('lead-processing', { connection: redisConnection }),
-  campaignScheduler: new Queue('campaign-scheduler', { connection: redisConnection }),
-  gbpAutoPost: new Queue('gbp-auto-post', { connection: redisConnection }),
+  whatsappMessages: new Queue('whatsapp-messages', { connection: redisConnection, defaultJobOptions: DEFAULT_JOB_OPTS }),
+  emails: new Queue('emails', { connection: redisConnection, defaultJobOptions: DEFAULT_JOB_OPTS }),
+  socialPublish: new Queue('social-publish', { connection: redisConnection, defaultJobOptions: DEFAULT_JOB_OPTS }),
+  googleSheetsSync: new Queue('google-sheets-sync', { connection: redisConnection, defaultJobOptions: DEFAULT_JOB_OPTS }),
+  leadProcessing: new Queue('lead-processing', { connection: redisConnection, defaultJobOptions: DEFAULT_JOB_OPTS }),
+  campaignScheduler: new Queue('campaign-scheduler', { connection: redisConnection, defaultJobOptions: DEFAULT_JOB_OPTS }),
+  gbpAutoPost: new Queue('gbp-auto-post', { connection: redisConnection, defaultJobOptions: DEFAULT_JOB_OPTS }),
   webhookRetry: webhookDeliveryQueue,
 } : {} as any;
+
+// Export shutdown for graceful worker teardown
+export function shutdownAllWorkers(): Promise<void> {
+  const workers = [whatsappWorker, emailWorker, socialPublishWorker, googleSheetsSyncWorker, leadProcessingWorker, campaignSchedulerWorker, gbpAutoPostWorker];
+  return Promise.allSettled(
+    workers.map(w => w?.close())
+  ).then(() => {});
+}
 
 // ==================== JOB WORKERS (only if Redis is available) ====================
 
@@ -317,7 +331,7 @@ leadProcessingWorker = new Worker(
         results.assignedTo = assignedUserId;
       }
     } catch (error: any) {
-      logger.error('Lead auto-assignment error:', error.message);
+      console.error('Lead auto-assignment error:', error.message);
       results.assignmentError = error.message;
     }
 
@@ -341,7 +355,7 @@ leadProcessingWorker = new Worker(
         });
       }
     } catch (error: any) {
-      logger.error('Lead notification error:', error.message);
+      console.error('Lead notification error:', error.message);
     }
 
     // 3. Update lead score if contact has enough data
@@ -363,7 +377,7 @@ leadProcessingWorker = new Worker(
       });
       results.score = scoreValue.score;
     } catch (error: any) {
-      logger.error('Lead scoring error:', error.message);
+      console.error('Lead scoring error:', error.message);
     }
 
     return results;
@@ -698,7 +712,7 @@ gbpAutoPostWorker = new Worker(
             ...result,
           });
         } catch (error: any) {
-          logger.error(`Error processing auto-post for business ${business.id}:`, error.message);
+          console.error(`Error processing auto-post for business ${business.id}:`, error.message);
           results.push({
             businessId: business.id,
             businessName: business.name,
@@ -740,10 +754,10 @@ export const workers = {
  * Graceful shutdown
  */
 export async function shutdownWorkers() {
-  logger.info('Shutting down workers...');
+  console.log('Shutting down workers...');
   
   if (!redisAvailable) {
-    logger.info('No Redis — no workers to shut down');
+    console.log('No Redis — no workers to shut down');
     return;
   }
   
@@ -759,11 +773,9 @@ export async function shutdownWorkers() {
   ]);
 
   await redisConnection?.quit();
-  logger.info('All workers shut down successfully');
+  console.log('All workers shut down successfully');
 }
 
-// Handle process termination
-process.on('SIGTERM', shutdownWorkers);
-process.on('SIGINT', shutdownWorkers);
+// Shutdown is handled by the main server gracefulShutdown() which calls shutdownWorkers via webhook-retry.service
 
 export default { queues, workers };

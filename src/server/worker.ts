@@ -8,40 +8,40 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { workers, shutdownWorkers } from './workers/index.js';
-import logger from './utils/logger.js';
 
-logger.info('🚀 Starting background job workers...');
+console.log('🚀 Starting background job workers...');
 
 // Log worker status
 Object.keys(workers).forEach((workerName) => {
-  logger.info(`✓ ${workerName} worker started`);
+  console.log(`✓ ${workerName} worker started`);
 });
 
-logger.info('✅ All workers are running');
+console.log('✅ All workers are running');
 
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
-  logger.info('\n🛑 Received SIGTERM, shutting down gracefully...');
+  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
   await shutdownWorkers();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  logger.info('\n🛑 Received SIGINT, shutting down gracefully...');
+  console.log('\n🛑 Received SIGINT, shutting down gracefully...');
   await shutdownWorkers();
   process.exit(0);
 });
 
 // Keep the process alive
 process.on('uncaughtException', (error) => {
-  logger.error('❌ Uncaught exception:', error);
+  console.error('❌ Uncaught exception:', error);
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
-  logger.error('❌ Unhandled rejection:', reason);
+  console.error('❌ Unhandled rejection:', reason);
 });
 
 // Log every minute
 setInterval(() => {
-  logger.info(`⏰ Workers alive - ${new Date().toISOString()}`);
+  console.log(`⏰ Workers alive - ${new Date().toISOString()}`);
 }, 60000);

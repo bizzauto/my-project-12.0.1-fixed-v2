@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import crypto from 'crypto';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -16,7 +15,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: { configs } });
   } catch (err) {
-    logger.error('Get SSO configs error:', err);
+    console.error('Get SSO configs error:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch SSO configs' });
   }
 });
@@ -57,7 +56,7 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    logger.error('Create SSO config error:', err);
+    console.error('Create SSO config error:', err);
     res.status(500).json({ success: false, error: 'Failed to create SSO config' });
   }
 });
@@ -88,7 +87,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    logger.error('Update SSO config error:', err);
+    console.error('Update SSO config error:', err);
     res.status(500).json({ success: false, error: 'Failed to update SSO config' });
   }
 });
@@ -103,7 +102,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await (prisma as any).sSOConfig.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'SSO config deleted' });
   } catch (err) {
-    logger.error('Delete SSO config error:', err);
+    console.error('Delete SSO config error:', err);
     res.status(500).json({ success: false, error: 'Failed to delete SSO config' });
   }
 });
@@ -139,7 +138,7 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: { authUrl, state } });
   } catch (err) {
-    logger.error('SSO auth error:', err);
+    console.error('SSO auth error:', err);
     res.status(500).json({ success: false, error: 'Failed to initiate SSO' });
   }
 });
@@ -154,7 +153,7 @@ router.get('/callback/:provider', async (req: Request, res: Response) => {
     // For now, return success indicating SSO flow completed
     res.json({ success: true, message: 'SSO authentication successful', provider: req.params.provider, code: String(code).substring(0, 10) + '...' });
   } catch (err) {
-    logger.error('SSO callback error:', err);
+    console.error('SSO callback error:', err);
     res.status(500).json({ success: false, error: 'SSO callback failed' });
   }
 });

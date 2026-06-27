@@ -3,7 +3,6 @@ import { prisma } from '../db.js';
 import { WhatsAppService } from './whatsapp.service.js';
 import { EmailService } from './email.service.js';
 import { handleLeadCapture as triggerLeadWorkflows } from './ai-auto-reply.service.js';
-import logger from '../utils/logger.js';
 
 /**
  * Lead Capture Service
@@ -25,8 +24,25 @@ export class LeadCaptureService {
       requirement?: string;
       city?: string;
       state?: string;
-    }
+    },
+    idempotencyKey?: string
   ): Promise<any> {
+    // Idempotency: check if this lead was recently captured (within last 5 minutes)
+    if (idempotencyKey) {
+      const recent = await prisma.activity.findFirst({
+        where: {
+          businessId,
+          type: 'lead_captured',
+          metadata: { path: ['idempotencyKey'], equals: idempotencyKey },
+          createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+        },
+      });
+      if (recent) {
+        console.log(`[LeadCapture] Duplicate IndiaMART lead ignored: ${idempotencyKey}`);
+        return { success: true, duplicate: true };
+      }
+    }
+
     // Create or update contact
     const contact = await this.upsertContact(businessId, {
       name: leadData.name,
@@ -59,7 +75,7 @@ export class LeadCaptureService {
         messageId: contact.id,
       });
     } catch (error: any) {
-      logger.error('Failed to send WhatsApp welcome message:', error.message);
+      console.error('Failed to send WhatsApp welcome message:', error.message);
     }
 
     // Send email if available
@@ -78,7 +94,7 @@ export class LeadCaptureService {
           `
         );
       } catch (error: any) {
-        logger.error('Failed to send email:', error.message);
+        console.error('Failed to send email:', error.message);
       }
     }
 
@@ -90,7 +106,7 @@ export class LeadCaptureService {
         type: 'lead_captured',
         title: 'New lead from IndiaMART',
         content: `Product: ${leadData.product}, Requirement: ${leadData.requirement}`,
-        metadata: { source: 'indiamart', ...leadData },
+        metadata: { source: 'indiamart', idempotencyKey, ...leadData },
         createdBy: 'lead_capture_service',
       },
     });
@@ -151,7 +167,7 @@ export class LeadCaptureService {
         messageId: contact.id,
       });
     } catch (error: any) {
-      logger.error('Failed to send WhatsApp message:', error.message);
+      console.error('Failed to send WhatsApp message:', error.message);
     }
 
     await prisma.activity.create({
@@ -222,7 +238,7 @@ export class LeadCaptureService {
           messageId: contact.id,
         });
       } catch (error: any) {
-        logger.error('Failed to send WhatsApp:', error.message);
+        console.error('Failed to send WhatsApp:', error.message);
       }
     }
 
@@ -292,7 +308,7 @@ export class LeadCaptureService {
           messageId: contact.id,
         });
       } catch (error: any) {
-        logger.error('Failed to send WhatsApp:', error.message);
+        console.error('Failed to send WhatsApp:', error.message);
       }
     }
 
@@ -483,14 +499,14 @@ export class LeadCaptureService {
               lead: leadData,
               timestamp: new Date().toISOString(),
             }, { timeout: 10000 });
-            logger.info(`[N8N] Triggered workflow ${(rule as any).n8nWorkflowId} for lead`);
+            console.log(`[N8N] Triggered workflow ${(rule as any).n8nWorkflowId} for lead`);
           } catch (e: any) {
-            logger.error(`[N8N] Failed to trigger workflow:`, e.message);
+            console.error(`[N8N] Failed to trigger workflow:`, e.message);
           }
         }
       }
     } catch (error: any) {
-      logger.error(`[N8N] Error triggering workflows:`, error.message);
+      console.error(`[N8N] Error triggering workflows:`, error.message);
     }
   }
 }

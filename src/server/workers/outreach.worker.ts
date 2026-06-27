@@ -4,7 +4,6 @@ import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EvolutionApiService } from '../services/evolution.service.js';
 import { FollowUpEngineService } from '../services/followup-engine.service.js';
 import { createRedisConnection } from '../utils/redis-connection.js';
-import logger from '../utils/logger.js';
 
 /**
  * Smart send: detects which WhatsApp channel is configured and routes accordingly.
@@ -14,15 +13,44 @@ async function smartSendText(businessId: string, to: string, message: string): P
     where: { businessId, type: 'evolution_api', isActive: true },
   });
   if (evoIntegration) {
-    return await EvolutionApiService.sendText(businessId, to, message);
+    try {
+      return await EvolutionApiService.sendText(businessId, to, message);
+    } catch (e) {
+      console.warn('[Worker] Evolution API failed, falling back to Meta');
+    }
   }
   return await WhatsAppService.sendTextMessage(businessId, to, message);
 }
 
 const redisConnection = createRedisConnection();
 
+async function withCampaignLock<T>(
+  campaignId: string,
+  fn: () => Promise<T>,
+  lockTimeoutSeconds = 120
+): Promise<T> {
+  if (!redisConnection) return fn();
+
+  const lockKey = `outreach:lock:${campaignId}`;
+  const lockValue = Date.now().toString();
+
+  const acquired = await redisConnection.set(lockKey, lockValue, 'EX', lockTimeoutSeconds, 'NX');
+  if (!acquired) {
+    throw new Error(`Campaign ${campaignId} is already being processed by another worker`);
+  }
+
+  try {
+    return await fn();
+  } finally {
+    const current = await redisConnection.get(lockKey);
+    if (current === lockValue) {
+      await redisConnection.del(lockKey);
+    }
+  }
+}
+
 if (!redisConnection) {
-  logger.info('[Outreach Worker] Redis not available — worker disabled');
+  console.log('[Outreach Worker] Redis not available — worker disabled');
 }
 
 // Queue for outreach messages
@@ -31,6 +59,11 @@ export const outreachQueue = redisConnection ? new Queue('outreach-messages', {
   defaultJobOptions: {
     removeOnComplete: 100,
     removeOnFail: 50,
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 5000,
+    },
   },
 }) : null;
 
@@ -51,7 +84,7 @@ const outreachWorker = redisConnection ? new Worker(
 
     if (type === 'send-single') {
       const { businessId, campaignId, contactId, messageType } = job.data;
-      const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+      const contact = await prisma.contact.findFirst({ where: { id: contactId, businessId } });
       if (!contact?.phone) throw new Error('Contact phone not found');
 
       const outreachLog = await prisma.outreachLog.findFirst({
@@ -59,7 +92,21 @@ const outreachWorker = redisConnection ? new Worker(
       });
       if (!outreachLog) throw new Error('Outreach log not found');
 
-      const result = await smartSendText(businessId, contact.phone, outreachLog.message);
+      if (outreachLog.status !== 'pending') {
+        return { skipped: true, reason: `Already ${outreachLog.status}` };
+      }
+
+      let result;
+      try {
+        result = await smartSendText(businessId, contact.phone, outreachLog.message);
+      } catch (error: any) {
+        if (error.response?.status === 429) {
+          await new Promise(r => setTimeout(r, 30000));
+          result = await smartSendText(businessId, contact.phone, outreachLog.message);
+        } else {
+          throw error;
+        }
+      }
 
       await prisma.outreachLog.update({
         where: { id: outreachLog.id },
@@ -75,76 +122,109 @@ const outreachWorker = redisConnection ? new Worker(
         data: { sent: { increment: 1 } },
       });
 
+      const pendingCount = await prisma.outreachLog.count({
+        where: { campaignId, status: { in: ['pending', 'processing'] } }
+      });
+      if (pendingCount === 0) {
+        await prisma.outreachCampaign.update({
+          where: { id: campaignId },
+          data: { status: 'completed' }
+        });
+      }
+
       return { success: true, contactId };
     }
 
     if (type === 'send-bulk') {
-      const { businessId, campaignId, messageType, delayMs = 3000, maxMessages = 30 } = job.data;
+      const { businessId, campaignId, messageType, maxMessages = 30 } = job.data;
 
-      const pendingLogs = await prisma.outreachLog.findMany({
-        where: { campaignId, messageType: messageType || 'initial', status: 'pending' },
-        include: { contact: true },
-        take: Math.min(maxMessages, 50),
-      });
+      try {
+        return await withCampaignLock(campaignId, async () => {
+          const pendingLogs = await prisma.outreachLog.findMany({
+            where: { campaignId, messageType: messageType || 'initial', status: 'pending' },
+            include: { contact: true },
+            take: Math.min(maxMessages, 50),
+          });
 
-      let sent = 0;
-      let errors = 0;
-
-      // Process messages with controlled concurrency to avoid WhatsApp rate limits
-      const CONCURRENCY_LIMIT = 3;
-
-      async function processBatch(logs: typeof pendingLogs) {
-        const results = await Promise.allSettled(
-          logs.map(async (log) => {
-            if (!log.contact?.phone) return;
-            const result = await smartSendText(businessId, log.contact.phone, log.message);
-            await prisma.outreachLog.update({
-              where: { id: log.id },
-              data: {
-                status: 'sent',
-                sentAt: new Date(),
-                whatsappMsgId: result?.messages?.[0]?.id || result?.messageId || null,
-              },
+          const logIds = pendingLogs.map(l => l.id);
+          if (logIds.length > 0) {
+            await prisma.outreachLog.updateMany({
+              where: { id: { in: logIds } },
+              data: { status: 'processing' },
             });
-            return true;
-          })
-        );
+          }
 
-        for (const r of results) {
-          if (r.status === 'fulfilled' && r.value) sent++;
-          else {
-            errors++;
-            const failedLog = pendingLogs[results.indexOf(r)];
-            if (failedLog) {
-              await prisma.outreachLog.update({
-                where: { id: failedLog.id },
-                data: { status: 'failed' },
-              }).catch(() => {});
+          let sent = 0;
+          let errors = 0;
+          const CONCURRENCY_LIMIT = 3;
+
+          async function processBatch(logs: typeof pendingLogs) {
+            const results = await Promise.allSettled(
+              logs.map(async (log) => {
+                if (!log.contact?.phone) return;
+                let result;
+                try {
+                  result = await smartSendText(businessId, log.contact.phone, log.message);
+                } catch (error: any) {
+                  if (error.response?.status === 429) {
+                    await new Promise(r => setTimeout(r, 30000));
+                    result = await smartSendText(businessId, log.contact.phone, log.message);
+                  } else {
+                    throw error;
+                  }
+                }
+                await prisma.outreachLog.update({
+                  where: { id: log.id },
+                  data: { status: 'sent', sentAt: new Date(), whatsappMsgId: result?.messages?.[0]?.id || result?.messageId || null },
+                });
+                return true;
+              })
+            );
+
+            for (const r of results) {
+              if (r.status === 'fulfilled' && r.value) {
+                sent++;
+              } else {
+                errors++;
+              }
             }
           }
+
+          for (let i = 0; i < pendingLogs.length; i += CONCURRENCY_LIMIT) {
+            const campaignCheck = await prisma.outreachCampaign.findUnique({ where: { id: campaignId } });
+            if (campaignCheck?.status === 'paused') break;
+
+            const batch = pendingLogs.slice(i, i + CONCURRENCY_LIMIT);
+            await processBatch(batch);
+
+            if (i + CONCURRENCY_LIMIT < pendingLogs.length) {
+              await new Promise(r => setTimeout(r, 2000 + Math.random() * 2000));
+            }
+          }
+
+          await prisma.outreachCampaign.update({
+            where: { id: campaignId },
+            data: { sent: { increment: sent } },
+          });
+
+          const remaining = await prisma.outreachLog.count({
+            where: { campaignId, status: { in: ['pending', 'processing'] } },
+          });
+          if (remaining === 0) {
+            await prisma.outreachCampaign.update({
+              where: { id: campaignId },
+              data: { status: 'completed' },
+            });
+          }
+
+          return { sent, errors };
+        });
+      } catch (error: any) {
+        if (error.message?.includes('already being processed')) {
+          return { skipped: true, reason: 'Campaign already being processed' };
         }
+        throw error;
       }
-
-      // Process in batches with CONCURRENCY_LIMIT parallelism per batch
-      for (let i = 0; i < pendingLogs.length; i += CONCURRENCY_LIMIT) {
-        const batch = pendingLogs.slice(i, i + CONCURRENCY_LIMIT);
-        await processBatch(batch);
-
-        // Delay between batches to avoid spam detection
-        if (i + CONCURRENCY_LIMIT < pendingLogs.length) {
-          const minDelay = 2000;
-          const maxDelay = 4000;
-          const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-          await new Promise((r) => setTimeout(r, randomDelay));
-        }
-      }
-
-      await prisma.outreachCampaign.update({
-        where: { id: campaignId },
-        data: { sent: { increment: sent } },
-      });
-
-      return { sent, errors };
     }
 
     if (type === 'process-followups') {

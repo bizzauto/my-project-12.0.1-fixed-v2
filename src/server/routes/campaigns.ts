@@ -3,7 +3,7 @@ import { prisma } from '../db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createCampaignSchema, updateCampaignSchema, scheduleCampaignSchema } from '../validations/crm-schemas.js';
-import logger from '../utils/logger.js';
+import { outreachQueue } from '../workers/outreach.worker.js';
 
 const router = Router();
 
@@ -48,7 +48,7 @@ router.get('/', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get campaigns error:', error);
+    console.error('Get campaigns error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch campaigns',
@@ -85,7 +85,7 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
       data: campaign,
     });
   } catch (error: any) {
-    logger.error('Get campaign error:', error);
+    console.error('Get campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch campaign',
@@ -137,7 +137,7 @@ router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), validate(createCam
       data: campaign,
     });
   } catch (error: any) {
-    logger.error('Create campaign error:', error);
+    console.error('Create campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create campaign',
@@ -171,7 +171,7 @@ router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateC
     }
 
     const updated = await prisma.campaign.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id, businessId: req.user.businessId },
       data: {
         name: req.body.name,
         templateName: req.body.templateName,
@@ -189,7 +189,7 @@ router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateC
       data: updated,
     });
   } catch (error: any) {
-    logger.error('Update campaign error:', error);
+    console.error('Update campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update campaign',
@@ -223,7 +223,7 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: a
     }
 
     await prisma.campaign.delete({
-      where: { id: req.params.id },
+      where: { id: req.params.id, businessId: req.user.businessId },
     });
 
     res.json({
@@ -231,7 +231,7 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: a
       message: 'Campaign deleted successfully',
     });
   } catch (error: any) {
-    logger.error('Delete campaign error:', error);
+    console.error('Delete campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete campaign',
@@ -257,10 +257,14 @@ router.post('/:id/start', authenticate, requireRole('OWNER', 'ADMIN'), async (re
       });
     }
 
-    if (campaign.status !== 'draft') {
+    const updated = await prisma.campaign.updateMany({
+      where: { id: req.params.id, status: 'draft' },
+      data: { status: 'active', startedAt: new Date() },
+    });
+    if (updated.count === 0) {
       return res.status(400).json({
         success: false,
-        error: 'Can only start draft campaigns',
+        error: 'Campaign already started or not found',
       });
     }
 
@@ -305,14 +309,50 @@ router.post('/:id/start', authenticate, requireRole('OWNER', 'ADMIN'), async (re
           });
         }
       }
+    } else {
+      if (!outreachQueue) {
+        return res.status(503).json({
+          success: false,
+          error: 'Campaign service unavailable. Please try again later.',
+        });
+      }
+
+      const contactIds = contacts.map((c: any) => c.id);
+      const messageContent = (campaign.content as any)?.message || campaign.name || '';
+
+      const messages = [];
+      for (const contact of contacts) {
+        const msg = await prisma.message.create({
+          data: {
+            businessId: req.user.businessId,
+            contactId: contact.id,
+            content: messageContent,
+            direction: 'outbound',
+            type: 'text',
+            status: 'queued',
+            campaignId: campaign.id,
+          },
+        }).catch(() => null);
+        if (msg) messages.push(msg);
+      }
+
+      if (messages.length > 0) {
+        await outreachQueue.add('send-bulk', {
+          type: 'send-bulk',
+          businessId: req.user.businessId,
+          campaignId: campaign.id,
+          messageType: 'initial',
+          delayMs: 3000,
+          maxMessages: 30,
+        }, {
+          delay: 5000,
+        });
+      }
     }
 
-    // Update campaign status
     await prisma.campaign.update({
-      where: { id: campaign.id },
+      where: { id: campaign.id, businessId: req.user.businessId },
       data: {
-        status: 'active',
-        startedAt: new Date(),
         targetContacts: contacts.length,
       },
     });
@@ -323,7 +363,7 @@ router.post('/:id/start', authenticate, requireRole('OWNER', 'ADMIN'), async (re
       data: { contactCount: contacts.length },
     });
   } catch (error: any) {
-    logger.error('Start campaign error:', error);
+    console.error('Start campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to start campaign',
@@ -350,7 +390,7 @@ router.post('/:id/pause', authenticate, requireRole('OWNER', 'ADMIN'), async (re
     }
 
     await prisma.campaign.update({
-      where: { id: campaign.id },
+      where: { id: campaign.id, businessId: req.user.businessId },
       data: { status: 'paused' },
     });
 
@@ -359,7 +399,7 @@ router.post('/:id/pause', authenticate, requireRole('OWNER', 'ADMIN'), async (re
       message: 'Campaign paused successfully',
     });
   } catch (error: any) {
-    logger.error('Pause campaign error:', error);
+    console.error('Pause campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to pause campaign',
@@ -409,9 +449,45 @@ router.post('/:id/send', authenticate, requireRole('OWNER', 'ADMIN'), async (req
       select: { id: true, phone: true },
     });
 
+    // Queue messages via BullMQ
+    if (outreachQueue && contacts.length > 0) {
+      const messageContent = (campaign.content as any)?.message || campaign.name || '';
+
+      // Create message records for each contact
+      const messages = [];
+      for (const contact of contacts) {
+        const msg = await prisma.message.create({
+          data: {
+            businessId: req.user.businessId,
+            contactId: contact.id,
+            content: messageContent,
+            direction: 'outbound',
+            type: 'text',
+            status: 'queued',
+            campaignId: campaign.id,
+          },
+        }).catch(() => null);
+        if (msg) messages.push(msg);
+      }
+
+      // Queue bulk send job
+      if (messages.length > 0) {
+        await outreachQueue.add('send-bulk', {
+          type: 'send-bulk',
+          businessId: req.user.businessId,
+          campaignId: campaign.id,
+          messageType: 'initial',
+          delayMs: 3000,
+          maxMessages: 30,
+        }, {
+          delay: 5000,
+        });
+      }
+    }
+
     // Update campaign status
     await prisma.campaign.update({
-      where: { id: campaign.id },
+      where: { id: campaign.id, businessId: req.user.businessId },
       data: {
         status: 'active',
         startedAt: new Date(),
@@ -425,7 +501,7 @@ router.post('/:id/send', authenticate, requireRole('OWNER', 'ADMIN'), async (req
       data: { contactCount: contacts.length },
     });
   } catch (error: any) {
-    logger.error('Send campaign error:', error);
+    console.error('Send campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send campaign',
@@ -469,7 +545,7 @@ router.post('/:id/schedule', authenticate, requireRole('OWNER', 'ADMIN'), valida
     }
 
     await prisma.campaign.update({
-      where: { id: campaign.id },
+      where: { id: campaign.id, businessId: req.user.businessId },
       data: {
         status: 'scheduled',
         scheduledAt: scheduledDate,
@@ -482,7 +558,7 @@ router.post('/:id/schedule', authenticate, requireRole('OWNER', 'ADMIN'), valida
       data: { scheduledAt: scheduledDate },
     });
   } catch (error: any) {
-    logger.error('Schedule campaign error:', error);
+    console.error('Schedule campaign error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to schedule campaign',
@@ -540,7 +616,7 @@ router.get('/:id/stats', authenticate, async (req: any, res: any) => {
       }),
     ]);
 
-    const totalRecipients = campaign.targetCount || 0;
+    const totalRecipients = campaign.targetContacts || campaign.targetCount || 0;
     const deliveryRate = totalRecipients > 0 ? (deliveredCount / totalRecipients) * 100 : 0;
     const readRate = deliveredCount > 0 ? (readCount / deliveredCount) * 100 : 0;
     const replyRate = readCount > 0 ? (repliedCount / readCount) * 100 : 0;
@@ -565,7 +641,7 @@ router.get('/:id/stats', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get campaign stats error:', error);
+    console.error('Get campaign stats error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get campaign statistics',

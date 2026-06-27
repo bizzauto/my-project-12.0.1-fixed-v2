@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { getJwtSecret } from '../utils/auth.js';
 
 export const API_VERSION = 'v1';
 export const API_PREFIX = `/api/${API_VERSION}`;
@@ -24,7 +23,7 @@ const ACCESS_TOKEN_EXPIRY = '15m';  // 15 minutes
 const REFRESH_TOKEN_EXPIRY = '7d';  // 7 days
 
 export function generateTokenPair(payload: TokenPayload): TokenPair {
-  const accessToken = jwt.sign(payload, getJwtSecret(), {
+  const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
     expiresIn: ACCESS_TOKEN_EXPIRY,
     issuer: 'bizzauto',
     subject: payload.userId,
@@ -32,7 +31,7 @@ export function generateTokenPair(payload: TokenPayload): TokenPair {
 
   const refreshToken = jwt.sign(
     { ...payload, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET || getJwtSecret(),
+    process.env.JWT_REFRESH_SECRET!,
     { expiresIn: REFRESH_TOKEN_EXPIRY, issuer: 'bizzauto' }
   );
 
@@ -45,7 +44,7 @@ export function generateTokenPair(payload: TokenPayload): TokenPair {
 
 export function verifyAccessToken(token: string): TokenPayload | null {
   try {
-    return jwt.verify(token, getJwtSecret(), {
+    return jwt.verify(token, process.env.JWT_SECRET!, {
       issuer: 'bizzauto',
     }) as TokenPayload;
   } catch (error) {
@@ -55,7 +54,7 @@ export function verifyAccessToken(token: string): TokenPayload | null {
 
 export function verifyRefreshToken(token: string): TokenPayload | null {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || getJwtSecret(), {
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET!, {
       issuer: 'bizzauto',
     }) as TokenPayload & { type: string };
     

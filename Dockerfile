@@ -1,6 +1,6 @@
 FROM node:22-alpine AS builder
 
-ARG VITE_GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com
+ARG VITE_GOOGLE_CLIENT_ID
 ARG VITE_API_URL
 
 ENV NODE_ENV=development
@@ -41,12 +41,12 @@ RUN mkdir -p uploads logs && chown -R appuser:appgroup uploads logs
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV NODE_OPTIONS="--max-old-space-size=512"
+ENV NODE_OPTIONS="--max-old-space-size=768"
 EXPOSE 3000
 
 USER appuser
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000/health/live || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:${PORT:-3000}/health || exit 1
 
 CMD ["./start.sh"]

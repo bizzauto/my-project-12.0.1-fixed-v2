@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import crypto from 'crypto';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -33,9 +32,14 @@ router.post('/:businessId', async (req: Request, res: Response) => {
           .createHmac('sha256', business.dograhWebhookSecret)
           .update(JSON.stringify(payload))
           .digest('hex');
-        if (signature !== expected) {
-          logger.warn('Dograh webhook signature mismatch for business:', businessId);
+        const sigBuf = Buffer.from(expected, 'hex');
+        const userSigBuf = Buffer.from(signature, 'hex');
+        if (sigBuf.length !== userSigBuf.length || !crypto.timingSafeEqual(sigBuf, userSigBuf)) {
+          console.warn('Dograh webhook signature mismatch for business:', businessId);
+          return res.status(401).json({ success: false, error: 'Invalid webhook signature' });
         }
+      } else {
+        return res.status(401).json({ success: false, error: 'Missing webhook signature' });
       }
     }
 
@@ -202,7 +206,7 @@ router.post('/:businessId', async (req: Request, res: Response) => {
           });
         } else {
           // Insufficient balance - log warning
-          logger.warn(
+          console.warn(
             `Insufficient wallet balance for business ${businessId}. ` +
             `Required: ₹${totalDeduction}, Available: ₹${wallet?.balance || 0}`
           );
@@ -212,7 +216,7 @@ router.post('/:businessId', async (req: Request, res: Response) => {
 
     res.json({ status: 'ok' });
   } catch (error: any) {
-    logger.error('Dograh webhook error:', error);
+    console.error('Dograh webhook error:', error);
     // Always return 200 to prevent retries
     res.json({ status: 'ok' });
   }

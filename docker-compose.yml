@@ -14,7 +14,7 @@ services:
       - NODE_ENV=production
       - PORT=4000
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:bizzauto-redis-pass@redis:6379
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       # === Payments ===
@@ -35,11 +35,18 @@ services:
       - GOOGLE_AUTH_REDIRECT_URL=${GOOGLE_AUTH_REDIRECT_URL:-https://bizzautoai.com/api/auth/google/callback}
       - GOOGLE_BUSINESS_REDIRECT_URL=${GOOGLE_BUSINESS_REDIRECT_URL:-https://bizzautoai.com/api/google-business/auth/callback}
     depends_on:
-      - postgres
-      - redis
-      - evolution-api
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      evolution-api:
+        condition: service_healthy
     networks:
       - bizzauto-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   # PostgreSQL Database
   postgres:
@@ -60,13 +67,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # Redis for caching and sessions
   redis:
     image: redis:7-alpine
     container_name: bizzauto-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --save 60 1000 --save 300 10 --requirepass bizzauto-redis-pass
     volumes:
       - redis_data:/data
     networks:
@@ -76,10 +87,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # n8n - Workflow Automation
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:1.65.0
     container_name: bizzauto-n8n
     restart: unless-stopped
     ports:
@@ -97,24 +112,36 @@ services:
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
       - WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
       - GENERIC_TIMEZONE=Asia/Kolkata
-      - DB_TYPE=sqlite
-      - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+      - DB_TYPE=postgres
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - n8n_data:/home/node/.n8n
     networks:
       - bizzauto-network
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5678/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
   # ==================== Evolution API (WhatsApp) ====================
   evolution-api:
-    image: evoapicloud/evolution-api:latest
+    image: evoapicloud/evolution-api:3.1.0
     container_name: bizzauto-evolution
     restart: unless-stopped
     ports:
@@ -126,7 +153,7 @@ services:
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/evolution_db
       - REDIS_ENABLED=true
-      - REDIS_URI=redis://redis:6379
+      - REDIS_URI=redis://:bizzauto-redis-pass@redis:6379
       - LOG_LEVEL=debug
       - LOG_SAVE=true
       - API_KEY_REQUEST_WHITELIST=${EVOLUTION_WHITELIST_IPS:-}
@@ -135,14 +162,55 @@ services:
     networks:
       - bizzauto-network
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # Automated Backup Service
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bizzauto-backup
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_PASSWORD=bizzauto-redis-pass
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - backups:/backups
+      - ./scripts/backup.sh:/scripts/backup.sh:ro
+      - uploads_data:/app/uploads
+    networks:
+      - bizzauto-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache redis bash postgresql-client coreutils findutils tar gzip
+        echo "0 2 * * * /scripts/backup.sh >> /var/log/backup.log 2>&1" > /etc/crontabs/root
+        crond -f -l 2
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
 networks:
   bizzauto-network:
@@ -153,3 +221,4 @@ volumes:
   redis_data:
   n8n_data:
   evolution_data:
+  backups:

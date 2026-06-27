@@ -7,7 +7,6 @@ import { LeadCaptureService } from '../services/lead-capture.service.js';
 import { GmailIMAPService } from '../services/gmail-imap.service.js';
 import { encrypt, decrypt } from '../utils/auth.js';
 import { simpleParser } from 'mailparser';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -80,7 +79,7 @@ router.post('/setup', authenticate, async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('IndiaMART setup error:', error);
+    console.error('IndiaMART setup error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -127,7 +126,7 @@ router.get('/config', authenticate, async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get config error:', error);
+    console.error('Get config error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -141,21 +140,21 @@ router.post('/debug-emails', authenticate, async (req: any, res: Response) => {
     const businessId = req.user.businessId;
     const { days = 7 } = req.body;
 
-    logger.info(`[Debug] Request for businessId: ${businessId}`);
+    console.log(`[Debug] Request for businessId: ${businessId}`);
 
     const integration = await prisma.integration.findFirst({
       where: { businessId, type: 'indiamart_email', isActive: true },
     });
 
     if (!integration) {
-      logger.info(`[Debug] No integration found`);
+      console.log(`[Debug] No integration found`);
       return res.status(400).json({ success: false, error: 'Not configured' });
     }
 
     const config = integration.config as any;
     const password = decrypt(config.password);
 
-    logger.info(`[Debug] Config: email=${config.email}, host=${config.imapHost}, port=${config.imapPort}`);
+    console.log(`[Debug] Config: email=${config.email}, host=${config.imapHost}, port=${config.imapPort}`);
 
     const Imap = (await import('imap')).default;
     const imap = new Imap({
@@ -175,15 +174,15 @@ router.post('/debug-emails', authenticate, async (req: any, res: Response) => {
       const safeResolve = (v: any) => { if (!resolved) { resolved = true; clearTimeout(timeoutId); try { imap.end(); } catch {} resolve(v); } };
 
       imap.once('ready', () => {
-        logger.info('[Debug] IMAP connected!');
+        console.log('[Debug] IMAP connected!');
         imap.openBox('INBOX', true, (err, box) => {
           if (err) { 
-            logger.info('[Debug] Error opening INBOX:', err.message);
+            console.log('[Debug] Error opening INBOX:', err.message);
             safeResolve({ error: err.message }); 
             return; 
           }
 
-          logger.info(`[Debug] INBOX opened. Total: ${box.messages.total}`);
+          console.log(`[Debug] INBOX opened. Total: ${box.messages.total}`);
 
           const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
           // Search for IndiaMART emails specifically
@@ -192,12 +191,12 @@ router.post('/debug-emails', authenticate, async (req: any, res: Response) => {
             ['FROM', 'indiamart.com'],
           ], (err, results) => {
             if (err) {
-              logger.info('[Debug] Search error:', err.message);
+              console.log('[Debug] Search error:', err.message);
               safeResolve({ error: err.message });
               return;
             }
 
-            logger.info(`[Debug] Found ${results ? results.length : 0} IndiaMART emails`);
+            console.log(`[Debug] Found ${results ? results.length : 0} IndiaMART emails`);
 
             if (!results || results.length === 0) {
               safeResolve({ totalEmails: box.messages.total, found: 0, emails: [] });
@@ -234,7 +233,7 @@ router.post('/debug-emails', authenticate, async (req: any, res: Response) => {
 
             fetch.once('end', () => {
               Promise.all(parsePromises).then(() => {
-                logger.info(`[Debug] Fetched ${emails.length} emails`);
+                console.log(`[Debug] Fetched ${emails.length} emails`);
                 safeResolve({
                   totalEmails: box.messages.total,
                   found: results.length,
@@ -247,17 +246,17 @@ router.post('/debug-emails', authenticate, async (req: any, res: Response) => {
       });
 
       imap.once('error', (err) => {
-        logger.info('[Debug] IMAP error:', err.message);
+        console.log('[Debug] IMAP error:', err.message);
         safeResolve({ error: err.message });
       });
 
       imap.connect();
     });
 
-    logger.info('[Debug] Result:', debugResult);
+    console.log('[Debug] Result:', debugResult);
     res.json({ success: true, data: debugResult });
   } catch (error: any) {
-    logger.error('[Debug] Error:', error);
+    console.error('[Debug] Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -284,7 +283,7 @@ router.post('/test-gmail', authenticate, async (req: any, res: Response) => {
     const config = integration.config as any;
     const password = decrypt(config.password);
 
-    logger.info(`[TestGmail] Testing connection for ${config.email}`);
+    console.log(`[TestGmail] Testing connection for ${config.email}`);
 
     // Simple IMAP connection test
     const Imap = (await import('imap')).default;
@@ -316,14 +315,14 @@ router.post('/test-gmail', authenticate, async (req: any, res: Response) => {
       };
 
       imap.once('ready', () => {
-        logger.info('[TestGmail] IMAP connected!');
+        console.log('[TestGmail] IMAP connected!');
         imap.openBox('INBOX', true, (err, box) => {
           if (err) {
             safeResolve({ success: false, error: `Cannot open INBOX: ${err.message}` });
             return;
           }
 
-          logger.info(`[TestGmail] INBOX opened. Total messages: ${box.messages.total}`);
+          console.log(`[TestGmail] INBOX opened. Total messages: ${box.messages.total}`);
 
           // Search for ALL emails in last 30 days
           const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -333,7 +332,7 @@ router.post('/test-gmail', authenticate, async (req: any, res: Response) => {
               return;
             }
 
-            logger.info(`[TestGmail] Found ${results ? results.length : 0} emails in last 30 days`);
+            console.log(`[TestGmail] Found ${results ? results.length : 0} emails in last 30 days`);
 
             if (!results || results.length === 0) {
               safeResolve({ 
@@ -370,7 +369,7 @@ router.post('/test-gmail', authenticate, async (req: any, res: Response) => {
 
             fetch.once('end', () => {
               Promise.all(parsePromises).then(() => {
-                logger.info(`[TestGmail] Sample emails:`, emails);
+                console.log(`[TestGmail] Sample emails:`, emails);
                 safeResolve({
                   success: true,
                   connected: true,
@@ -390,7 +389,7 @@ router.post('/test-gmail', authenticate, async (req: any, res: Response) => {
       });
 
       imap.once('error', (err) => {
-        logger.error('[TestGmail] IMAP error:', err.message);
+        console.error('[TestGmail] IMAP error:', err.message);
         safeResolve({ 
           success: false, 
           error: `IMAP error: ${err.message}`,
@@ -403,7 +402,7 @@ router.post('/test-gmail', authenticate, async (req: any, res: Response) => {
 
     res.json(testResult);
   } catch (error: any) {
-    logger.error('[TestGmail] Error:', error);
+    console.error('[TestGmail] Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -417,7 +416,7 @@ router.post('/simple-sync', authenticate, async (req: any, res: Response) => {
     const businessId = req.user.businessId;
     const { days = 30 } = req.body;
 
-    logger.info(`[SimpleSync] Request received for businessId: ${businessId}`);
+    console.log(`[SimpleSync] Request received for businessId: ${businessId}`);
 
     // Get email config
     const integration = await prisma.integration.findFirst({
@@ -425,7 +424,7 @@ router.post('/simple-sync', authenticate, async (req: any, res: Response) => {
     });
 
     if (!integration) {
-      logger.info(`[SimpleSync] No integration found for businessId: ${businessId}`);
+      console.log(`[SimpleSync] No integration found for businessId: ${businessId}`);
       return res.status(400).json({
         success: false,
         error: 'Email not configured. Please setup first.',
@@ -435,8 +434,8 @@ router.post('/simple-sync', authenticate, async (req: any, res: Response) => {
     const config = integration.config as any;
     const password = decrypt(config.password);
 
-    logger.info(`[SimpleSync] Config found: email=${config.email}, host=${config.imapHost}, port=${config.imapPort}`);
-    logger.info(`[SimpleSync] Starting sync for ${config.email}`);
+    console.log(`[SimpleSync] Config found: email=${config.email}, host=${config.imapHost}, port=${config.imapPort}`);
+    console.log(`[SimpleSync] Starting sync for ${config.email}`);
 
     const result = await GmailIMAPService.fetchAndCreateLeads(
       businessId,
@@ -450,9 +449,9 @@ router.post('/simple-sync', authenticate, async (req: any, res: Response) => {
       }
     );
 
-    logger.info(`[SimpleSync] Result: success=${result.success}, total=${result.totalEmails}, indiamart=${result.indiamartEmails}, created=${result.leadsCreated}`);
-    logger.info(`[SimpleSync] Details:`, result.details);
-    logger.info(`[SimpleSync] Errors:`, result.errors);
+    console.log(`[SimpleSync] Result: success=${result.success}, total=${result.totalEmails}, indiamart=${result.indiamartEmails}, created=${result.leadsCreated}`);
+    console.log(`[SimpleSync] Details:`, result.details);
+    console.log(`[SimpleSync] Errors:`, result.errors);
 
     // Update last sync time
     await prisma.integration.update({
@@ -473,7 +472,7 @@ router.post('/simple-sync', authenticate, async (req: any, res: Response) => {
       data: result,
     });
   } catch (error: any) {
-    logger.error('[SimpleSync] Error:', error);
+    console.error('[SimpleSync] Error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -526,7 +525,7 @@ router.post('/sync', authenticate, async (req: any, res: Response) => {
       sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     }
 
-    logger.info(`[EmailLead] Sync: platform=${platform}, since=${sinceDate.toISOString()}`);
+    console.log(`[EmailLead] Sync: platform=${platform}, since=${sinceDate.toISOString()}`);
 
     const result = await EmailLeadService.processEmails(
       businessId,
@@ -568,7 +567,7 @@ router.post('/sync', authenticate, async (req: any, res: Response) => {
       data: result,
     });
   } catch (error: any) {
-    logger.error('IndiaMART sync error:', error);
+    console.error('IndiaMART sync error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -626,7 +625,7 @@ router.post('/test-connection', authenticate, async (req: any, res: Response) =>
       },
     });
   } catch (error: any) {
-    logger.error('Test connection error:', error);
+    console.error('Test connection error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -709,7 +708,7 @@ router.post('/import', authenticate, async (req: any, res: Response) => {
       data: contact,
     });
   } catch (error: any) {
-    logger.error('Import error:', error);
+    console.error('Import error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -766,7 +765,7 @@ router.post('/bulk-import', authenticate, async (req: any, res: Response) => {
       data: results,
     });
   } catch (error: any) {
-    logger.error('Bulk import error:', error);
+    console.error('Bulk import error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -854,7 +853,7 @@ router.get('/leads', authenticate, async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get IndiaMART leads error:', error);
+    console.error('Get IndiaMART leads error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -876,7 +875,7 @@ router.delete('/disconnect', authenticate, async (req: any, res: Response) => {
       message: 'IndiaMART email integration removed',
     });
   } catch (error: any) {
-    logger.error('Disconnect error:', error);
+    console.error('Disconnect error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

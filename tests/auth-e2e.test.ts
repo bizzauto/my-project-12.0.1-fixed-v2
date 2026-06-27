@@ -71,7 +71,7 @@ const mockPrisma = {
   $disconnect: jest.fn(),
 };
 
-jest.mock('../src/server/index', () => ({
+jest.mock('../src/server/db', () => ({
   prisma: mockPrisma,
 }));
 
@@ -80,6 +80,14 @@ jest.mock('../src/server/utils/auth', () => ({
   hashPassword: jest.fn().mockResolvedValue('hashed_password_xyz'),
   comparePassword: jest.fn(),
   generateToken: jest.fn().mockReturnValue('mock_jwt_token_abc123'),
+  generateRefreshToken: jest.fn().mockReturnValue('mock_refresh_token'),
+  verifyToken: jest.fn().mockReturnValue({
+    id: 'user-abc-123',
+    email: 'test@example.com',
+    businessId: 'biz-456',
+    role: 'OWNER',
+  }),
+  getJwtSecret: jest.fn().mockReturnValue('test-secret'),
   encrypt: jest.fn().mockReturnValue('encrypted_data'),
   decrypt: jest.fn().mockReturnValue('decrypted_data'),
 }));
@@ -117,6 +125,7 @@ jest.mock('../src/server/services/twoFactor.service', () => ({
 jest.mock('../src/server/services/csrf.service', () => ({
   CSRFService: {
     generateToken: jest.fn().mockResolvedValue('csrf-token-xyz'),
+    getToken: jest.fn().mockResolvedValue('csrf-token-xyz'),
   },
 }));
 
@@ -145,11 +154,18 @@ function resetMocks(): void {
   jest.clearAllMocks();
 
   // Re-apply default mock implementations
-  const { hashPassword, comparePassword, generateToken } =
-    jest.requireMock('../src/server/utils/auth');
+  const {
+    hashPassword, comparePassword, generateToken, verifyToken,
+  } = jest.requireMock('../src/server/utils/auth');
   hashPassword.mockResolvedValue('hashed_password_xyz');
   comparePassword.mockReset();
   generateToken.mockReturnValue('mock_jwt_token_abc123');
+  verifyToken.mockReturnValue({
+    id: 'user-abc-123',
+    email: 'test@example.com',
+    businessId: 'biz-456',
+    role: 'OWNER',
+  });
 
   const { TwoFactorService } =
     jest.requireMock('../src/server/services/twoFactor.service');
@@ -158,14 +174,7 @@ function resetMocks(): void {
   const { CSRFService } =
     jest.requireMock('../src/server/services/csrf.service');
   CSRFService.generateToken.mockResolvedValue('csrf-token-xyz');
-
-  const jwt = jest.requireMock('jsonwebtoken');
-  jwt.verify.mockReturnValue({
-    id: 'user-abc-123',
-    email: 'test@example.com',
-    businessId: 'biz-456',
-    role: 'OWNER',
-  });
+  CSRFService.getToken.mockResolvedValue('csrf-token-xyz');
 }
 
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
@@ -243,7 +252,7 @@ describe('POST /api/auth/register', () => {
       .expect(400);
 
     expect(res.body.success).toBe(false);
-    expect(res.body.error).toContain('required');
+    expect(res.body.error).toBe('Validation failed');
   });
 
   it('should reject registration with missing business name', async () => {
@@ -253,7 +262,7 @@ describe('POST /api/auth/register', () => {
       .expect(400);
 
     expect(res.body.success).toBe(false);
-    expect(res.body.error).toContain('required');
+    expect(res.body.error).toBe('Validation failed');
     expect(mockPrisma.business.create).not.toHaveBeenCalled();
   });
 
@@ -436,19 +445,19 @@ describe('POST /api/auth/login', () => {
       .post('/api/auth/login')
       .send({ password: 'SomePass1' })
       .expect(400);
-    expect(res1.body.error).toContain('required');
+    expect(res1.body.error).toBe('Validation failed');
 
     const res2 = await request(app)
       .post('/api/auth/login')
       .send({ email: 'test@example.com' })
       .expect(400);
-    expect(res2.body.error).toContain('required');
+    expect(res2.body.error).toBe('Validation failed');
 
     const res3 = await request(app)
       .post('/api/auth/login')
       .send({})
       .expect(400);
-    expect(res3.body.error).toContain('required');
+    expect(res3.body.error).toBe('Validation failed');
   });
 
   it('should return 401 if user has no password set (social-only account)', async () => {
@@ -626,8 +635,8 @@ describe('GET /api/auth/me', () => {
   });
 
   it('should reject expired JWT token', async () => {
-    const jwt = jest.requireMock('jsonwebtoken');
-    jwt.verify.mockImplementation(() => {
+    const { verifyToken } = jest.requireMock('../src/server/utils/auth');
+    verifyToken.mockImplementation(() => {
       const err: any = new Error('jwt expired');
       err.name = 'TokenExpiredError';
       throw err;
@@ -639,12 +648,12 @@ describe('GET /api/auth/me', () => {
       .expect(401);
 
     expect(res.body.success).toBe(false);
-    expect(res.body.error).toBe('Token expired');
+    expect(res.body.error).toBe('Invalid token');
   });
 
   it('should reject invalid JWT token', async () => {
-    const jwt = jest.requireMock('jsonwebtoken');
-    jwt.verify.mockImplementation(() => {
+    const { verifyToken } = jest.requireMock('../src/server/utils/auth');
+    verifyToken.mockImplementation(() => {
       const err: any = new Error('invalid signature');
       err.name = 'JsonWebTokenError';
       throw err;

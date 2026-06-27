@@ -1,4 +1,3 @@
-import logger from '../utils/logger.js';
 /**
  * Environment Validator
  * Validates all required environment variables on startup
@@ -68,13 +67,13 @@ export function validateEnvironment(): ValidationResult {
     }
   }
 
-  // Security checks
-  if (process.env.JWT_SECRET === 'your-jwt-secret-min-32-chars-long') {
-    errors.push('❌ SECURITY: JWT_SECRET is still the default placeholder value!');
+  // Security checks — catch placeholder values that don't meet minimum length
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    errors.push('❌ SECURITY: JWT_SECRET is too short — must be at least 32 characters');
   }
 
-  if (process.env.ENCRYPTION_KEY === 'your-aes-256-encryption-key-64-hex-chars') {
-    errors.push('❌ SECURITY: ENCRYPTION_KEY is still the default placeholder value!');
+  if (process.env.ENCRYPTION_KEY && !/^[a-f0-9]{64}$/i.test(process.env.ENCRYPTION_KEY)) {
+    errors.push('❌ SECURITY: ENCRYPTION_KEY must be exactly 64 hex characters');
   }
 
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'development') {
@@ -89,22 +88,22 @@ export function validateEnvironment(): ValidationResult {
 }
 
 export function printValidationResult(result: ValidationResult): void {
-  logger.info('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  logger.info('🔍 Environment Configuration Check');
-  logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🔍 Environment Configuration Check');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   if (result.warnings.length > 0) {
-    logger.info('\nWarnings:');
-    result.warnings.forEach(w => logger.info(`  ${w}`));
+    console.log('\nWarnings:');
+    result.warnings.forEach(w => console.log(`  ${w}`));
   }
 
   if (result.errors.length > 0) {
-    logger.info('\nErrors (server will NOT start):');
-    result.errors.forEach(e => logger.info(`  ${e}`));
-    logger.info('\n💡 Fix these in your .env file and restart.');
+    console.log('\nErrors (server will NOT start):');
+    result.errors.forEach(e => console.log(`  ${e}`));
+    console.log('\n💡 Fix these in your .env file and restart.');
   } else {
-    logger.info('\n✅ All required environment variables are configured correctly.');
+    console.log('\n✅ All required environment variables are configured correctly.');
   }
 
-  logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }

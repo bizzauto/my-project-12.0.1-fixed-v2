@@ -1,7 +1,6 @@
 import { simpleParser, EmailAddress } from 'mailparser';
 import { prisma } from '../db.js';
 import { LeadCaptureService } from './lead-capture.service.js';
-import logger from '../utils/logger.js';
 
 /**
  * IndiaMART Email Integration Service
@@ -215,7 +214,7 @@ export class IndiaMARTEmailService {
                       result.processed++;
                       // Note: businessId will be passed from the route
                       result.newLeads++;
-                      logger.info('IndiaMART Lead from email:', leadData.name, leadData.phone);
+                      console.log('IndiaMART Lead from email:', leadData.name, leadData.phone);
                     }
                   } catch (e: any) {
                     result.errors.push(`Parse error: ${e.message}`);
@@ -358,11 +357,11 @@ export class IndiaMARTEmailService {
       const since = options.since || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const limit = 100;
 
-      logger.info(`[IndiaMART] Connecting to IMAP: ${emailConfig.imapHost}:${emailConfig.imapPort}`);
+      console.log(`[IndiaMART] Connecting to IMAP: ${emailConfig.imapHost}:${emailConfig.imapPort}`);
 
       await new Promise<void>((resolve, reject) => {
         imap.once('ready', () => {
-          logger.info(`[IndiaMART] IMAP connected successfully`);
+          console.log(`[IndiaMART] IMAP connected successfully`);
           imap.openBox('INBOX', true, async (err, box) => {
             if (err) {
               imap.end();
@@ -370,7 +369,7 @@ export class IndiaMARTEmailService {
               return;
             }
 
-            logger.info(`[IndiaMART] INBOX opened. Searching for IndiaMART emails since ${since.toISOString()}`);
+            console.log(`[IndiaMART] INBOX opened. Searching for IndiaMART emails since ${since.toISOString()}`);
 
             imap.search(
               [
@@ -388,20 +387,20 @@ export class IndiaMARTEmailService {
               ],
               async (err, results) => {
                 if (err) {
-                  logger.error(`[IndiaMART] Search error:`, err);
+                  console.error(`[IndiaMART] Search error:`, err);
                   imap.end();
                   resolve();
                   return;
                 }
 
                 if (!results || results.length === 0) {
-                  logger.info(`[IndiaMART] No IndiaMART emails found`);
+                  console.log(`[IndiaMART] No IndiaMART emails found`);
                   imap.end();
                   resolve();
                   return;
                 }
 
-                logger.info(`[IndiaMART] Found ${results.length} IndiaMART emails`);
+                console.log(`[IndiaMART] Found ${results.length} IndiaMART emails`);
 
                 const toFetch = results.slice(-limit);
                 const fetch = imap.fetch(toFetch, { bodies: '', struct: true });
@@ -431,7 +430,7 @@ export class IndiaMARTEmailService {
 
                         if (existing) {
                           result.skipped++;
-                          logger.info(`[IndiaMART] Skipping duplicate: ${leadData.name} ${leadData.phone}`);
+                          console.log(`[IndiaMART] Skipping duplicate: ${leadData.name} ${leadData.phone}`);
                           return;
                         }
 
@@ -447,24 +446,24 @@ export class IndiaMARTEmailService {
 
                         result.newLeads++;
                         result.leads.push(contact);
-                        logger.info(`[IndiaMART] New lead captured: ${leadData.name} ${leadData.phone}`);
+                        console.log(`[IndiaMART] New lead captured: ${leadData.name} ${leadData.phone}`);
                       }
                     } catch (e: any) {
                       result.errors.push(`Parse error: ${e.message}`);
-                      logger.error(`[IndiaMART] Parse error:`, e.message);
+                      console.error(`[IndiaMART] Parse error:`, e.message);
                     }
                   });
                 });
 
                 fetch.once('end', () => {
-                  logger.info(`[IndiaMART] Email fetch complete. Processed: ${result.processed}, New: ${result.newLeads}`);
+                  console.log(`[IndiaMART] Email fetch complete. Processed: ${result.processed}, New: ${result.newLeads}`);
                   imap.end();
                   resolve();
                 });
 
                 fetch.once('error', (err) => {
                   result.errors.push(`Fetch error: ${err.message}`);
-                  logger.error(`[IndiaMART] Fetch error:`, err);
+                  console.error(`[IndiaMART] Fetch error:`, err);
                   imap.end();
                   resolve();
                 });
@@ -474,7 +473,7 @@ export class IndiaMARTEmailService {
         });
 
         imap.once('error', (err) => {
-          logger.error(`[IndiaMART] IMAP connection error:`, err);
+          console.error(`[IndiaMART] IMAP connection error:`, err);
           reject(new Error(`IMAP error: ${err.message}`));
         });
 
@@ -491,7 +490,7 @@ export class IndiaMARTEmailService {
       }
     } catch (e: any) {
       result.errors.push(`Process error: ${e.message}`);
-      logger.error(`[IndiaMART] Process error:`, e);
+      console.error(`[IndiaMART] Process error:`, e);
     }
 
     return result;

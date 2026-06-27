@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { cacheResponse } from '../middleware/cache.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -175,7 +174,7 @@ router.get('/dashboard', authenticate, cacheResponse(30), async (req: any, res: 
       },
     });
   } catch (error: any) {
-    logger.error('Get dashboard analytics error:', error);
+    console.error('Get dashboard analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch dashboard analytics',
@@ -276,7 +275,7 @@ router.get('/', authenticate, cacheResponse(60), async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get analytics error:', error);
+    console.error('Get analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch analytics',
@@ -343,32 +342,32 @@ router.get('/messages', authenticate, async (req: any, res: any) => {
     const { period = '30' } = req.query;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - Number(period));
+    const businessId = req.user.businessId;
 
-    const messages = await prisma.message.findMany({
-      where: {
-        contact: { businessId: req.user.businessId },
-        createdAt: { gte: startDate },
-      },
+    const [total, sent, delivered, read, failed] = await Promise.all([
+      prisma.message.count({ where: { contact: { businessId }, createdAt: { gte: startDate } } }),
+      prisma.message.count({ where: { contact: { businessId }, createdAt: { gte: startDate }, status: 'sent' } }),
+      prisma.message.count({ where: { contact: { businessId }, createdAt: { gte: startDate }, status: 'delivered' } }),
+      prisma.message.count({ where: { contact: { businessId }, createdAt: { gte: startDate }, status: 'read' } }),
+      prisma.message.count({ where: { contact: { businessId }, createdAt: { gte: startDate }, status: 'failed' } }),
+    ]);
+
+    const recentMessages = await prisma.message.findMany({
+      where: { contact: { businessId }, createdAt: { gte: startDate } },
       orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: { id: true, content: true, direction: true, status: true, createdAt: true, contactId: true },
     });
-
-    const stats = {
-      total: messages.length,
-      sent: messages.filter((m: any) => m.status === 'sent').length,
-      delivered: messages.filter((m: any) => m.status === 'delivered').length,
-      read: messages.filter((m: any) => m.status === 'read').length,
-      failed: messages.filter((m: any) => m.status === 'failed').length,
-    };
 
     res.json({
       success: true,
       data: {
-        stats,
-        messages: messages.slice(0, 50),
+        stats: { total, sent, delivered, read, failed },
+        messages: recentMessages,
       },
     });
   } catch (error: any) {
-    logger.error('Get messages analytics error:', error);
+    console.error('Get messages analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch messages analytics',
@@ -380,27 +379,31 @@ router.get('/messages', authenticate, async (req: any, res: any) => {
 // Get campaigns analytics
 router.get('/campaigns', authenticate, cacheResponse(30), async (req: any, res: any) => {
   try {
-    const campaigns = await prisma.campaign.findMany({
-      where: { businessId: req.user.businessId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const businessId = req.user.businessId;
 
-    const stats = {
-      total: campaigns.length,
-      active: campaigns.filter((c: any) => c.status === 'active').length,
-      paused: campaigns.filter((c: any) => c.status === 'paused').length,
-      completed: campaigns.filter((c: any) => c.status === 'completed').length,
-    };
+    const [total, active, paused, completed] = await Promise.all([
+      prisma.campaign.count({ where: { businessId } }),
+      prisma.campaign.count({ where: { businessId, status: 'active' } }),
+      prisma.campaign.count({ where: { businessId, status: 'paused' } }),
+      prisma.campaign.count({ where: { businessId, status: 'completed' } }),
+    ]);
+
+    const recentCampaigns = await prisma.campaign.findMany({
+      where: { businessId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { id: true, name: true, status: true, type: true, createdAt: true, scheduledAt: true },
+    });
 
     res.json({
       success: true,
       data: {
-        stats,
-        campaigns,
+        stats: { total, active, paused, completed },
+        campaigns: recentCampaigns,
       },
     });
   } catch (error: any) {
-    logger.error('Get campaigns analytics error:', error);
+    console.error('Get campaigns analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch campaigns analytics',
@@ -415,41 +418,41 @@ router.get('/social', authenticate, cacheResponse(60), async (req: any, res: any
     const { period = '30' } = req.query;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - Number(period));
+    const businessId = req.user.businessId;
 
-    const posts = await prisma.post.findMany({
-      where: {
-        businessId: req.user.businessId,
-        createdAt: { gte: startDate },
-      },
+    const [total, published, scheduled, draft] = await Promise.all([
+      prisma.post.count({ where: { businessId, createdAt: { gte: startDate } } }),
+      prisma.post.count({ where: { businessId, createdAt: { gte: startDate }, status: 'published' } }),
+      prisma.post.count({ where: { businessId, createdAt: { gte: startDate }, status: 'scheduled' } }),
+      prisma.post.count({ where: { businessId, createdAt: { gte: startDate }, status: 'draft' } }),
+    ]);
+
+    const recentPosts = await prisma.post.findMany({
+      where: { businessId, createdAt: { gte: startDate } },
       orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: { id: true, content: true, status: true, platforms: true, createdAt: true },
     });
 
-    const stats = {
-      total: posts.length,
-      published: posts.filter((p: any) => p.status === 'published').length,
-      scheduled: posts.filter((p: any) => p.status === 'scheduled').length,
-      draft: posts.filter((p: any) => p.status === 'draft').length,
-    };
-
-    const byPlatform = posts.reduce((acc: any, post: any) => {
+    const byPlatform: Record<string, number> = {};
+    for (const post of recentPosts) {
       if (post.platforms) {
-        post.platforms.forEach((platform: string) => {
-          acc[platform] = (acc[platform] || 0) + 1;
-        });
+        for (const platform of post.platforms) {
+          byPlatform[platform] = (byPlatform[platform] || 0) + 1;
+        }
       }
-      return acc;
-    }, {});
+    }
 
     res.json({
       success: true,
       data: {
-        stats,
+        stats: { total, published, scheduled, draft },
         byPlatform,
-        posts: posts.slice(0, 50),
+        posts: recentPosts,
       },
     });
   } catch (error: any) {
-    logger.error('Get social analytics error:', error);
+    console.error('Get social analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch social analytics',
@@ -528,7 +531,7 @@ router.get('/roi', authenticate, cacheResponse(60), async (req: any, res: any) =
       data: roiData,
     });
   } catch (error: any) {
-    logger.error('Get ROI analytics error:', error);
+    console.error('Get ROI analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch ROI analytics',
@@ -601,7 +604,7 @@ router.get('/funnel', authenticate, cacheResponse(60), async (req: any, res: any
       },
     });
   } catch (error: any) {
-    logger.error('Get funnel analytics error:', error);
+    console.error('Get funnel analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch funnel analytics',
@@ -645,7 +648,7 @@ router.get('/contacts', authenticate, cacheResponse(60), async (req: any, res: a
       },
     });
   } catch (error: any) {
-    logger.error('Get contacts analytics error:', error);
+    console.error('Get contacts analytics error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch contacts analytics',

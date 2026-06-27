@@ -1,19 +1,12 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { prisma } from '../db.js';
-import logger from '../utils/logger.js';
 
 // Initialize Razorpay
-const razorpayKey = process.env.RAZORPAY_KEY_ID;
-const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
-const razorpay = razorpayKey && razorpaySecret
-  ? new Razorpay({ key_id: razorpayKey, key_secret: razorpaySecret })
-  : null;
-
-function requireRazorpay(): Razorpay {
-  if (!razorpay) throw new Error('Razorpay not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.');
-  return razorpay;
-}
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID!,
+  key_secret: process.env.RAZORPAY_KEY_SECRET!,
+});
 
 // Plan pricing
 export const PLAN_PRICES: Record<string, { month: number; year: number }> = {
@@ -58,7 +51,7 @@ export const createRazorpayOrder = async (
       },
     };
 
-    const order = await requireRazorpay().orders.create(options);
+    const order = await razorpay.orders.create(options);
 
     return {
       success: true,
@@ -70,7 +63,7 @@ export const createRazorpayOrder = async (
       },
     };
   } catch (error: any) {
-    logger.error('Razorpay order creation failed:', error);
+    console.error('Razorpay order creation failed:', error);
     return {
       success: false,
       error: error.message || 'Failed to create payment order',
@@ -87,13 +80,16 @@ export const verifyPaymentSignature = (
   try {
     const body = razorpayOrderId + '|' + razorpayPaymentId;
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'your_razorpay_secret_key')
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
       .update(body.toString())
       .digest('hex');
 
-    return expectedSignature === razorpaySignature;
+    const expectedBuf = Buffer.from(expectedSignature, 'hex');
+    const receivedBuf = Buffer.from(razorpaySignature, 'hex');
+    if (expectedBuf.length !== receivedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
   } catch (error) {
-    logger.error('Payment verification failed:', error);
+    console.error('Payment verification failed:', error);
     return false;
   }
 };
@@ -141,10 +137,10 @@ export const handleWebhook = async (event: string, payload: any) => {
         const plan = (notes.plan || 'STARTER').toUpperCase();
         const duration = (notes.duration || 'month').toLowerCase();
 
-        logger.info('Payment captured:', payment.id, 'Business:', businessId, 'Plan:', plan);
+        console.log('Payment captured:', payment.id, 'Business:', businessId, 'Plan:', plan);
 
         if (!businessId) {
-          logger.warn('[Razorpay] payment.captured missing businessId in notes');
+          console.warn('[Razorpay] payment.captured missing businessId in notes');
           break;
         }
 
@@ -202,7 +198,7 @@ export const handleWebhook = async (event: string, payload: any) => {
           });
         });
 
-        logger.info('[Razorpay] Business plan updated:', businessId, '→', plan);
+        console.log('[Razorpay] Business plan updated:', businessId, '→', plan);
         break;
       }
 
@@ -212,7 +208,7 @@ export const handleWebhook = async (event: string, payload: any) => {
         const businessId = notes.businessId;
         const errorDesc = payment.error_description || 'Unknown error';
 
-        logger.info('Payment failed:', payment.id, errorDesc);
+        console.log('Payment failed:', payment.id, errorDesc);
 
         if (businessId) {
           await prisma.activity.create({
@@ -230,7 +226,7 @@ export const handleWebhook = async (event: string, payload: any) => {
 
       case 'subscription.charged': {
         const subscription = payload.subscription;
-        logger.info('Subscription charged:', subscription.id);
+        console.log('Subscription charged:', subscription.id);
 
         // Update subscription end date (+1 cycle)
         const existingSub = await prisma.subscription.findFirst({
@@ -249,7 +245,7 @@ export const handleWebhook = async (event: string, payload: any) => {
 
       case 'subscription.cancelled': {
         const subscription = payload.subscription;
-        logger.info('Subscription cancelled:', subscription.id);
+        console.log('Subscription cancelled:', subscription.id);
 
         // Downgrade to FREE
         const existingSub = await prisma.subscription.findFirst({
@@ -283,12 +279,12 @@ export const handleWebhook = async (event: string, payload: any) => {
       }
 
       default:
-        logger.info('Unhandled webhook event:', event);
+        console.log('Unhandled webhook event:', event);
     }
 
     return { success: true };
   } catch (error: any) {
-    logger.error('Webhook handling failed:', error);
+    console.error('Webhook handling failed:', error);
     return { success: false, error: error.message };
   }
 };
@@ -300,7 +296,7 @@ export const createSubscriptionPlan = async (
   interval: string
 ) => {
   try {
-    const plan = await requireRazorpay().plans.create({
+    const plan = await razorpay.plans.create({
       period: interval === 'month' ? 'monthly' : 'yearly',
       interval: 1, // Every 1 period
       item: {
@@ -319,7 +315,7 @@ export const createSubscriptionPlan = async (
       },
     };
   } catch (error: any) {
-    logger.error('Failed to create subscription plan:', error);
+    console.error('Failed to create subscription plan:', error);
     return {
       success: false,
       error: error.message || 'Failed to create subscription plan',
@@ -334,7 +330,7 @@ export const createSubscription = async (
   total_count: number
 ) => {
   try {
-    const subscription = await (requireRazorpay().subscriptions.create as any)({
+    const subscription = await (razorpay.subscriptions.create as any)({
       plan_id: planId,
       customer_id: customerId,
       total_count,
@@ -346,7 +342,7 @@ export const createSubscription = async (
       data: subscription,
     };
   } catch (error: any) {
-    logger.error('Failed to create subscription:', error);
+    console.error('Failed to create subscription:', error);
     return {
       success: false,
       error: error.message || 'Failed to create subscription',
@@ -357,13 +353,13 @@ export const createSubscription = async (
 // Cancel subscription
 export const cancelSubscription = async (subscriptionId: string) => {
   try {
-    const subscription = await requireRazorpay().subscriptions.cancel(subscriptionId);
+    const subscription = await razorpay.subscriptions.cancel(subscriptionId);
     return {
       success: true,
       data: subscription,
     };
   } catch (error: any) {
-    logger.error('Failed to cancel subscription:', error);
+    console.error('Failed to cancel subscription:', error);
     return {
       success: false,
       error: error.message || 'Failed to cancel subscription',
@@ -374,13 +370,13 @@ export const cancelSubscription = async (subscriptionId: string) => {
 // Fetch subscription
 export const fetchSubscription = async (subscriptionId: string) => {
   try {
-    const subscription = await requireRazorpay().subscriptions.fetch(subscriptionId);
+    const subscription = await razorpay.subscriptions.fetch(subscriptionId);
     return {
       success: true,
       data: subscription,
     };
   } catch (error: any) {
-    logger.error('Failed to fetch subscription:', error);
+    console.error('Failed to fetch subscription:', error);
     return {
       success: false,
       error: error.message || 'Failed to fetch subscription',

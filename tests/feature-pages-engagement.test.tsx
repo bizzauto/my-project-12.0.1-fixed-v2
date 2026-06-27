@@ -29,7 +29,7 @@ import AppointmentsPage from '../src/components/AppointmentsPage';
 
 // ======== Test helpers ========
 const renderWithProviders = (ui: React.ReactElement, options?: Omit<RenderOptions, 'wrapper'>) =>
-  render(ui, { wrapper: ({ children }) => <BrowserRouter>{children}</BrowserRouter>, ...options });
+  render(ui, { wrapper: ({ children }: { children: React.ReactNode }) => <BrowserRouter>{children}</BrowserRouter>, ...options });
 
 const renderWithRouter = (ui: React.ReactElement) => renderWithProviders(ui);
 
@@ -155,10 +155,10 @@ describe('AppointmentsPage', () => {
     });
   });
 
-  it('shows view mode tabs (Calendar, List, Services)', async () => {
+  it('shows view mode tabs (Month, List, Services)', async () => {
     renderWithRouter(<AppointmentsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Calendar')).toBeInTheDocument();
+      expect(screen.getByText('Month')).toBeInTheDocument();
       expect(screen.getByText('List')).toBeInTheDocument();
       expect(screen.getByText('Services')).toBeInTheDocument();
     });

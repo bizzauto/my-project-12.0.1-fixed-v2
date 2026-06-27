@@ -7,7 +7,6 @@ import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EmailService } from '../services/email.service.js';
 import { handleLeadCapture as triggerLeadWorkflows } from '../services/ai-auto-reply.service.js';
 import rateLimit from 'express-rate-limit';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -55,7 +54,7 @@ router.post('/indiamart/:businessId', leadCaptureLimiter, validateWebhook, async
       data: contact,
     });
   } catch (error: any) {
-    logger.error('IndiaMART lead capture error:', error);
+    console.error('IndiaMART lead capture error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -92,7 +91,7 @@ router.post('/justdial/:businessId', leadCaptureLimiter, validateWebhook, async 
       data: contact,
     });
   } catch (error: any) {
-    logger.error('JustDial lead capture error:', error);
+    console.error('JustDial lead capture error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -130,7 +129,7 @@ router.post('/facebook/:businessId', leadCaptureLimiter, validateWebhook, async 
       data: contact,
     });
   } catch (error: any) {
-    logger.error('Facebook lead capture error:', error);
+    console.error('Facebook lead capture error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -167,7 +166,7 @@ router.post('/instagram/:businessId', leadCaptureLimiter, validateWebhook, async
       data: contact,
     });
   } catch (error: any) {
-    logger.error('Instagram lead capture error:', error);
+    console.error('Instagram lead capture error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -235,7 +234,7 @@ router.post('/manual', authenticate, leadCaptureLimiter, async (req: AuthRequest
           contact: { id: contact.id, name: leadData.name, phone: leadData.phone, email: leadData.email, company: leadData.company },
           source: 'manual',
           contactId: contact.id,
-        }).catch((e: any) => logger.error('[Manual Lead] Workflow trigger failed:', e.message));
+        }).catch((e: any) => console.error('[Manual Lead] Workflow trigger failed:', e.message));
         break;
       default:
         return res.status(400).json({
@@ -250,7 +249,7 @@ router.post('/manual', authenticate, leadCaptureLimiter, async (req: AuthRequest
       data: contact,
     });
   } catch (error: any) {
-    logger.error('Manual lead capture error:', error);
+    console.error('Manual lead capture error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -321,7 +320,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('List leads error:', error);
+    console.error('List leads error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -369,7 +368,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Lead stats error:', error);
+    console.error('Lead stats error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -413,7 +412,7 @@ router.post('/export/csv', authenticate, async (req: AuthRequest, res: Response)
     res.setHeader('Content-Disposition', 'attachment; filename=leads_export.csv');
     res.send(csv);
   } catch (error: any) {
-    logger.error('CSV export error:', error);
+    console.error('CSV export error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -456,7 +455,7 @@ router.post('/export/excel', authenticate, async (req: AuthRequest, res: Respons
     res.setHeader('Content-Disposition', 'attachment; filename=leads_export.xlsx');
     res.send(csv);
   } catch (error: any) {
-    logger.error('Excel export error:', error);
+    console.error('Excel export error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -475,7 +474,7 @@ router.post('/export/sheets', authenticate, async (req: AuthRequest, res: Respon
     const result = await GoogleSheetsService.syncContacts(businessId, {});
     res.json({ success: true, url: result.spreadsheetUrl, synced: result.synced });
   } catch (error: any) {
-    logger.error('Sheets export error:', error);
+    console.error('Sheets export error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -538,7 +537,7 @@ router.post('/bulk-reply', authenticate, async (req: AuthRequest, res: Response)
 
     res.json({ success: true, sent, total: contacts.length, errors: errors.length > 0 ? errors : undefined });
   } catch (error: any) {
-    logger.error('Bulk reply error:', error);
+    console.error('Bulk reply error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -564,7 +563,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     await prisma.contact.delete({ where: { id } });
     res.json({ success: true, message: 'Lead deleted' });
   } catch (error: any) {
-    logger.error('Delete lead error:', error);
+    console.error('Delete lead error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -605,7 +604,7 @@ router.post('/webhook-secret', authenticate, async (req: AuthRequest, res: Respo
       data: { secret },
     });
   } catch (error: any) {
-    logger.error('Generate webhook secret error:', error);
+    console.error('Generate webhook secret error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -642,7 +641,7 @@ router.get('/webhook-secret', authenticate, async (req: AuthRequest, res: Respon
       },
     });
   } catch (error: any) {
-    logger.error('Get webhook secret error:', error);
+    console.error('Get webhook secret error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -650,9 +649,9 @@ router.get('/webhook-secret', authenticate, async (req: AuthRequest, res: Respon
 /**
  * POST /api/leads/capture/:businessId
  * Public lead capture endpoint for website forms
- * Requires x-webhook-secret header
+ * No authentication required - rate limited
  */
-router.post('/capture/:businessId', leadCaptureLimiter, validateWebhook, async (req: Request, res: Response) => {
+router.post('/capture/:businessId', leadCaptureLimiter, async (req: Request, res: Response) => {
   try {
     const { businessId } = req.params as { businessId: string };
     const { name, phone, email, company, product, requirement, city, supplier, source: src } = req.body;
@@ -688,7 +687,7 @@ router.post('/capture/:businessId', leadCaptureLimiter, validateWebhook, async (
           `Hi ${name || 'there'}! 👋\n\nThank you for your inquiry about ${product || 'our products'}.\n\nWe've received your requirement and our team will get back to you shortly.\n\nBest regards,\n${business?.name || 'Our Team'}`;
         await WhatsAppService.sendTextMessage(businessId, phone, msg, { messageId: contact.id });
       } catch (e: any) {
-        logger.error('Auto-reply WhatsApp failed:', e.message);
+        console.error('Auto-reply WhatsApp failed:', e.message);
       }
     }
 
@@ -701,7 +700,7 @@ router.post('/capture/:businessId', leadCaptureLimiter, validateWebhook, async (
           `<h2>Thank you for contacting us!</h2><p>Dear ${name || 'there'},</p><p>We have received your inquiry about <strong>${product || 'our products'}</strong>.</p><p>Our team will get back to you shortly.</p><p>Best regards,<br/>Our Team</p>`
         );
       } catch (e: any) {
-        logger.error('Auto-reply email failed:', e.message);
+        console.error('Auto-reply email failed:', e.message);
       }
     }
 
@@ -724,11 +723,11 @@ router.post('/capture/:businessId', leadCaptureLimiter, validateWebhook, async (
       contact: { id: contact.id, name, phone, email, company },
       source: src || 'website',
       contactId: contact.id,
-    }).catch((e: any) => logger.error('[Public Lead] Workflow trigger failed:', e.message));
+    }).catch((e: any) => console.error('[Public Lead] Workflow trigger failed:', e.message));
 
     res.json({ success: true, message: 'Lead captured successfully', data: contact });
   } catch (error: any) {
-    logger.error('Public lead capture error:', error);
+    console.error('Public lead capture error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

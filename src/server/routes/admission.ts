@@ -3,14 +3,18 @@ import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import multer from 'multer';
 import path from 'path';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
-// Configure multer for file uploads
+// Configure multer for file uploads with business-scoped subdirectory
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    const businessId = (req as any).user?.businessId || 'unknown';
+    const dir = `uploads/${businessId}`;
+    import('fs').then(fs => {
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    }).catch(() => cb(null, 'uploads/'));
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -140,7 +144,7 @@ router.post('/submit', authenticate, upload.fields([
       }
     });
   } catch (error: any) {
-    logger.error('Admission form submission error:', error);
+    console.error('Admission form submission error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to submit admission form',

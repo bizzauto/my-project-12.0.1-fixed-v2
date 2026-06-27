@@ -1,7 +1,6 @@
 import { prisma } from '../db.js';
 import path from 'path';
 import fs from 'fs';
-import logger from '../utils/logger.js';
 
 const MEDIA_RETENTION_DAYS = 90;
 const WARNING_DAYS = 85;
@@ -379,7 +378,7 @@ class WhatsAppMediaCleanupService {
     let freedSpace = 0;
 
     // Log admin action
-    logger.info(`[MediaCleanup] Admin ${adminUserId} approved deletion of ${fileIds.length} files. Reason: ${reason}`);
+    console.log(`[MediaCleanup] Admin ${adminUserId} approved deletion of ${fileIds.length} files. Reason: ${reason}`);
 
     for (const fileId of fileIds) {
       // Find file by ID
@@ -420,7 +419,7 @@ class WhatsAppMediaCleanupService {
           failed++;
         }
       } catch (error) {
-        logger.error(`[MediaCleanup] Failed to delete ${file.filepath}:`, error);
+        console.error(`[MediaCleanup] Failed to delete ${file.filepath}:`, error);
         failed++;
       }
     }
@@ -451,17 +450,17 @@ class WhatsAppMediaCleanupService {
   static async runScheduledCleanup(): Promise<void> {
     const stats = await this.getCleanupStats();
     
-    logger.info(`[MediaCleanup] Scheduled scan: ${stats.totalFiles} total, ${stats.oldFiles} old (${stats.oldFilesSize} bytes)`);
+    console.log(`[MediaCleanup] Scheduled scan: ${stats.totalFiles} total, ${stats.oldFiles} old (${stats.oldFilesSize} bytes)`);
 
     // Send warnings for files approaching 90 days
     if (stats.warnings.length > 0) {
       await this.sendWarningsToUsers();
-      logger.info(`[MediaCleanup] Sent ${stats.warnings.length} warnings`);
+      console.log(`[MediaCleanup] Sent ${stats.warnings.length} warnings`);
     }
 
     // Log stats for monitoring
     if (stats.oldFiles > 0) {
-      logger.info(`[MediaCleanup] WARNING: ${stats.oldFiles} files pending deletion (admin approval required)`);
+      console.log(`[MediaCleanup] WARNING: ${stats.oldFiles} files pending deletion (admin approval required)`);
     }
   }
 

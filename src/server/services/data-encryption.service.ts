@@ -1,7 +1,4 @@
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import logger from '../utils/logger.js';
 
 /**
  * Data Encryption Service
@@ -13,51 +10,8 @@ const IV_LENGTH = 16;
 const TAG_LENGTH = 16;
 const SALT_LENGTH = 64;
 
-// Use ENCRYPTION_KEY from env, fallback to DATA_ENCRYPTION_KEY, then persist to .encryption.key in dev
-// This ensures encrypted data survives restarts (same mechanism as auth.ts)
-function resolveEncryptionKey(): string {
-  const fromEnv = process.env.ENCRYPTION_KEY || process.env.DATA_ENCRYPTION_KEY;
-  if (fromEnv) return fromEnv;
-
-  const isProd = process.env.NODE_ENV === 'production';
-  if (isProd) {
-    throw new Error('CRITICAL: ENCRYPTION_KEY environment variable is not set. Server cannot start in production without it.');
-  }
-
-  // Dev fallback: persist to .encryption.key file so data survives restarts
-  const keyFile = path.resolve(process.cwd(), '.encryption.key');
-  try {
-    if (fs.existsSync(keyFile)) {
-      const existing = fs.readFileSync(keyFile, 'utf8').trim();
-      if (existing.length === 64) {
-        logger.info('[DataEncryption] Loaded existing encryption key from .encryption.key');
-        return existing;
-      }
-      logger.warn('[DataEncryption] Existing .encryption.key is invalid, generating new one...');
-    }
-  } catch (e) {
-    // Ignore — will generate new
-  }
-
-  const newKey = crypto.randomBytes(32).toString('hex');
-  try {
-    fs.writeFileSync(keyFile, newKey, 'utf8');
-    logger.info('[DataEncryption] Generated new encryption key → .encryption.key (DO NOT COMMIT)');
-    // Add to .gitignore if not already there
-    const gitignorePath = path.resolve(process.cwd(), '.gitignore');
-    if (fs.existsSync(gitignorePath)) {
-      let gitignore = fs.readFileSync(gitignorePath, 'utf8');
-      if (!gitignore.includes('.encryption.key')) {
-        fs.writeFileSync(gitignorePath, gitignore + '\n# Dev encryption key (auto-generated)\n.encryption.key\n', 'utf8');
-      }
-    }
-  } catch (e) {
-    logger.warn('[DataEncryption] Could not persist encryption key to file. Data will be lost on restart.');
-  }
-  return newKey;
-}
-
-const ENCRYPTION_KEY = resolveEncryptionKey();
+// Use environment variable or generate a secure key
+const ENCRYPTION_KEY = process.env.DATA_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 
 /**
  * Encrypt sensitive data (phone, email, address, etc.)
@@ -105,7 +59,7 @@ export function decryptData(ciphertext: string): string {
     
     return decrypted;
   } catch (error) {
-    logger.error('[Encryption] Decryption failed:', error);
+    console.error('[Encryption] Decryption failed:', error);
     return ciphertext; // Return as-is if decryption fails
   }
 }

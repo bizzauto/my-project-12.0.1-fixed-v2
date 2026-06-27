@@ -1,15 +1,14 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from './utils/auth.js';
 import { default as redisClient } from './services/redis.service.js';
 import { checkConnectionLimit, checkMessageLimit, cleanupSocketLimits, startRateLimitCleanup } from './middleware/websocket-rate-limit.js';
-import { getJwtSecret } from './utils/auth.js';
-import logger from './utils/logger.js';
 
 export function setupWebSocket(httpServer: HttpServer) {
   const io = new SocketServer(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'https://bizzautoai.com',
+      origin: process.env.FRONTEND_URL || 'https://bizzautoai.com',
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -39,6 +38,17 @@ export function setupWebSocket(httpServer: HttpServer) {
       }
 
       const decoded = jwt.verify(token as string, getJwtSecret()) as any;
+
+      // Verify user still exists and is active
+      const { prisma } = await import('./db.js');
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { id: true, isActive: true },
+      });
+      if (!user || !user.isActive) {
+        return next(new Error('User not found or deactivated'));
+      }
+
       socket.userId = decoded.userId;
       socket.businessId = decoded.businessId;
       socket.plan = decoded.plan || 'FREE';
@@ -49,7 +59,7 @@ export function setupWebSocket(httpServer: HttpServer) {
   });
 
   io.on('connection', async (socket: Socket) => {
-    logger.info(`🔌 User connected: ${socket.userId} (Business: ${socket.businessId})`);
+    console.log(`🔌 User connected: ${socket.userId} (Business: ${socket.businessId})`);
 
     // Join user's business room
     if (socket.businessId) {
@@ -146,7 +156,7 @@ export function setupWebSocket(httpServer: HttpServer) {
 
     // Handle disconnect
     socket.on('disconnect', async () => {
-      logger.info(`🔌 User disconnected: ${socket.userId}`);
+      console.log(`🔌 User disconnected: ${socket.userId}`);
       cleanupSocketLimits(socket.id);
       if (redisClient) {
         await redisClient?.hdel(`socket:${socket.userId}`, 'socketId');

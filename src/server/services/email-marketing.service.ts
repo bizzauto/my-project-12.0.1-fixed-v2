@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import logger from '../utils/logger.js';
 
 interface EmailTemplate {
   id: string;
@@ -139,7 +138,7 @@ export class EmailMarketingService {
       });
     }
 
-    logger.info(`📧 Sending email to ${to}: ${processedSubject}`);
+    console.log(`📧 Sending email to ${to}: ${processedSubject}`);
 
     return {
       success: true,

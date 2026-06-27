@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -57,7 +56,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: any) => {
 
     res.json({ success: true, data: { pipelines: result } });
   } catch (error: any) {
-    logger.error('Get pipelines error:', error);
+    console.error('Get pipelines error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch pipelines', details: error.message });
   }
 });
@@ -98,7 +97,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: any) => {
 
     res.status(201).json({ success: true, data: pipeline });
   } catch (error: any) {
-    logger.error('Create pipeline error:', error);
+    console.error('Create pipeline error:', error);
     res.status(500).json({ success: false, error: 'Failed to create pipeline', details: error.message });
   }
 });
@@ -132,7 +131,7 @@ router.post('/:id/stages', authenticate, async (req: AuthRequest, res: any) => {
 
     res.status(201).json({ success: true, data: stage });
   } catch (error: any) {
-    logger.error('Create stage error:', error);
+    console.error('Create stage error:', error);
     res.status(500).json({ success: false, error: 'Failed to create stage', details: error.message });
   }
 });
@@ -161,7 +160,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: any) => {
 
     res.json({ success: true, message: 'Pipeline deleted' });
   } catch (error: any) {
-    logger.error('Delete pipeline error:', error);
+    console.error('Delete pipeline error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete pipeline', details: error.message });
   }
 });

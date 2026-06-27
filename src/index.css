@@ -407,7 +407,6 @@ body {
   margin: 0;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Custom scrollbar */
@@ -439,6 +438,11 @@ body {
 
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
+}
+
+/* Dark mode transitions */
+body {
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Dark mode background */

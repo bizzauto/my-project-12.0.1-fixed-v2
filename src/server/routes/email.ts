@@ -3,7 +3,6 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { EmailService } from '../services/email.service.js';
 import { prisma } from '../db.js';
 import crypto from 'crypto';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -27,7 +26,7 @@ router.post('/test', authenticate, async (req: AuthRequest, res: Response) => {
       });
     }
   } catch (error: any) {
-    logger.error('Email test error:', error);
+    console.error('Email test error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -53,7 +52,7 @@ router.post('/test-connection', authenticate, async (req: AuthRequest, res: Resp
       });
     }
   } catch (error: any) {
-    logger.error('Email test connection error:', error);
+    console.error('Email test connection error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -417,7 +416,7 @@ router.post('/password-reset', async (req: Request, res: Response) => {
         resetToken
       );
     } catch (emailError) {
-      logger.error('Failed to send reset email:', emailError);
+      console.error('Failed to send reset email:', emailError);
     }
 
     res.json({
@@ -425,7 +424,7 @@ router.post('/password-reset', async (req: Request, res: Response) => {
       message: 'If an account exists, a reset email has been sent',
     });
   } catch (error: any) {
-    logger.error('Password reset error:', error);
+    console.error('Password reset error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -486,7 +485,7 @@ router.post('/password-reset/confirm', async (req: Request, res: Response) => {
       message: 'Password has been reset',
     });
   } catch (error: any) {
-    logger.error('Password reset confirm error:', error);
+    console.error('Password reset confirm error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

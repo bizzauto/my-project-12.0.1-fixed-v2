@@ -4,7 +4,6 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { cacheResponse } from '../middleware/cache.js';
 import { createInvoiceSchema, updateInvoiceSchema, markInvoicePaidSchema } from '../validations/crm-schemas.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -96,7 +95,7 @@ router.get('/', authenticate, cacheResponse(15), async (req: AuthRequest, res: a
       },
     });
   } catch (error: any) {
-    logger.error('Get invoices error:', error);
+    console.error('Get invoices error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch invoices', details: error.message });
   }
 });
@@ -148,7 +147,7 @@ router.post('/', authenticate, validate(createInvoiceSchema), async (req: AuthRe
 
     res.status(201).json({ success: true, data: mapDocToInvoice(doc) });
   } catch (error: any) {
-    logger.error('Create invoice error:', error);
+    console.error('Create invoice error:', error);
     res.status(500).json({ success: false, error: 'Failed to create invoice', details: error.message });
   }
 });
@@ -175,7 +174,7 @@ router.put('/:id', authenticate, validate(updateInvoiceSchema), async (req: Auth
     if (paymentMethod !== undefined) newContent.paymentMethod = paymentMethod;
 
     const updated = await prisma.document.update({
-      where: { id },
+      where: { id, businessId },
       data: {
         ...(status !== undefined && { status }),
         content: newContent,
@@ -184,7 +183,7 @@ router.put('/:id', authenticate, validate(updateInvoiceSchema), async (req: Auth
 
     res.json({ success: true, data: mapDocToInvoice(updated) });
   } catch (error: any) {
-    logger.error('Update invoice error:', error);
+    console.error('Update invoice error:', error);
     res.status(500).json({ success: false, error: 'Failed to update invoice', details: error.message });
   }
 });
@@ -206,7 +205,7 @@ router.put('/:id/pay', authenticate, validate(markInvoicePaidSchema), async (req
     const existingContent = (existing.content as any) || {};
 
     const updated = await prisma.document.update({
-      where: { id },
+      where: { id, businessId },
       data: {
         status: 'paid',
         content: {
@@ -219,7 +218,7 @@ router.put('/:id/pay', authenticate, validate(markInvoicePaidSchema), async (req
 
     res.json({ success: true, data: mapDocToInvoice(updated) });
   } catch (error: any) {
-    logger.error('Mark invoice paid error:', error);
+    console.error('Mark invoice paid error:', error);
     res.status(500).json({ success: false, error: 'Failed to mark invoice as paid', details: error.message });
   }
 });
@@ -238,10 +237,10 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: any) => {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
 
-    await prisma.document.delete({ where: { id } });
+    await prisma.document.delete({ where: { id, businessId } });
     res.json({ success: true, message: 'Invoice deleted' });
   } catch (error: any) {
-    logger.error('Delete invoice error:', error);
+    console.error('Delete invoice error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete invoice', details: error.message });
   }
 });

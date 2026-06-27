@@ -10,6 +10,7 @@ const PLAN_LIMITS: Record<string, RateLimitConfig> = {
   STARTER: { windowMs: 60000, maxRequests: 50 },   // 50 req/min
   GROWTH: { windowMs: 60000, maxRequests: 200 },   // 200 req/min
   PRO: { windowMs: 60000, maxRequests: 500 },      // 500 req/min
+  AGENCY: { windowMs: 60000, maxRequests: 1000 },  // 1000 req/min
   ENTERPRISE: { windowMs: 60000, maxRequests: 2000 }, // 2000 req/min
 };
 
@@ -20,6 +21,7 @@ const messageRateLimits: Record<string, number> = {
   STARTER: 200,   // 200 messages/min
   GROWTH: 500,    // 500 messages/min
   PRO: 1000,      // 1000 messages/min
+  AGENCY: 3000,   // 3000 messages/min
   ENTERPRISE: 3000, // 3000 messages/min
 };
 

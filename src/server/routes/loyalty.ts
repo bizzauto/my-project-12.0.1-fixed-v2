@@ -1,7 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -14,7 +13,7 @@ router.get('/program', authenticate, async (req: AuthRequest, res: Response) => 
 
     res.json({ success: true, data: program });
   } catch (error: any) {
-    logger.error('Get loyalty program error:', error);
+    console.error('Get loyalty program error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch loyalty program', details: error.message });
   }
 });
@@ -57,7 +56,7 @@ router.post('/program', authenticate, async (req: AuthRequest, res: Response) =>
 
     res.json({ success: true, data: program });
   } catch (error: any) {
-    logger.error('Create/update loyalty program error:', error);
+    console.error('Create/update loyalty program error:', error);
     res.status(500).json({ success: false, error: 'Failed to save loyalty program', details: error.message });
   }
 });
@@ -118,7 +117,7 @@ router.get('/points/:contactId', authenticate, async (req: AuthRequest, res: Res
       },
     });
   } catch (error: any) {
-    logger.error('Get contact points error:', error);
+    console.error('Get contact points error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch points history', details: error.message });
   }
 });
@@ -184,7 +183,7 @@ router.post('/points/earn', authenticate, async (req: AuthRequest, res: Response
 
     res.json({ success: true, message: `${Math.round(points)} points earned`, data: earnedPoints });
   } catch (error: any) {
-    logger.error('Earn points error:', error);
+    console.error('Earn points error:', error);
     res.status(500).json({ success: false, error: 'Failed to earn points', details: error.message });
   }
 });
@@ -275,7 +274,7 @@ router.post('/points/redeem', authenticate, async (req: AuthRequest, res: Respon
       },
     });
   } catch (error: any) {
-    logger.error('Redeem points error:', error);
+    console.error('Redeem points error:', error);
     res.status(500).json({ success: false, error: 'Failed to redeem points', details: error.message });
   }
 });
@@ -298,7 +297,7 @@ router.get('/rewards', authenticate, async (req: AuthRequest, res: Response) => 
 
     res.json({ success: true, data: rewards });
   } catch (error: any) {
-    logger.error('List rewards error:', error);
+    console.error('List rewards error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch rewards', details: error.message });
   }
 });
@@ -336,7 +335,7 @@ router.post('/rewards', authenticate, async (req: AuthRequest, res: Response) =>
 
     res.status(201).json({ success: true, data: reward });
   } catch (error: any) {
-    logger.error('Create reward error:', error);
+    console.error('Create reward error:', error);
     res.status(500).json({ success: false, error: 'Failed to create reward', details: error.message });
   }
 });
@@ -371,7 +370,7 @@ router.put('/rewards/:id', authenticate, async (req: AuthRequest, res: Response)
 
     res.json({ success: true, data: reward });
   } catch (error: any) {
-    logger.error('Update reward error:', error);
+    console.error('Update reward error:', error);
     res.status(500).json({ success: false, error: 'Failed to update reward', details: error.message });
   }
 });
@@ -472,7 +471,7 @@ router.post('/rewards/:id/redeem', authenticate, async (req: AuthRequest, res: R
       },
     });
   } catch (error: any) {
-    logger.error('Redeem reward error:', error);
+    console.error('Redeem reward error:', error);
     res.status(500).json({ success: false, error: 'Failed to redeem reward', details: error.message });
   }
 });
@@ -570,7 +569,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get loyalty stats error:', error);
+    console.error('Get loyalty stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch loyalty stats', details: error.message });
   }
 });

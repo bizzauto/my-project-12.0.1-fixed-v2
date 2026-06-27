@@ -3,7 +3,6 @@ import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import axios from 'axios';
 import https from 'https';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -18,9 +17,9 @@ const n8nHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 function getN8nApiKey(): string | null {
   const key = process.env.N8N_APP_API_KEY || process.env.N8N_API_KEY || null;
   if (!key) {
-    logger.warn('[n8n] No API key configured. Set N8N_APP_API_KEY env var for n8n integration.');
+    console.warn('[n8n] No API key configured. Set N8N_APP_API_KEY env var for n8n integration.');
   } else if (!process.env.N8N_APP_API_KEY && process.env.N8N_API_KEY) {
-    logger.warn('[n8n] Falling back to N8N_API_KEY for n8n calls. Recommended: set N8N_APP_API_KEY explicitly.');
+    console.warn('[n8n] Falling back to N8N_API_KEY for n8n calls. Recommended: set N8N_APP_API_KEY explicitly.');
   }
   return key;
 }
@@ -253,7 +252,7 @@ router.post('/n8n/trigger/:workflowId', async (req: AuthRequest, res: Response) 
 
     res.json({ success: true, data: response.data });
   } catch (error: any) {
-    logger.error('n8n trigger error:', error);
+    console.error('n8n trigger error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to trigger n8n workflow',
@@ -285,7 +284,7 @@ router.get('/n8n/workflows', async (req: AuthRequest, res: Response) => {
         data: response.data.data || response.data.workflows || response.data || [],
       });
     } catch (error: any) {
-      logger.warn('[n8n] Workflows fetch failed:', error.message);
+      console.warn('[n8n] Workflows fetch failed:', error.message);
       res.json({
         success: true,
         data: [],
@@ -318,7 +317,7 @@ router.post('/n8n/workflows/:workflowId/trigger', async (req: AuthRequest, res: 
 
     res.json({ success: true, data: response.data });
   } catch (error: any) {
-    logger.error('n8n workflow trigger error:', error);
+    console.error('n8n workflow trigger error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -843,7 +842,7 @@ router.post('/deploy-template', requireRole('OWNER', 'ADMIN'), async (req: AuthR
       data: workflow,
     });
   } catch (error: any) {
-    logger.error('Deploy template error:', error);
+    console.error('Deploy template error:', error);
     res.status(500).json({ success: false, error: 'Failed to deploy template', details: error.message });
   }
 });

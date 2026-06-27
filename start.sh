@@ -1,19 +1,22 @@
 #!/bin/sh
-# Startup script - runs prisma migrate deploy then starts server
+# Startup script - runs prisma db push then starts server
 set -e
 
-# Show Redis configuration status
-echo "=== Redis Config ==="
+# Debug: Show what env vars are available
+echo "=== Redis Debug ==="
 echo "REDIS_URL set: $([ -n \"$REDIS_URL\" ] && echo 'YES' || echo 'NO')"
 echo "REDIS_PASSWORD set: $([ -n \"$REDIS_PASSWORD\" ] && echo 'YES' || echo 'NO')"
+echo "REDIS_HOST set: $([ -n \"$REDIS_HOST\" ] && echo 'YES' || echo 'NO')"
+echo "All env vars with REDIS: $(env | grep -i redis | head -5)"
 
 # If REDIS_URL exists but has NO password (no @ sign), treat it as unauthenticated
 if [ -n "$REDIS_URL" ] && echo "$REDIS_URL" | grep -qE '^redis://[^@]*$'; then
-  echo "WARNING: REDIS_URL has no password — clearing it to prevent NOAUTH errors"
+  echo "WARNING: REDIS_URL has no password ($REDIS_URL) — clearing it to prevent NOAUTH errors"
   unset REDIS_URL
 fi
 
 # Build REDIS_URL only if not already set
+# IMPORTANT: Only build URL WITH auth. Never connect without password.
 if [ -z "$REDIS_URL" ]; then
   if [ -n "$REDIS_PASSWORD" ]; then
     host="${REDIS_HOST:-coolify-redis}"
@@ -26,18 +29,17 @@ if [ -z "$REDIS_URL" ]; then
   fi
 fi
 
-echo "Running Prisma setup..."
-# Ensure Prisma client is generated
+echo "Redis URL present: $([ -n \"$REDIS_URL\" ] && echo 'YES' || echo 'NO')"
+echo "Running Prisma generate + db push..."
+# Prisma generate is already done during Docker build (RUN step)
+# Only retry if .prisma/client is missing (e.g. volume mount overwrote node_modules)
 if [ ! -f node_modules/.prisma/client/index.js ]; then
   echo "Prisma client missing, regenerating..."
   npx prisma generate 2>&1 || echo "Warning: Prisma generate failed, continuing..."
 else
-  echo "Prisma client already generated."
+  echo "Prisma client already generated, skipping."
 fi
-
-# Apply pending migrations (safe for production — only applies, never modifies schema)
-echo "Running prisma migrate deploy..."
-npx prisma migrate deploy 2>&1 || echo "Warning: prisma migrate deploy failed, continuing..."
+timeout 60 npx prisma migrate deploy 2>&1 || echo "Warning: Prisma migrate deploy failed or timed out, continuing..."
 
 echo "Starting server..."
 exec node dist/server/index.js

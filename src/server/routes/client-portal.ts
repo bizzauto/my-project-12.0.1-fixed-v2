@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -64,7 +63,7 @@ async function authenticateClientPortal(req: AuthRequest, res: Response, next: F
 
     next();
   } catch (error: any) {
-    logger.error('Client portal auth error:', error);
+    console.error('Client portal auth error:', error);
     res.status(500).json({
       success: false,
       error: 'Authentication failed',
@@ -163,7 +162,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('List client portals error:', error);
+    console.error('List client portals error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch portal entries',
@@ -251,7 +250,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Create client portal error:', error);
+    console.error('Create client portal error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create portal access',
@@ -303,7 +302,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       data: { ...portal, contact },
     });
   } catch (error: any) {
-    logger.error('Update client portal error:', error);
+    console.error('Update client portal error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update portal entry',
@@ -341,7 +340,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       message: 'Portal access revoked',
     });
   } catch (error: any) {
-    logger.error('Delete client portal error:', error);
+    console.error('Delete client portal error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to revoke portal access',
@@ -418,7 +417,7 @@ router.get('/:id/activity', authenticate, async (req: AuthRequest, res: Response
       },
     });
   } catch (error: any) {
-    logger.error('Get portal activity error:', error);
+    console.error('Get portal activity error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch portal activity',
@@ -465,7 +464,7 @@ router.post('/:id/regenerate-token', authenticate, async (req: AuthRequest, res:
       data: portal,
     });
   } catch (error: any) {
-    logger.error('Regenerate token error:', error);
+    console.error('Regenerate token error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to regenerate token',
@@ -541,7 +540,7 @@ router.post('/p/login', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Client portal login error:', error);
+    console.error('Client portal login error:', error);
     res.status(500).json({
       success: false,
       error: 'Login failed',
@@ -650,7 +649,7 @@ router.get('/p/dashboard', authenticateClientPortal, async (req: AuthRequest, re
       data: dashboard,
     });
   } catch (error: any) {
-    logger.error('Client dashboard error:', error);
+    console.error('Client dashboard error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to load dashboard',
@@ -724,7 +723,7 @@ router.get('/p/invoices', authenticateClientPortal, async (req: AuthRequest, res
       },
     });
   } catch (error: any) {
-    logger.error('Client invoices error:', error);
+    console.error('Client invoices error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch invoices',
@@ -784,7 +783,7 @@ router.get('/p/appointments', authenticateClientPortal, async (req: AuthRequest,
       },
     });
   } catch (error: any) {
-    logger.error('Client appointments error:', error);
+    console.error('Client appointments error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch appointments',
@@ -878,7 +877,7 @@ router.get('/p/deals', authenticateClientPortal, async (req: AuthRequest, res: R
       },
     });
   } catch (error: any) {
-    logger.error('Client deals error:', error);
+    console.error('Client deals error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch deals',
@@ -924,7 +923,7 @@ router.get('/p/profile', authenticateClientPortal, async (req: AuthRequest, res:
       },
     });
   } catch (error: any) {
-    logger.error('Client profile error:', error);
+    console.error('Client profile error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch profile',

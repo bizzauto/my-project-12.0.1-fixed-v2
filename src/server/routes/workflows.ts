@@ -3,7 +3,6 @@ import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createWorkflowSchema, updateWorkflowSchema } from '../validations/crm-schemas.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -56,7 +55,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get workflows error:', error);
+    console.error('Get workflows error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch workflows',
@@ -93,7 +92,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       data: workflow,
     });
   } catch (error: any) {
-    logger.error('Get workflow error:', error);
+    console.error('Get workflow error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch workflow',
@@ -149,7 +148,7 @@ router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), validate(createWor
       data: workflow,
     });
   } catch (error: any) {
-    logger.error('Create workflow error:', error);
+    console.error('Create workflow error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create workflow',
@@ -213,7 +212,7 @@ router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateW
       data: updated,
     });
   } catch (error: any) {
-    logger.error('Update workflow error:', error);
+    console.error('Update workflow error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update workflow',
@@ -249,7 +248,7 @@ router.patch('/:id/toggle', authenticate, requireRole('OWNER', 'ADMIN'), async (
       data: updated,
     });
   } catch (error: any) {
-    logger.error('Toggle workflow error:', error);
+    console.error('Toggle workflow error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to toggle workflow',
@@ -291,7 +290,7 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: A
       message: 'Workflow deleted successfully',
     });
   } catch (error: any) {
-    logger.error('Delete workflow error:', error);
+    console.error('Delete workflow error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete workflow',
@@ -314,7 +313,7 @@ router.post('/:id/run', authenticate, requireRole('OWNER', 'ADMIN'), async (req:
       },
     });
   } catch (error: any) {
-    logger.error('Run workflow error:', error);
+    console.error('Run workflow error:', error);
     res.status(500).json({ success: false, error: 'Failed to run workflow', details: error.message });
   }
 });
@@ -364,7 +363,7 @@ router.get('/:id/runs', authenticate, async (req: AuthRequest, res: Response) =>
       },
     });
   } catch (error: any) {
-    logger.error('Get workflow runs error:', error);
+    console.error('Get workflow runs error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch workflow runs',
@@ -406,7 +405,7 @@ router.get('/executions/:executionId', authenticate, async (req: AuthRequest, re
       data: execution,
     });
   } catch (error: any) {
-    logger.error('Get execution error:', error);
+    console.error('Get execution error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch execution details',
@@ -435,7 +434,7 @@ router.post('/execute', authenticate, async (req: AuthRequest, res: Response) =>
       },
     });
   } catch (error: any) {
-    logger.error('Execute workflow error:', error);
+    console.error('Execute workflow error:', error);
     res.status(500).json({ success: false, error: 'Failed to execute workflows', details: error.message });
   }
 });

@@ -2,7 +2,6 @@ import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { cacheResponse } from '../middleware/cache.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -67,7 +66,7 @@ router.get('/stats', authenticate, cacheResponse(30), async (req: AuthRequest, r
       },
     });
   } catch (error: any) {
-    logger.error('Get review stats error:', error);
+    console.error('Get review stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch review stats', details: error.message });
   }
 });
@@ -184,7 +183,7 @@ router.post('/sync', authenticate, async (req: AuthRequest, res: Response) => {
       data: { synced },
     });
   } catch (error: any) {
-    logger.error('Review sync error:', error);
+    console.error('Review sync error:', error);
     res.status(500).json({ success: false, error: 'Failed to sync reviews', details: error.message });
   }
 });

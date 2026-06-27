@@ -1,7 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { AuthRequest, requireRole } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -43,7 +42,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: { goals: mapped } });
   } catch (error) {
-    logger.error('Error fetching goals:', error);
+    console.error('Error fetching goals:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch goals' });
   }
 });
@@ -93,7 +92,7 @@ router.post('/', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Re
 
     res.json({ success: true, data: mapped });
   } catch (error) {
-    logger.error('Error creating goal:', error);
+    console.error('Error creating goal:', error);
     res.status(500).json({ success: false, error: 'Failed to create goal' });
   }
 });
@@ -142,7 +141,7 @@ router.put('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: 
 
     res.json({ success: true, data: mapped });
   } catch (error) {
-    logger.error('Error updating goal:', error);
+    console.error('Error updating goal:', error);
     res.status(500).json({ success: false, error: 'Failed to update goal' });
   }
 });
@@ -164,7 +163,7 @@ router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, re
     await prisma.goal.delete({ where: { id } });
     res.json({ success: true, message: 'Goal deleted successfully' });
   } catch (error) {
-    logger.error('Error deleting goal:', error);
+    console.error('Error deleting goal:', error);
     res.status(500).json({ success: false, error: 'Failed to delete goal' });
   }
 });

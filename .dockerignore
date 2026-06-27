@@ -2,7 +2,6 @@ node_modules
 dist
 .env
 .env.production
-.env.*.local
 *.log
 .DS_Store
 .git
@@ -31,53 +30,3 @@ tsconfig*.json
 .prettierrc*
 extra
 EXTRA
-
-# Security: sensitive files
-.encryption.key
-*.key
-*.pub
-*-key
-*_key*
-bizzauto-new-key*
-temp_vps_key*
-coolify_cookies.txt
-*.cookies.txt
-
-# Debug/fix scripts
-_fix_login.*
-fix-whatsapp.*
-fix-query-types.*
-setup-test-user.*
-data.sql
-*.sql
-
-# Screenshots and images
-screenshot*
-*.png
-*.jpg
-
-# Build output logs
-build-output*.txt
-build[0-9]*.txt
-
-# Replit
-.replit
-npx
-
-# Agent workspaces
-.kilo/
-.continue/
-.qodo/
-.qwen/
-.roo/
-
-# White-label subdirectory
-white-label/
-
-# Monitoring
-grafana/
-prometheus/
-
-# Docs and guides
-docs/
-skill.md/

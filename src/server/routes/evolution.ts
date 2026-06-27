@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { EvolutionApiService } from '../services/evolution.service.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -245,16 +244,21 @@ router.post('/check-number', authenticate, async (req: any, res: any) => {
 
 // ==================== WEBHOOK ====================
 
-// Webhook receiver (no auth - called by Evolution API server)
+// Webhook receiver — validates shared secret before processing
 router.post('/webhook/:businessId', async (req: any, res: any) => {
   try {
+    const webhookSecret = req.headers['x-webhook-secret'] || req.query.secret;
+    if (webhookSecret !== process.env.EVOLUTION_WEBHOOK_SECRET) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
     const { businessId } = req.params;
     if (!businessId) return res.status(400).json({ success: false, error: 'Business ID required' });
 
     await EvolutionApiService.processWebhook(businessId, req.body);
     res.json({ success: true });
   } catch (error: any) {
-    logger.error('Evolution webhook error:', error.message);
+    console.error('Evolution webhook error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -1,6 +1,7 @@
 import axios from 'axios';
+import crypto from 'crypto';
 import { prisma } from '../db.js';
-import logger from '../utils/logger.js';
+import { circuitBreaker } from '../services/circuit-breaker.service.js';
 
 /**
  * Evolution API Service
@@ -134,7 +135,7 @@ export class EvolutionApiService {
          || error.response?.data?.error === 'Forbidden');
 
       if (isAlreadyExists) {
-        logger.info('Evolution API instance already exists, saving config...');
+        console.log('Evolution API instance already exists, saving config...');
         await prisma.integration.upsert({
           where: { id: `evo_${businessId}` },
           create: {
@@ -159,7 +160,7 @@ export class EvolutionApiService {
         return { success: true, message: 'Instance already exists', instanceName };
       }
 
-      logger.error('Evolution API create instance error:', error.response?.data || error.message);
+      console.error('Evolution API create instance error:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Failed to create Evolution API instance');
     }
   }
@@ -215,7 +216,7 @@ export class EvolutionApiService {
       resolvedPhone = '919999999999'; // placeholder — user should update in settings
     }
 
-    logger.info(`[Evolution] === Starting connect for: ${resolvedInstanceName} ===`);
+    console.log(`[Evolution] === Starting connect for: ${resolvedInstanceName} ===`);
 
     // Step 1: Delete any existing instance (cleanup, suppress errors)
     try {
@@ -223,9 +224,9 @@ export class EvolutionApiService {
         `${config.baseUrl}/instance/delete/${resolvedInstanceName}`,
         { headers: { apikey: config.apiKey }, timeout: 10000 }
       );
-      logger.info(`[Evolution] Deleted existing instance: ${resolvedInstanceName}`);
+      console.log(`[Evolution] Deleted existing instance: ${resolvedInstanceName}`);
     } catch (e: any) {
-      logger.info(`[Evolution] Delete ${resolvedInstanceName} (may not exist): ${e?.response?.status || e.message}`);
+      console.log(`[Evolution] Delete ${resolvedInstanceName} (may not exist): ${e?.response?.status || e.message}`);
     }
 
     // Also clean up any OTHER stale instances for this business
@@ -245,17 +246,17 @@ export class EvolutionApiService {
             `${config.baseUrl}/instance/delete/${stale.name}`,
             { headers: { apikey: config.apiKey }, timeout: 5000 }
           );
-          logger.info(`[Evolution] Cleaned stale instance: ${stale.name}`);
+          console.log(`[Evolution] Cleaned stale instance: ${stale.name}`);
         } catch {}
       }
     } catch {}
 
     // Step 2: Wait 3 seconds for cleanup to propagate
-    logger.info('[Evolution] Waiting 3s for cleanup...');
+    console.log('[Evolution] Waiting 3s for cleanup...');
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Step 3: Create fresh instance
-    logger.info(`[Evolution] Creating instance: ${resolvedInstanceName}`);
+    console.log(`[Evolution] Creating instance: ${resolvedInstanceName}`);
     let createResult: any;
     try {
       createResult = await axios.post(
@@ -274,23 +275,23 @@ export class EvolutionApiService {
           timeout: 30000,
         }
       );
-      logger.info('[Evolution] Instance created successfully');
+      console.log('[Evolution] Instance created successfully');
     } catch (createErr: any) {
       // If instance already exists, that's fine — continue to connect
       const status = createErr?.response?.status;
       if (status === 403 || status === 409) {
-        logger.info('[Evolution] Instance already exists, proceeding to connect...');
+        console.log('[Evolution] Instance already exists, proceeding to connect...');
       } else {
         throw new Error(`Failed to create instance: ${createErr?.response?.data?.message || createErr.message}`);
       }
     }
 
     // Step 4: Wait 2 seconds for instance to initialize
-    logger.info('[Evolution] Waiting 2s for instance initialization...');
+    console.log('[Evolution] Waiting 2s for instance initialization...');
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Step 5: Get QR code via connect endpoint (with 2 retries)
-    logger.info(`[Evolution] Connecting instance: ${resolvedInstanceName}`);
+    console.log(`[Evolution] Connecting instance: ${resolvedInstanceName}`);
     let connectResponse: any = null;
     let lastError: any = null;
 
@@ -300,14 +301,14 @@ export class EvolutionApiService {
           `${config.baseUrl}/instance/connect/${resolvedInstanceName}`,
           { headers: { apikey: config.apiKey }, timeout: 30000 }
         );
-        logger.info(`[Evolution] Connect attempt ${attempt} succeeded`);
+        console.log(`[Evolution] Connect attempt ${attempt} succeeded`);
         break;
       } catch (err: any) {
         lastError = err;
-        logger.error(`[Evolution] Connect attempt ${attempt} failed:`, err?.response?.data || err.message);
+        console.error(`[Evolution] Connect attempt ${attempt} failed:`, err?.response?.data || err.message);
         if (attempt < 3) {
           const waitTime = attempt * 2000;
-          logger.info(`[Evolution] Retrying in ${waitTime}ms...`);
+          console.log(`[Evolution] Retrying in ${waitTime}ms...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
@@ -320,7 +321,7 @@ export class EvolutionApiService {
     }
 
     const data = connectResponse?.data;
-    logger.info('[Evolution] Connect response:', JSON.stringify({ hasBase64: !!data?.base64, hasCode: !!data?.code, count: data?.count }).substring(0, 200));
+    console.log('[Evolution] Connect response:', JSON.stringify({ hasBase64: !!data?.base64, hasCode: !!data?.code, count: data?.count }).substring(0, 200));
 
     // Step 6: Extract QR code from connect response
     const qrCodeRaw = this.extractQR(data);
@@ -328,7 +329,7 @@ export class EvolutionApiService {
     if (!qrCodeRaw) {
       // If connect returned { count: 0 }, try /instance/qrcode/:name as fallback
       if (data?.count === 0 || data?.count === undefined) {
-        logger.info('[Evolution] No QR from connect, trying qrcode fallback endpoint...');
+        console.log('[Evolution] No QR from connect, trying qrcode fallback endpoint...');
         try {
           const qrResponse = await axios.get(
             `${config.baseUrl}/instance/qrcode/${resolvedInstanceName}`,
@@ -336,18 +337,18 @@ export class EvolutionApiService {
           );
           const fallbackQR = this.extractQR(qrResponse.data);
           if (fallbackQR) {
-            logger.info('[Evolution] QR fallback succeeded');
+            console.log('[Evolution] QR fallback succeeded');
             await this.saveIntegrationConfig(businessId, config, resolvedInstanceName, qrResponse.data?.instance?.id || '');
             const isBase64Image = fallbackQR.startsWith('data:') || fallbackQR.startsWith('iVBOR');
             return { qrCode: fallbackQR, qrCodeBase64: isBase64Image ? fallbackQR : undefined, status: 'scanning' };
           }
         } catch (qrErr: any) {
-          logger.error('[Evolution] QR fallback also failed:', qrErr?.response?.data || qrErr.message);
+          console.error('[Evolution] QR fallback also failed:', qrErr?.response?.data || qrErr.message);
         }
       }
 
       // Last resort: try waiting a bit and connecting again (QR may need time to generate)
-      logger.info('[Evolution] Final attempt: waiting 3s then retrying connect...');
+      console.log('[Evolution] Final attempt: waiting 3s then retrying connect...');
       await new Promise(resolve => setTimeout(resolve, 3000));
       try {
         const finalRes = await axios.get(
@@ -356,13 +357,13 @@ export class EvolutionApiService {
         );
         const finalQR = this.extractQR(finalRes.data);
         if (finalQR) {
-          logger.info('[Evolution] Final attempt succeeded!');
+          console.log('[Evolution] Final attempt succeeded!');
           await this.saveIntegrationConfig(businessId, config, resolvedInstanceName, finalRes.data?.instance?.id || '');
           const isBase64Image = finalQR.startsWith('data:') || finalQR.startsWith('iVBOR');
           return { qrCode: finalQR, qrCodeBase64: isBase64Image ? finalQR : undefined, status: 'scanning' };
         }
       } catch (finalErr: any) {
-        logger.error('[Evolution] Final attempt failed:', finalErr?.response?.data || finalErr.message);
+        console.error('[Evolution] Final attempt failed:', finalErr?.response?.data || finalErr.message);
       }
 
       throw new Error('No QR code returned from Evolution API. The instance may be stuck. Try refreshing after a few seconds.');
@@ -373,7 +374,7 @@ export class EvolutionApiService {
     await this.saveIntegrationConfig(businessId, config, resolvedInstanceName, instanceId, resolvedPhone);
 
     const isBase64Image = qrCodeRaw.startsWith('data:') || qrCodeRaw.startsWith('iVBOR');
-    logger.info(`[Evolution] === Connect complete for: ${resolvedInstanceName} ===`);
+    console.log(`[Evolution] === Connect complete for: ${resolvedInstanceName} ===`);
     return {
       qrCode: qrCodeRaw,
       qrCodeBase64: isBase64Image ? qrCodeRaw : undefined,
@@ -470,7 +471,7 @@ export class EvolutionApiService {
         }
       } catch (apiError: any) {
         // Evolution API unreachable or instance not found — fall back to DB cached status
-        logger.info(`[Evolution] Status check failed for ${config.instanceName}: ${apiError?.response?.status || apiError.message}`);
+        console.log(`[Evolution] Status check failed for ${config.instanceName}: ${apiError?.response?.status || apiError.message}`);
 
         // Read cached status from Integration config
         const integration = await prisma.integration.findFirst({
@@ -501,7 +502,7 @@ export class EvolutionApiService {
       );
       await this.updateStatus(businessId, 'disconnected');
     } catch (error: any) {
-      logger.error('Evolution API disconnect error:', error.response?.data || error.message);
+      console.error('Evolution API disconnect error:', error.response?.data || error.message);
       throw new Error('Failed to disconnect instance');
     }
   }
@@ -521,7 +522,7 @@ export class EvolutionApiService {
         data: { isActive: false },
       });
     } catch (error: any) {
-      logger.error('Evolution API delete error:', error.response?.data || error.message);
+      console.error('Evolution API delete error:', error.response?.data || error.message);
       throw new Error('Failed to delete instance');
     }
   }
@@ -539,12 +540,17 @@ export class EvolutionApiService {
   ): Promise<any> {
     const config = await this.getConfig(businessId);
     const formattedNumber = this.formatPhone(to);
+    const idempotencyKey = crypto.randomUUID();
 
     try {
-      const response = await axios.post(
-        `${config.baseUrl}/message/sendText/${config.instanceName}`,
-        { number: formattedNumber, text: message, delay: options.delay || 0, linkPreview: options.linkPreview ?? true },
-        { headers: { apikey: config.apiKey } }
+      const response = await circuitBreaker.execute(
+        'evolution-api',
+        () => axios.post(
+          `${config.baseUrl}/message/sendText/${config.instanceName}`,
+          { number: formattedNumber, text: message, delay: options.delay || 0, linkPreview: options.linkPreview ?? true, optionsId: idempotencyKey },
+          { headers: { apikey: config.apiKey }, timeout: 15000 }
+        ),
+        { timeoutMs: 15000 }
       );
 
       await prisma.message.create({
@@ -576,10 +582,14 @@ export class EvolutionApiService {
     const formattedNumber = this.formatPhone(to);
 
     try {
-      const response = await axios.post(
-        `${config.baseUrl}/message/sendMedia/${config.instanceName}`,
-        { number: formattedNumber, mediatype: mediaType, media: { url: mediaUrl }, delay: options.delay || 0, ...(caption ? { caption } : {}) },
-        { headers: { apikey: config.apiKey } }
+      const response = await circuitBreaker.execute(
+        'evolution-api',
+        () => axios.post(
+          `${config.baseUrl}/message/sendMedia/${config.instanceName}`,
+          { number: formattedNumber, mediatype: mediaType, media: { url: mediaUrl }, delay: options.delay || 0, ...(caption ? { caption } : {}) },
+          { headers: { apikey: config.apiKey }, timeout: 15000 }
+        ),
+        { timeoutMs: 15000 }
       );
 
       await prisma.message.create({
@@ -607,22 +617,26 @@ export class EvolutionApiService {
   ): Promise<any> {
     const config = await this.getConfig(businessId);
     const formattedNumber = this.formatPhone(to);
-
-    try {
-      const response = await axios.post(
-        `${config.baseUrl}/message/sendButtons/${config.instanceName}`,
-        {
-          number: formattedNumber, text: template.text, footer: template.footer || '',
-          buttons: template.buttons.map((btn, i) => ({
-            index: i + 1,
-            type: btn.type === 'reply' ? 'replyButton' : btn.type === 'url' ? 'urlButton' : 'callButton',
-            title: btn.title, ...(btn.url ? { url: btn.url } : {}), ...(btn.phone ? { phone: btn.phone } : {}),
-          })),
-          delay: options.delay || 0,
-        },
-        { headers: { apikey: config.apiKey } }
+try {
+      const response = await circuitBreaker.execute(
+        'evolution-api',
+        () => axios.post(
+          `${config.baseUrl}/message/sendButtons/${config.instanceName}`,
+          {
+            number: formattedNumber,
+            text: template.text,
+            footer: template.footer || '',
+            buttons: template.buttons.map((btn, i) => ({
+              index: i + 1,
+              type: btn.type === 'reply' ? 'replyButton' : btn.type === 'url' ? 'urlButton' : 'callButton',
+              title: btn.title, ...(btn.url ? { url: btn.url } : {}), ...(btn.phone ? { phone: btn.phone } : {}),
+            })),
+            delay: options.delay || 0,
+          },
+          { headers: { apikey: config.apiKey }, timeout: 15000 }
+        ),
+        { timeoutMs: 15000 }
       );
-
       await prisma.message.create({
         data: { businessId, direction: 'outbound', type: 'template', content: template.text, interactiveType: 'button', waMessageId: response.data?.key?.id, status: 'sent' },
       });
@@ -717,7 +731,7 @@ export class EvolutionApiService {
           contact = await prisma.contact.create({
             data: { businessId, name: `WhatsApp ${from}`, phone: from, source: 'whatsapp', tags: ['WhatsApp Lead', 'Auto-Captured'], whatsappOptIn: true, lastActivity: new Date(), lastMessageAt: new Date() },
           });
-          logger.info(`[Evolution] New lead created: ${from}`);
+          console.log(`[Evolution] New lead created: ${from}`);
           await prisma.activity.create({
             data: { businessId, contactId: contact.id, type: 'lead_captured', title: 'New lead from WhatsApp', content: 'Auto-captured from Evolution API message', metadata: { source: 'evolution', phone: from }, createdBy: 'system' },
           });

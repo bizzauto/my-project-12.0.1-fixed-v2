@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer';
 import { prisma } from '../db.js';
-import logger from '../utils/logger.js';
 
 /**
  * Transactional Email Service
@@ -223,7 +222,7 @@ export class EmailService {
         return { success: true };
       } catch (error: any) {
         lastError = error.message;
-        logger.warn(`[EmailService] Attempt ${attempt}/${retries} failed for ${to}: ${error.message}`);
+        console.warn(`[EmailService] Attempt ${attempt}/${retries} failed for ${to}: ${error.message}`);
         // Reset transporter on connection errors (e.g., ECONNRESET, ETIMEDOUT)
         if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
           this.transporter = null;

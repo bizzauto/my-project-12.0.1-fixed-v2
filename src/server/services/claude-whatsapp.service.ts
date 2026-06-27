@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { prisma } from '../db.js';
 import { decrypt, encrypt } from '../utils/auth.js';
-import logger from '../utils/logger.js';
 
 /**
  * Claude WhatsApp Provider Service
@@ -229,7 +228,7 @@ Return ONLY the rewritten message, no explanation.`;
         return { text: optimized.substring(0, targetLength), saved: body.length - optimized.length };
       }
     } catch (err) {
-      logger.warn('[ClaudeWhatsApp] Nvidia NIM failed, trying Gemini:', (err as any).message);
+      console.warn('[ClaudeWhatsApp] Nvidia NIM failed, trying Gemini:', (err as any).message);
     }
 
     // 2) Fallback: Gemini
@@ -250,7 +249,7 @@ Return ONLY the rewritten message, no explanation.`;
         return { text: optimized.substring(0, targetLength), saved: body.length - optimized.length };
       }
     } catch (err) {
-      logger.warn('[ClaudeWhatsApp] Gemini failed, trying OpenRouter:', (err as any).message);
+      console.warn('[ClaudeWhatsApp] Gemini failed, trying OpenRouter:', (err as any).message);
     }
 
     // 3) Fallback: OpenRouter
@@ -280,7 +279,7 @@ Return ONLY the rewritten message, no explanation.`;
       const optimized = response.data?.choices?.[0]?.message?.content?.trim() || body;
       return { text: optimized.substring(0, targetLength), saved: body.length - optimized.length };
     } catch (err) {
-      logger.warn('[ClaudeWhatsApp] AI optimization failed, using naive truncation:', (err as any).message);
+      console.warn('[ClaudeWhatsApp] AI optimization failed, using naive truncation:', (err as any).message);
       return { text: body.substring(0, targetLength - 3) + '...', saved: body.length - targetLength };
     }
   }
@@ -638,7 +637,7 @@ Return ONLY the rewritten message, no explanation.`;
         });
       }
     } catch (err) {
-      logger.warn('[ClaudeWhatsApp] Failed to persist message:', (err as any).message);
+      console.warn('[ClaudeWhatsApp] Failed to persist message:', (err as any).message);
     }
   }
 
@@ -709,7 +708,7 @@ Return ONLY the rewritten message, no explanation.`;
         fallbackCount,
       };
     } catch (err) {
-      logger.error('[ClaudeWhatsApp] Failed to compute cost stats:', (err as any).message);
+      console.error('[ClaudeWhatsApp] Failed to compute cost stats:', (err as any).message);
       return {
         period: { from, to },
         totalSent: 0,

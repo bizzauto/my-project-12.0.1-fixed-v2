@@ -1,6 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger.js';
+
+const speedTracker: Record<string, { count: number; windowStart: number }> = {};
 
 /**
  * Global Rate Limiter - Prevents brute force & DDoS
@@ -21,12 +22,13 @@ export const globalRateLimiter = rateLimit({
  */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   message: { success: false, error: 'Too many auth attempts. Please try again in 15 minutes.', code: 'AUTH_RATE_LIMIT_EXCEEDED' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
   skipSuccessfulRequests: true,
+  skip: (req) => req.method === 'GET' || req.method === 'OPTIONS',
 });
 
 /**
@@ -69,28 +71,32 @@ export const uploadRateLimiter = rateLimit({
 });
 
 /**
- * Speed Limiter - No-op placeholder
+ * Speed Limiter - Prevents aggressive scraping/crawling
+ * Adds 100-300ms delay for requests exceeding 1 req/sec sustained
  */
 export const speedLimiter = (req: Request, res: Response, next: NextFunction) => {
-  const startTime = Date.now();
-  
-  res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    
-    // Log slow requests (> 5 seconds) for monitoring
-    if (duration > 5000) {
-      logger.warn(`[SpeedLimiter] Slow request: ${req.method} ${req.path} took ${duration}ms from ${req.ip}`);
-    }
-    
-    // If request took > 30 seconds, the request-timeout middleware
-    // would have already terminated it. This is a safety net for
-    // responses that barely squeak under the timeout.
-    if (duration > 30000) {
-      logger.error(`[SpeedLimiter] Extremely slow request: ${req.method} ${req.path} took ${duration}ms — potential DoS`);
-    }
-  });
-  
-  next();
+  const now = Date.now();
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const windowMs = 1000; // 1 second window
+
+  if (!speedTracker[ip]) {
+    speedTracker[ip] = { count: 0, windowStart: now };
+  }
+
+  const tracker = speedTracker[ip];
+  if (now - tracker.windowStart > windowMs) {
+    tracker.count = 0;
+    tracker.windowStart = now;
+  }
+
+  tracker.count++;
+
+  if (tracker.count > 1) {
+    const delay = Math.min((tracker.count - 1) * 100, 300);
+    setTimeout(next, delay);
+  } else {
+    next();
+  }
 };
 
 /**

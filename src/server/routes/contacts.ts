@@ -4,7 +4,6 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { checkContactLimit } from '../middleware/planLimits.js';
 import { createContactSchema, updateContactSchema, importContactsSchema } from '../validations/schemas.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -68,7 +67,7 @@ router.get('/', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get contacts error:', error);
+    console.error('Get contacts error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch contacts',
@@ -110,7 +109,7 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
       data: contact,
     });
   } catch (error: any) {
-    logger.error('Get contact error:', error);
+    console.error('Get contact error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch contact',
@@ -178,7 +177,7 @@ router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), checkContactLimit,
       data: contact,
     });
   } catch (error: any) {
-    logger.error('Create contact error:', error);
+    console.error('Create contact error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create contact',
@@ -223,7 +222,7 @@ router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), validate(updateC
       data: updated,
     });
   } catch (error: any) {
-    logger.error('Update contact error:', error);
+    console.error('Update contact error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update contact',
@@ -264,7 +263,7 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: a
       message: 'Contact deleted successfully',
     });
   } catch (error: any) {
-    logger.error('Delete contact error:', error);
+    console.error('Delete contact error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete contact',
@@ -351,7 +350,7 @@ router.post('/import', authenticate, requireRole('OWNER', 'ADMIN'), checkContact
       },
     });
   } catch (error: any) {
-    logger.error('Import contacts error:', error);
+    console.error('Import contacts error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to import contacts',
@@ -404,7 +403,7 @@ router.get('/search', authenticate, async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Search contacts error:', error);
+    console.error('Search contacts error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to search contacts',

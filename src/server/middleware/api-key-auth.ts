@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../db.js';
-import logger from '../utils/logger.js';
 
 /**
  * API Key Authentication Middleware
@@ -121,7 +120,7 @@ export function authenticateApiKey(requiredPermissions?: string[]) {
 
       next();
     } catch (error: any) {
-      logger.error('API key auth error:', error.message);
+      console.error('API key auth error:', error.message);
       res.status(500).json({ success: false, error: 'API key authentication failed' });
     }
   };

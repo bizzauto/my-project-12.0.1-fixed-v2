@@ -2,7 +2,6 @@ import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import WhatsAppMediaCleanupService, { MEDIA_RETENTION_DAYS } from '../services/whatsapp-media-cleanup.service.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -24,7 +23,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       }
     });
   } catch (error: any) {
-    logger.error('Cleanup stats error:', error);
+    console.error('Cleanup stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to get cleanup stats' });
   }
 });
@@ -46,7 +45,7 @@ router.get('/pending', async (req: AuthRequest, res: Response) => {
       }
     });
   } catch (error: any) {
-    logger.error('Pending files error:', error);
+    console.error('Pending files error:', error);
     res.status(500).json({ success: false, error: 'Failed to get pending files' });
   }
 });
@@ -66,7 +65,7 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
       data: warnings
     });
   } catch (error: any) {
-    logger.error('User warnings error:', error);
+    console.error('User warnings error:', error);
     res.status(500).json({ success: false, error: 'Failed to get user warnings' });
   }
 });
@@ -86,7 +85,7 @@ router.post('/warn-users', async (req: AuthRequest, res: Response) => {
       data: result
     });
   } catch (error: any) {
-    logger.error('Send warnings error:', error);
+    console.error('Send warnings error:', error);
     res.status(500).json({ success: false, error: 'Failed to send warnings' });
   }
 });
@@ -124,7 +123,7 @@ router.post('/export', async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: exportData });
   } catch (error: any) {
-    logger.error('Export error:', error);
+    console.error('Export error:', error);
     res.status(500).json({ success: false, error: 'Failed to export files' });
   }
 });
@@ -170,7 +169,7 @@ router.delete('/', async (req: AuthRequest, res: Response) => {
       data: result
     });
   } catch (error: any) {
-    logger.error('Delete error:', error);
+    console.error('Delete error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete files' });
   }
 });
@@ -186,7 +185,7 @@ router.post('/cleanup-trigger', async (req: AuthRequest, res: Response) => {
     
     res.json({ success: true, message: 'Cleanup scan completed' });
   } catch (error: any) {
-    logger.error('Cleanup trigger error:', error);
+    console.error('Cleanup trigger error:', error);
     res.status(500).json({ success: false, error: 'Failed to run cleanup' });
   }
 });

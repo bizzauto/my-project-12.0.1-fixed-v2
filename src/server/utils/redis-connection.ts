@@ -1,5 +1,4 @@
 import IORedis from 'ioredis';
-import logger from '../utils/logger.js';
 
 let redisDisabled = false;
 
@@ -13,46 +12,60 @@ export function createRedisConnection() {
   const redisUrl = process.env.REDIS_URL;
   const redisPassword = process.env.REDIS_PASSWORD;
   const redisHost = process.env.REDIS_HOST;
+  // Coolify sometimes injects the full Redis URL into REDIS_USERNAME by mistake
+  const redisUsername = process.env.REDIS_USERNAME;
+  const redisEnabled = process.env.REDIS_ENABLED;
 
-  logger.info(`[Redis] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${redisPassword ? 'SET' : 'NOT SET'}, REDIS_HOST: ${redisHost || 'NOT SET'}`);
+  console.log(`[Redis] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${redisPassword ? 'SET' : 'NOT SET'}, REDIS_HOST: ${redisHost || 'NOT SET'}, REDIS_USERNAME: ${redisUsername ? `SET (prefix: ${redisUsername.slice(0, 8)}...)` : 'NOT SET'}, REDIS_ENABLED: ${redisEnabled || 'NOT SET'}`);
 
-  // NUCLEAR: If Redis is not explicitly configured by user, disable it
-  // Coolify auto-injects REDIS_URL/REDIS_HOST for its linked Redis service
-  // but that Redis uses ACL which causes NOAUTH spam
-  if (!redisPassword && !process.env.REDIS_ENABLED) {
-    logger.info('[Redis] No REDIS_PASSWORD or REDIS_ENABLED — Redis disabled. Set REDIS_ENABLED=true to enable.');
+  // Check if REDIS_USERNAME contains a full Redis URL (Coolify quirk)
+  const effectiveUrl = (redisUrl && redisUrl.includes('@')) ? redisUrl
+    : (redisUsername && redisUsername.startsWith('redis://')) ? redisUsername
+    : null;
+
+  // NUCLEAR: Redis is completely disabled unless REDIS_ENABLED=true
+  // This prevents Coolify auto-injected env vars from causing connection floods
+  if (!redisEnabled) {
+    console.log('[Redis] REDIS_ENABLED not set to true — Redis disabled entirely. Set REDIS_ENABLED=true in env to enable.');
     redisDisabled = true;
     return null;
   }
 
-  if (redisUrl) {
-    const hasAt = redisUrl.includes('@');
+  // If enabled, still require password for security
+  if (!redisPassword && !redisUrl && !redisHost) {
+    console.log('[Redis] REDIS_ENABLED but no Redis credentials provided.');
+    redisDisabled = true;
+    return null;
+  }
+
+  if (effectiveUrl) {
+    const hasAt = effectiveUrl.includes('@');
     if (!hasAt) {
-      logger.info('[Redis] REDIS_URL has no @ (no auth) — Redis disabled.');
+      console.log('[Redis] REDIS_URL has no @ (no auth) — Redis disabled.');
       redisDisabled = true;
       return null;
     }
-    const schemeFree = redisUrl.replace(/^rediss?:\/\//, '');
+    const schemeFree = effectiveUrl.replace(/^rediss?:\/\//, '');
     const passwordPart = schemeFree.split('@')[0];
     if (!passwordPart || passwordPart === ':' || passwordPart === '') {
-      logger.info('[Redis] REDIS_URL has empty password — Redis disabled.');
+      console.log('[Redis] REDIS_URL has empty password — Redis disabled.');
       redisDisabled = true;
       return null;
     }
-    logger.info('[Redis] Connecting via REDIS_URL...');
-    return connectToRedis(redisUrl);
+    console.log('[Redis] Connecting via REDIS_URL...');
+    return connectToRedis(effectiveUrl);
   }
 
   if (redisPassword) {
     const host = process.env.REDIS_HOST || 'coolify-redis';
     const port = process.env.REDIS_PORT || '6379';
     const url = `redis://:${redisPassword}@${host}:${port}`;
-    logger.info(`[Redis] Connecting via password to ${host}:${port}...`);
+    console.log(`[Redis] Connecting via password to ${host}:${port}...`);
     return connectToRedis(url);
   }
 
   if (redisHost) {
-    logger.info('[Redis] REDIS_HOST set but no password — Redis disabled.');
+    console.log('[Redis] REDIS_HOST set but no password — Redis disabled.');
     redisDisabled = true;
     return null;
   }
@@ -76,9 +89,9 @@ function connectToRedis(url: string) {
   function handleNoAuth(ctx: string) {
     return (err: any) => {
       if (err?.message?.includes('NOAUTH') || err?.message?.includes('AUTH') || err?.message?.includes('ERR')) {
-        logger.error(`[Redis] NOAUTH ${ctx} — credentials rejected. Redis permanently disabled.`);
+        console.warn(`[Redis] Auth failed (${ctx}), retrying in 10s...`);
         redisDisabled = true;
-        try { client.destroy(); } catch {}
+        setTimeout(() => { redisDisabled = false; }, 10000);
         return true;
       }
       return false;
@@ -87,30 +100,30 @@ function connectToRedis(url: string) {
 
   client.on('error', (err: any) => {
     if (handleNoAuth('error event')(err)) return;
-    logger.error(`[Redis] Connection error: ${err.message}`);
+    console.error(`[Redis] Connection error: ${err.message}`);
   });
 
   client.on('connect', () => {
-    logger.info('[Redis] TCP connected, waiting for ready...');
+    console.log('[Redis] TCP connected, waiting for ready...');
   });
 
   client.on('ready', () => {
-    logger.info('[Redis] Connected successfully');
+    console.log('[Redis] Connected successfully');
   });
 
   client.on('reconnecting', () => {
-    logger.info('[Redis] Reconnecting...');
+    console.log('[Redis] Reconnecting...');
   });
 
   client.on('reconnected', () => {
-    logger.info('[Redis] Reconnected successfully — queues are operational again');
+    console.log('[Redis] Reconnected successfully — queues are operational again');
   });
 
   client.connect().catch((err: any) => {
     if (handleNoAuth('on connect')(err)) return;
-    logger.error(`[Redis] Connect failed: ${err.message}`);
+    console.error(`[Redis] Connect failed: ${err.message}`);
     redisDisabled = true;
-    try { client.destroy(); } catch {}
+    try { client.quit(); } catch {}
   });
 
   return client;

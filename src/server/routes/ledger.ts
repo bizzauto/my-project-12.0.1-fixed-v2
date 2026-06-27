@@ -4,7 +4,6 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { cacheResponse } from '../middleware/cache.js';
 import { createLedgerEntrySchema, updateLedgerEntrySchema } from '../validations/crm-schemas.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -55,7 +54,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: any) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get ledger entries error:', error);
+    console.error('Get ledger entries error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch ledger entries', details: error.message });
   }
 });
@@ -91,7 +90,7 @@ router.get('/stats', authenticate, cacheResponse(30), async (req: AuthRequest, r
       },
     });
   } catch (error: any) {
-    logger.error('Get ledger stats error:', error);
+    console.error('Get ledger stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch ledger stats', details: error.message });
   }
 });
@@ -135,7 +134,7 @@ router.post('/', authenticate, validate(createLedgerEntrySchema), async (req: Au
 
     res.status(201).json({ success: true, data: entry });
   } catch (error: any) {
-    logger.error('Create ledger entry error:', error);
+    console.error('Create ledger entry error:', error);
     res.status(500).json({ success: false, error: 'Failed to create ledger entry', details: error.message });
   }
 });
@@ -169,7 +168,7 @@ router.put('/:id', authenticate, validate(updateLedgerEntrySchema), async (req: 
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    logger.error('Update ledger entry error:', error);
+    console.error('Update ledger entry error:', error);
     res.status(500).json({ success: false, error: 'Failed to update ledger entry', details: error.message });
   }
 });
@@ -188,7 +187,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: any) => {
     await prisma.ledgerEntry.delete({ where: { id } });
     res.json({ success: true, message: 'Entry deleted successfully' });
   } catch (error: any) {
-    logger.error('Delete ledger entry error:', error);
+    console.error('Delete ledger entry error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete ledger entry', details: error.message });
   }
 });

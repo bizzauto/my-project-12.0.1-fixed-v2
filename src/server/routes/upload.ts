@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { UploadService } from '../services/upload.service.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -10,7 +9,7 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max (individual file categories have stricter limits)
+    fileSize: 10 * 1024 * 1024, // 10MB max (individual file categories have stricter limits)
     files: 10, // Max 10 files per request
   },
 });
@@ -83,7 +82,7 @@ router.post(
         message: `${results.length} file(s) uploaded successfully${errors.length ? `, ${errors.length} failed` : ''}`,
       });
     } catch (error: any) {
-      logger.error('Upload error:', error);
+      console.error('Upload error:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Upload failed',
@@ -111,7 +110,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: result });
   } catch (error: any) {
-    logger.error('List uploads error:', error);
+    console.error('List uploads error:', error);
     res.status(500).json({ success: false, error: 'Failed to list uploads' });
   }
 });
@@ -125,7 +124,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     const result = await UploadService.deleteFile(req.params.id, businessId);
     res.json(result);
   } catch (error: any) {
-    logger.error('Delete upload error:', error);
+    console.error('Delete upload error:', error);
     res.status(404).json({ success: false, error: error.message || 'Upload not found' });
   }
 });
@@ -138,7 +137,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
     const stats = await UploadService.getStorageStats(req.user.businessId);
     res.json({ success: true, data: stats });
   } catch (error: any) {
-    logger.error('Upload stats error:', error);
+    console.error('Upload stats error:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to get storage stats' });
   }
 });

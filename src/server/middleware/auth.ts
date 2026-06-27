@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import crypto from 'crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { prisma } from '../db.js';
-import { verifyToken } from '../utils/auth.js';
 import { CSRFService } from '../services/csrf.service.js';
-import logger from '../utils/logger.js';
+import { verifyToken } from '../utils/auth.js';
+import { ipBlocker } from './ipSecurity.js';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -35,18 +35,20 @@ async function authenticateViaN8nApiKey(req: AuthRequest): Promise<boolean> {
   const signature = req.headers['x-business-signature'] as string | undefined;
 
   if (!rawBusinessId || !signature) {
-    logger.warn('[n8nAuth] Missing x-business-id or x-business-signature header');
+    console.warn('[n8nAuth] Missing x-business-id or x-business-signature header');
     return false; // Let the calling authenticate middleware handle the 401
   }
 
-  // Verify HMAC signature: HMAC-SHA256(apiKey, businessId) === signature
-  const expectedSignature = crypto
-    .createHmac('sha256', configuredKey)
-    .update(rawBusinessId)
-    .digest('hex');
+        // Verify HMAC signature: HMAC-SHA256(apiKey, businessId) === signature
+        const expectedSignature = createHmac('sha256', configuredKey)
+            .update(rawBusinessId)
+            .digest('hex');
 
-  if (!crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signature))) {
-    logger.warn('[n8nAuth] Invalid business signature — possible tenant breakout attempt');
+  // Check buffer lengths match before timingSafeEqual to prevent crash
+  const expectedBuf = Buffer.from(expectedSignature, 'hex');
+  const signatureBuf = Buffer.from(signature, 'hex');
+    if (expectedBuf.length !== signatureBuf.length || !timingSafeEqual(expectedBuf, signatureBuf)) {
+    console.warn('[n8nAuth] Invalid business signature — possible tenant breakout attempt');
     return false; // Let the calling authenticate middleware handle the 403
   }
 
@@ -83,7 +85,17 @@ export const authenticate = async (
       });
     }
 
-    const decoded = verifyToken(token) as any;
+    let decoded: any;
+    try {
+      decoded = verifyToken(token) as any;
+    } catch (verifyError: any) {
+      // Track failed auth attempts for IP blocking
+      ipBlocker.increment(req.ip || req.socket.remoteAddress || 'unknown');
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token',
+      });
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
@@ -91,6 +103,7 @@ export const authenticate = async (
     });
 
     if (!user) {
+      ipBlocker.increment(req.ip || req.socket.remoteAddress || 'unknown');
       return res.status(401).json({
         success: false,
         error: 'User not found',
@@ -98,6 +111,7 @@ export const authenticate = async (
     }
 
     if (!user.isActive) {
+      ipBlocker.increment(req.ip || req.socket.remoteAddress || 'unknown');
       return res.status(403).json({
         success: false,
         error: 'Your account has been suspended. Contact support.',
@@ -105,16 +119,26 @@ export const authenticate = async (
     }
 
     // Only generate CSRF token if not exists or expired (max once per session)
-    let csrfToken = await CSRFService.getToken(user.id);
-    if (!csrfToken) {
-      csrfToken = await CSRFService.generateToken(user.id);
+    let csrfToken: string | null = null;
+    try {
+      csrfToken = await CSRFService.getToken(user.id);
+      if (!csrfToken) {
+        csrfToken = await CSRFService.generateToken(user.id);
+      }
+    } catch (csrfErr: any) {
+      // Gracefully handle missing csrfToken column in production DB
+      // This can happen when Prisma migration hasn't been properly baselined
+      console.warn(`[Auth] CSRF token generation failed (${csrfErr?.message || String(csrfErr)}). Auth continues without CSRF.`);
+      csrfToken = null;
     }
-    res.setHeader('X-CSRF-Token', csrfToken);
+    if (csrfToken) {
+      res.setHeader('X-CSRF-Token', csrfToken);
+    }
 
     req.user = {
       id: user.id,
       email: user.email,
-      businessId: user.businessId || 'super-admin',
+      businessId: user.businessId || null,
       role: user.role,
     };
 
@@ -231,7 +255,7 @@ export const requireBusinessAccess = async (
  * Generate a webhook secret for lead capture endpoints
  */
 export function generateWebhookSecret(): string {
-  return 'wh_' + crypto.randomBytes(24).toString('hex');
+  return 'wh_' + randomBytes(24).toString('hex');
 }
 
 /**
@@ -269,7 +293,7 @@ export async function validateWebhook(
     // Constant-time comparison to prevent timing attacks
     const expected = Buffer.from(business.leadWebhookSecret);
     const received = Buffer.from(webhookSecret);
-    if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+    if (expected.length !== received.length || !timingSafeEqual(expected, received)) {
       res.status(403).json({ success: false, error: 'Invalid webhook secret' });
       return;
     }
@@ -277,7 +301,7 @@ export async function validateWebhook(
     req.user = { businessId, isWebhook: true };
     next();
   } catch (error: any) {
-    logger.error('Webhook validation error:', error.message);
+    console.error('Webhook validation error:', error.message);
     res.status(500).json({ success: false, error: 'Webhook validation failed' });
   }
 }

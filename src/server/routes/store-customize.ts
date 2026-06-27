@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -17,7 +16,7 @@ themeRouter.get('/public/:businessId', async (req, res) => {
     if (!theme) return res.json(null);
     res.json(theme);
   } catch (error) {
-    logger.error('Error fetching public store theme:', error);
+    console.error('Error fetching public store theme:', error);
     res.status(500).json({ error: 'Failed to fetch store theme' });
   }
 });
@@ -30,7 +29,7 @@ themeRouter.get('/', authenticate, async (req: AuthRequest, res) => {
     });
     res.json(theme || null);
   } catch (error) {
-    logger.error('Error fetching store theme:', error);
+    console.error('Error fetching store theme:', error);
     res.status(500).json({ error: 'Failed to fetch store theme' });
   }
 });
@@ -95,7 +94,7 @@ themeRouter.post('/', authenticate, async (req: AuthRequest, res) => {
 
     res.json(theme);
   } catch (error) {
-    logger.error('Error saving store theme:', error);
+    console.error('Error saving store theme:', error);
     res.status(500).json({ error: 'Failed to save store theme' });
   }
 });
@@ -114,7 +113,7 @@ videosRouter.get('/:productId', async (req, res) => {
     });
     res.json(videos);
   } catch (error) {
-    logger.error('Error fetching product videos:', error);
+    console.error('Error fetching product videos:', error);
     res.status(500).json({ error: 'Failed to fetch product videos' });
   }
 });
@@ -127,7 +126,7 @@ videosRouter.post('/', authenticate, async (req: AuthRequest, res) => {
     });
     res.status(201).json(video);
   } catch (error) {
-    logger.error('Error adding product video:', error);
+    console.error('Error adding product video:', error);
     res.status(500).json({ error: 'Failed to add product video' });
   }
 });
@@ -138,7 +137,7 @@ videosRouter.delete('/:id', authenticate, async (req: AuthRequest, res) => {
     await (prisma as any).productVideo.delete({ where: { id } });
     res.json({ message: 'Video deleted' });
   } catch (error) {
-    logger.error('Error deleting product video:', error);
+    console.error('Error deleting product video:', error);
     res.status(500).json({ error: 'Failed to delete product video' });
   }
 });
@@ -157,7 +156,7 @@ sizeGuideRouter.get('/public/:businessId', async (req, res) => {
     });
     res.json(guides);
   } catch (error) {
-    logger.error('Error fetching size guides:', error);
+    console.error('Error fetching size guides:', error);
     res.status(500).json({ error: 'Failed to fetch size guides' });
   }
 });
@@ -171,7 +170,7 @@ sizeGuideRouter.get('/public/:businessId/:category', async (req, res) => {
     if (!guide) return res.status(404).json({ error: 'Size guide not found' });
     res.json(guide);
   } catch (error) {
-    logger.error('Error fetching size guide by category:', error);
+    console.error('Error fetching size guide by category:', error);
     res.status(500).json({ error: 'Failed to fetch size guide' });
   }
 });
@@ -185,7 +184,7 @@ sizeGuideRouter.post('/', authenticate, async (req: AuthRequest, res) => {
     });
     res.status(201).json(guide);
   } catch (error) {
-    logger.error('Error creating size guide:', error);
+    console.error('Error creating size guide:', error);
     res.status(500).json({ error: 'Failed to create size guide' });
   }
 });
@@ -200,7 +199,7 @@ sizeGuideRouter.put('/:id', authenticate, async (req: AuthRequest, res) => {
     });
     res.json(guide);
   } catch (error) {
-    logger.error('Error updating size guide:', error);
+    console.error('Error updating size guide:', error);
     res.status(500).json({ error: 'Failed to update size guide' });
   }
 });
@@ -211,7 +210,7 @@ sizeGuideRouter.delete('/:id', authenticate, async (req: AuthRequest, res) => {
     await (prisma as any).sizeGuide.delete({ where: { id } });
     res.json({ message: 'Size guide deleted' });
   } catch (error) {
-    logger.error('Error deleting size guide:', error);
+    console.error('Error deleting size guide:', error);
     res.status(500).json({ error: 'Failed to delete size guide' });
   }
 });
@@ -230,7 +229,7 @@ emailTemplatesRouter.get('/', authenticate, async (req: AuthRequest, res) => {
     });
     res.json(templates);
   } catch (error) {
-    logger.error('Error listing email templates:', error);
+    console.error('Error listing email templates:', error);
     res.status(500).json({ error: 'Failed to list email templates' });
   }
 });
@@ -251,7 +250,7 @@ emailTemplatesRouter.post('/', authenticate, async (req: AuthRequest, res) => {
     });
     res.status(201).json(template);
   } catch (error) {
-    logger.error('Error creating email template:', error);
+    console.error('Error creating email template:', error);
     res.status(500).json({ error: 'Failed to create email template' });
   }
 });
@@ -272,7 +271,7 @@ emailTemplatesRouter.put('/:id', authenticate, async (req: AuthRequest, res) => 
     });
     res.json(template);
   } catch (error) {
-    logger.error('Error updating email template:', error);
+    console.error('Error updating email template:', error);
     res.status(500).json({ error: 'Failed to update email template' });
   }
 });
@@ -283,7 +282,7 @@ emailTemplatesRouter.delete('/:id', authenticate, async (req: AuthRequest, res) 
     await (prisma as any).newEmailTemplate.delete({ where: { id } });
     res.json({ message: 'Email template deleted' });
   } catch (error) {
-    logger.error('Error deleting email template:', error);
+    console.error('Error deleting email template:', error);
     res.status(500).json({ error: 'Failed to delete email template' });
   }
 });
@@ -301,7 +300,7 @@ emailTemplatesRouter.post('/:id/test', authenticate, async (req: AuthRequest, re
     // For now, return the template data as confirmation
     res.json({ message: `Test email would be sent to ${toEmail}`, template });
   } catch (error) {
-    logger.error('Error sending test email:', error);
+    console.error('Error sending test email:', error);
     res.status(500).json({ error: 'Failed to send test email' });
   }
 });
@@ -321,7 +320,7 @@ pushRouter.post('/subscribe', async (req, res) => {
     });
     res.status(201).json(subscription);
   } catch (error) {
-    logger.error('Error subscribing to push notifications:', error);
+    console.error('Error subscribing to push notifications:', error);
     res.status(500).json({ error: 'Failed to subscribe to push notifications' });
   }
 });
@@ -334,7 +333,7 @@ pushRouter.post('/unsubscribe', async (req, res) => {
     });
     res.json({ message: 'Unsubscribed from push notifications' });
   } catch (error) {
-    logger.error('Error unsubscribing from push notifications:', error);
+    console.error('Error unsubscribing from push notifications:', error);
     res.status(500).json({ error: 'Failed to unsubscribe from push notifications' });
   }
 });
@@ -365,7 +364,7 @@ pushRouter.post('/send', authenticate, async (req: AuthRequest, res) => {
 
     res.json({ message: `Push notification sent to ${sentCount} subscribers`, sentCount });
   } catch (error) {
-    logger.error('Error sending push notification:', error);
+    console.error('Error sending push notification:', error);
     res.status(500).json({ error: 'Failed to send push notification' });
   }
 });
@@ -385,7 +384,7 @@ pushRouter.get('/stats', authenticate, async (req: AuthRequest, res) => {
     });
     res.json({ totalSubscribers: count });
   } catch (error) {
-    logger.error('Error fetching push notification stats:', error);
+    console.error('Error fetching push notification stats:', error);
     res.status(500).json({ error: 'Failed to fetch push notification stats' });
   }
 });
@@ -415,7 +414,7 @@ segmentsRouter.get('/', authenticate, async (req: AuthRequest, res) => {
 
     res.json(segmentsWithCounts);
   } catch (error) {
-    logger.error('Error listing customer segments:', error);
+    console.error('Error listing customer segments:', error);
     res.status(500).json({ error: 'Failed to list customer segments' });
   }
 });
@@ -436,7 +435,7 @@ segmentsRouter.post('/', authenticate, async (req: AuthRequest, res) => {
     });
     res.status(201).json(segment);
   } catch (error) {
-    logger.error('Error creating customer segment:', error);
+    console.error('Error creating customer segment:', error);
     res.status(500).json({ error: 'Failed to create customer segment' });
   }
 });
@@ -451,7 +450,7 @@ segmentsRouter.put('/:id', authenticate, async (req: AuthRequest, res) => {
     });
     res.json(segment);
   } catch (error) {
-    logger.error('Error updating customer segment:', error);
+    console.error('Error updating customer segment:', error);
     res.status(500).json({ error: 'Failed to update customer segment' });
   }
 });
@@ -463,7 +462,7 @@ segmentsRouter.delete('/:id', authenticate, async (req: AuthRequest, res) => {
     await (prisma as any).customerSegment.delete({ where: { id } });
     res.json({ message: 'Segment deleted' });
   } catch (error) {
-    logger.error('Error deleting customer segment:', error);
+    console.error('Error deleting customer segment:', error);
     res.status(500).json({ error: 'Failed to delete customer segment' });
   }
 });
@@ -515,7 +514,7 @@ segmentsRouter.post('/:id/refresh', authenticate, async (req: AuthRequest, res) 
 
     res.json({ message: `Segment refreshed with ${contacts.length} members`, memberCount: contacts.length });
   } catch (error) {
-    logger.error('Error refreshing customer segment:', error);
+    console.error('Error refreshing customer segment:', error);
     res.status(500).json({ error: 'Failed to refresh customer segment' });
   }
 });
@@ -529,7 +528,7 @@ segmentsRouter.get('/customers/:segmentId', authenticate, async (req: AuthReques
     });
     res.json(members.map((m: any) => m.contact));
   } catch (error) {
-    logger.error('Error fetching segment customers:', error);
+    console.error('Error fetching segment customers:', error);
     res.status(500).json({ error: 'Failed to fetch segment customers' });
   }
 });
@@ -557,7 +556,7 @@ priceHistoryRouter.get('/stats', authenticate, async (req: AuthRequest, res) => 
 
     res.json(changes);
   } catch (error) {
-    logger.error('Error fetching price history stats:', error);
+    console.error('Error fetching price history stats:', error);
     res.status(500).json({ error: 'Failed to fetch price history stats' });
   }
 });
@@ -571,7 +570,7 @@ priceHistoryRouter.get('/:productId', async (req, res) => {
     });
     res.json(history);
   } catch (error) {
-    logger.error('Error fetching price history:', error);
+    console.error('Error fetching price history:', error);
     res.status(500).json({ error: 'Failed to fetch price history' });
   }
 });
@@ -590,7 +589,7 @@ priceHistoryRouter.post('/', authenticate, async (req: AuthRequest, res) => {
     });
     res.status(201).json(record);
   } catch (error) {
-    logger.error('Error recording price change:', error);
+    console.error('Error recording price change:', error);
     res.status(500).json({ error: 'Failed to record price change' });
   }
 });
@@ -616,7 +615,7 @@ lowStockRouter.get('/stats', authenticate, async (req: AuthRequest, res) => {
 
     res.json({ totalAlerts, byCategory: alertsByCategory });
   } catch (error) {
-    logger.error('Error fetching low stock stats:', error);
+    console.error('Error fetching low stock stats:', error);
     res.status(500).json({ error: 'Failed to fetch low stock stats' });
   }
 });
@@ -631,7 +630,7 @@ lowStockRouter.get('/', authenticate, async (req: AuthRequest, res) => {
     });
     res.json(alerts);
   } catch (error) {
-    logger.error('Error listing low stock alerts:', error);
+    console.error('Error listing low stock alerts:', error);
     res.status(500).json({ error: 'Failed to list low stock alerts' });
   }
 });
@@ -683,7 +682,7 @@ lowStockRouter.post('/check', authenticate, async (req: AuthRequest, res) => {
       newAlerts: createdCount,
     });
   } catch (error) {
-    logger.error('Error checking low stock:', error);
+    console.error('Error checking low stock:', error);
     res.status(500).json({ error: 'Failed to check low stock' });
   }
 });
@@ -697,7 +696,7 @@ lowStockRouter.patch('/:id/acknowledge', authenticate, async (req: AuthRequest, 
     });
     res.json(alert);
   } catch (error) {
-    logger.error('Error acknowledging low stock alert:', error);
+    console.error('Error acknowledging low stock alert:', error);
     res.status(500).json({ error: 'Failed to acknowledge low stock alert' });
   }
 });
@@ -711,7 +710,7 @@ lowStockRouter.patch('/:id/resolve', authenticate, async (req: AuthRequest, res)
     });
     res.json(alert);
   } catch (error) {
-    logger.error('Error resolving low stock alert:', error);
+    console.error('Error resolving low stock alert:', error);
     res.status(500).json({ error: 'Failed to resolve low stock alert' });
   }
 });
@@ -729,7 +728,7 @@ analyticsIntegrationRouter.get('/', authenticate, async (req: AuthRequest, res) 
     });
     res.json(integration || null);
   } catch (error) {
-    logger.error('Error fetching analytics integration:', error);
+    console.error('Error fetching analytics integration:', error);
     res.status(500).json({ error: 'Failed to fetch analytics integration' });
   }
 });
@@ -757,7 +756,7 @@ analyticsIntegrationRouter.post('/', authenticate, async (req: AuthRequest, res)
 
     res.json(integration);
   } catch (error) {
-    logger.error('Error saving analytics integration:', error);
+    console.error('Error saving analytics integration:', error);
     res.status(500).json({ error: 'Failed to save analytics integration' });
   }
 });
@@ -898,7 +897,7 @@ searchRouter.get('/products/:businessId', async (req, res) => {
       facets,
     });
   } catch (error) {
-    logger.error('Error searching products:', error);
+    console.error('Error searching products:', error);
     res.status(500).json({ error: 'Failed to search products' });
   }
 });
@@ -916,7 +915,7 @@ i18nRouter.get('/languages', async (req, res) => {
     });
     res.json(languages.map((l: any) => l.language));
   } catch (error) {
-    logger.error('Error listing languages:', error);
+    console.error('Error listing languages:', error);
     res.status(500).json({ error: 'Failed to list languages' });
   }
 });
@@ -943,7 +942,7 @@ i18nRouter.get('/:businessId', async (req, res) => {
 
     res.json(grouped);
   } catch (error) {
-    logger.error('Error fetching store translations:', error);
+    console.error('Error fetching store translations:', error);
     res.status(500).json({ error: 'Failed to fetch store translations' });
   }
 });
@@ -966,7 +965,7 @@ i18nRouter.post('/', authenticate, async (req: AuthRequest, res) => {
 
     res.json({ message: `Saved translations for ${language}`, count: 1 });
   } catch (error) {
-    logger.error('Error saving translations:', error);
+    console.error('Error saving translations:', error);
     res.status(500).json({ error: 'Failed to save translations' });
   }
 });

@@ -1,7 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -44,7 +43,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('Get courses error:', error);
+    console.error('Get courses error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch courses', details: error.message });
   }
 });
@@ -70,7 +69,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, data: course });
   } catch (error: any) {
-    logger.error('Get course error:', error);
+    console.error('Get course error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch course', details: error.message });
   }
 });
@@ -107,7 +106,7 @@ router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRe
 
     res.status(201).json({ success: true, data: course });
   } catch (error: any) {
-    logger.error('Create course error:', error);
+    console.error('Create course error:', error);
     res.status(500).json({ success: false, error: 'Failed to create course', details: error.message });
   }
 });
@@ -137,7 +136,7 @@ router.put('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: Auth
 
     res.json({ success: true, data: course });
   } catch (error: any) {
-    logger.error('Update course error:', error);
+    console.error('Update course error:', error);
     res.status(500).json({ success: false, error: 'Failed to update course', details: error.message });
   }
 });
@@ -157,7 +156,7 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: A
 
     res.json({ success: true, message: 'Course deleted' });
   } catch (error: any) {
-    logger.error('Delete course error:', error);
+    console.error('Delete course error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete course', details: error.message });
   }
 });
@@ -198,7 +197,7 @@ router.post('/:id/modules', authenticate, requireRole('OWNER', 'ADMIN'), async (
 
     res.status(201).json({ success: true, data: module });
   } catch (error: any) {
-    logger.error('Create course module error:', error);
+    console.error('Create course module error:', error);
     res.status(500).json({ success: false, error: 'Failed to create module', details: error.message });
   }
 });
@@ -223,7 +222,7 @@ router.put('/modules/:moduleId', authenticate, requireRole('OWNER', 'ADMIN'), as
 
     res.json({ success: true, data: module });
   } catch (error: any) {
-    logger.error('Update course module error:', error);
+    console.error('Update course module error:', error);
     res.status(500).json({ success: false, error: 'Failed to update module', details: error.message });
   }
 });
@@ -243,7 +242,7 @@ router.delete('/modules/:moduleId', authenticate, requireRole('OWNER', 'ADMIN'),
 
     res.json({ success: true, message: 'Module deleted' });
   } catch (error: any) {
-    logger.error('Delete course module error:', error);
+    console.error('Delete course module error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete module', details: error.message });
   }
 });
@@ -293,7 +292,7 @@ router.post('/modules/:moduleId/lessons', authenticate, requireRole('OWNER', 'AD
 
     res.status(201).json({ success: true, data: lesson });
   } catch (error: any) {
-    logger.error('Create course lesson error:', error);
+    console.error('Create course lesson error:', error);
     res.status(500).json({ success: false, error: 'Failed to create lesson', details: error.message });
   }
 });
@@ -323,7 +322,7 @@ router.put('/lessons/:lessonId', authenticate, requireRole('OWNER', 'ADMIN'), as
 
     res.json({ success: true, data: lesson });
   } catch (error: any) {
-    logger.error('Update course lesson error:', error);
+    console.error('Update course lesson error:', error);
     res.status(500).json({ success: false, error: 'Failed to update lesson', details: error.message });
   }
 });
@@ -343,7 +342,7 @@ router.delete('/lessons/:lessonId', authenticate, requireRole('OWNER', 'ADMIN'),
 
     res.json({ success: true, message: 'Lesson deleted' });
   } catch (error: any) {
-    logger.error('Delete course lesson error:', error);
+    console.error('Delete course lesson error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete lesson', details: error.message });
   }
 });
@@ -403,7 +402,7 @@ router.post('/:id/enroll', authenticate, requireRole('OWNER', 'ADMIN'), async (r
     if (error.code === 'P2002') {
       return res.status(409).json({ success: false, error: 'Contact is already enrolled in this course' });
     }
-    logger.error('Enroll in course error:', error);
+    console.error('Enroll in course error:', error);
     res.status(500).json({ success: false, error: 'Failed to enroll', details: error.message });
   }
 });
@@ -449,7 +448,7 @@ router.get('/:id/enrollments', authenticate, async (req: AuthRequest, res: Respo
       },
     });
   } catch (error: any) {
-    logger.error('Get enrollments error:', error);
+    console.error('Get enrollments error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch enrollments', details: error.message });
   }
 });
@@ -493,7 +492,7 @@ router.patch('/enrollments/:enrollmentId/progress', authenticate, requireRole('O
 
     res.json({ success: true, data: enrollment });
   } catch (error: any) {
-    logger.error('Update enrollment progress error:', error);
+    console.error('Update enrollment progress error:', error);
     res.status(500).json({ success: false, error: 'Failed to update progress', details: error.message });
   }
 });
@@ -538,7 +537,7 @@ router.get('/public/:courseId', async (req: any, res: Response) => {
 
     res.json({ success: true, data: course });
   } catch (error: any) {
-    logger.error('Public course view error:', error);
+    console.error('Public course view error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch course', details: error.message });
   }
 });
