@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import "./lib/i18n"; // Initialize i18next before any component uses useTranslation
 import AppWrapper from "./AppWrapper";
 import { getStoredTheme, getThemeById, applyTheme } from "./lib/themes";
 

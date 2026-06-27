@@ -35,6 +35,7 @@ const GoogleLoginButton: React.FC<Props> = ({
   const buttonRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
+  const initializedRef = useRef(false);
 
   // Handle the credential (ID token) from Google
   const handleCredentialResponse = async (response: { credential: string }) => {
@@ -97,6 +98,10 @@ const GoogleLoginButton: React.FC<Props> = ({
         retryTimer = setTimeout(initGoogle, 200);
         return;
       }
+
+      // Prevent re-initialization (StrictMode runs effects twice in dev)
+      if (initializedRef.current) return;
+      initializedRef.current = true;
 
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
