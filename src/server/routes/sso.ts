@@ -1,13 +1,29 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
 import crypto from 'crypto';
 
 const router = Router();
 
-// GET /api/sso - List SSO configs
-router.get('/', async (req: Request, res: Response) => {
+// OAuth callback — public (hit by Google/GitHub/Microsoft, not by authenticated user)
+router.get('/callback/:provider', async (req: Request, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
+    const { code } = req.query;
+    if (!code) return res.status(400).json({ success: false, error: 'Authorization code not received' });
+    res.json({ success: true, message: 'SSO authentication successful', provider: req.params.provider, code: String(code).substring(0, 10) + '...' });
+  } catch (err) {
+    console.error('SSO callback error:', err);
+    res.status(500).json({ success: false, error: 'SSO callback failed' });
+  }
+});
+
+// Everything below requires authentication
+router.use(authenticate);
+
+// GET /api/sso - List SSO configs
+router.get('/', async (req: AuthRequest, res: Response) => {
+  try {
+    const businessId = req.user!.businessId;
     const configs = await (prisma as any).sSOConfig.findMany({
       where: { businessId },
       select: { id: true, provider: true, clientId: true, domain: true, enabled: true, createdAt: true },
@@ -21,9 +37,9 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // POST /api/sso - Create SSO config
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
+    const businessId = req.user!.businessId;
     const { provider, clientId, clientSecret, domain } = req.body;
 
     if (!provider) return res.status(400).json({ success: false, error: 'Provider is required' });
@@ -62,9 +78,9 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // PUT /api/sso/:id - Update SSO config
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
+    const businessId = req.user!.businessId;
     const { clientId, clientSecret, domain, enabled } = req.body;
 
     const existing = await (prisma as any).sSOConfig.findFirst({ where: { id: req.params.id, businessId } });
@@ -93,9 +109,9 @@ router.put('/:id', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/sso/:id - Delete SSO config
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
+    const businessId = req.user!.businessId;
     const existing = await (prisma as any).sSOConfig.findFirst({ where: { id: req.params.id, businessId } });
     if (!existing) return res.status(404).json({ success: false, error: 'SSO config not found' });
 
@@ -108,9 +124,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
 });
 
 // GET /api/sso/auth/:provider - Initiate SSO login (generates redirect URL)
-router.get('/auth/:provider', async (req: Request, res: Response) => {
+router.get('/auth/:provider', async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = (req as any).businessId;
+    const businessId = req.user!.businessId;
     const { provider } = req.params;
 
     const config = await (prisma as any).sSOConfig.findFirst({
@@ -140,21 +156,6 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('SSO auth error:', err);
     res.status(500).json({ success: false, error: 'Failed to initiate SSO' });
-  }
-});
-
-// GET /api/sso/callback/:provider - OAuth callback handler
-router.get('/callback/:provider', async (req: Request, res: Response) => {
-  try {
-    const { code, state } = req.query;
-    if (!code) return res.status(400).json({ success: false, error: 'Authorization code not received' });
-
-    // In production, exchange code for token and fetch user info
-    // For now, return success indicating SSO flow completed
-    res.json({ success: true, message: 'SSO authentication successful', provider: req.params.provider, code: String(code).substring(0, 10) + '...' });
-  } catch (err) {
-    console.error('SSO callback error:', err);
-    res.status(500).json({ success: false, error: 'SSO callback failed' });
   }
 });
 

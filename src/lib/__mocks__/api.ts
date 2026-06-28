@@ -72,7 +72,10 @@ module.exports = {
   }),
   analyticsAPI: createMockAPI({
     dashboard: { success: true, data: {} }, messages: { success: true, data: {} },
-    leads: { success: true, data: {} }, reports: {}, exportPDF: {}, overview: {}, getOverview: {},
+    campaigns: { success: true, data: {} }, social: { success: true, data: {} },
+    contacts: { success: true, data: {} }, roi: { success: true, data: [] },
+    funnel: { success: true, data: {} }, leads: { success: true, data: {} },
+    reports: {}, exportPDF: {}, overview: {}, getOverview: {},
   }),
   reviewsAPI: createMockAPI({
     list: { success: true, data: { reviews: [] } }, get: {}, reply: {}, create: {}, delete: {}, request: {},

@@ -329,39 +329,39 @@ export default function CRMPage() {
           appointmentsAPI.list({}),
           ledgerAPI.list({}),
         ]);
-        if (contactsRes.status === 'fulfilled' && contactsRes.value?.data?.contacts) {
-          setContacts(contactsRes.value.data.contacts);
+        if (contactsRes.status === 'fulfilled' && contactsRes.value?.data?.data?.contacts) {
+          setContacts(contactsRes.value.data.data.contacts);
         } else {
           setContacts(demoContacts);
         }
-        if (appointmentsRes.status === 'fulfilled' && appointmentsRes.value?.data?.appointments) {
-          setAppointments(appointmentsRes.value.data.appointments);
+        if (appointmentsRes.status === 'fulfilled' && appointmentsRes.value?.data?.data?.appointments) {
+          setAppointments(appointmentsRes.value.data.data.appointments);
         } else {
           setAppointments(demoAppointments);
         }
-        if (ledgerRes.status === 'fulfilled' && ledgerRes.value?.data?.entries) {
-          setLedger(ledgerRes.value.data.entries);
+        if (ledgerRes.status === 'fulfilled' && ledgerRes.value?.data?.data?.entries) {
+          setLedger(ledgerRes.value.data.data.entries);
         } else {
           setLedger(demoLedger);
         }
         // Deals from API
         const dealsRes = await dealsAPI.list({ limit: 200 }).catch(() => null);
-        if (dealsRes?.data?.deals) {
+        if (dealsRes?.data?.data?.deals) {
           setDeals(dealsRes.data.data.deals);
         } else {
           setDeals(demoDeals);
         }
         // Invoices from API
         const invoicesRes = await crmInvoicesAPI.list({ limit: 200 }).catch(() => null);
-        if (invoicesRes?.data?.invoices) {
-          setInvoices(invoicesRes.data.invoices);
+        if (invoicesRes?.data?.data?.invoices) {
+          setInvoices(invoicesRes.data.data.invoices);
         } else {
           setInvoices(demoInvoices);
         }
         // Goals from API
         const goalsRes = await goalsAPI.list({}).catch(() => null);
-        if (goalsRes?.data?.goals) {
-          setGoals(goalsRes.data.goals);
+        if (goalsRes?.data?.data?.goals) {
+          setGoals(goalsRes.data.data.goals);
         } else {
           setGoals(demoGoals);
         }

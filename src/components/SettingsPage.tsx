@@ -194,9 +194,9 @@ export default function SettingsPage() {
       toast.success('Google account linked successfully!');
       // Refresh user data
       authAPI.getProfile().then(res => {
-        if (res.data?.user) {
+        if (res.data?.data?.user) {
           useAuthStore.setState((state: any) => ({
-            user: { ...state.user, ...res.data.user }
+            user: { ...state.user, ...res.data.data.user }
           }));
         }
       });
