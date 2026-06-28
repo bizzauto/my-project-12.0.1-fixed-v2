@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
+import apiClient from '../lib/api';
 import {
   Plus, Search, MoreVertical, Trash2, Edit3, Eye, Copy, BarChart3,
   Settings, ChevronDown, ChevronRight, GripVertical, X, Check,
@@ -194,8 +195,8 @@ export default function SurveyBuilder() {
   const loadSurveys = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/surveys');
-      const data = await res.json();
+      const res = await apiClient.get('/surveys');
+      const data = res.data;
       if (data.success) {
         setSurveys(data.data.surveys.map((s: any) => ({
           ...s,
@@ -225,8 +226,8 @@ export default function SurveyBuilder() {
 
   const loadResponses = async (surveyId: string) => {
     try {
-      const res = await fetch(`/api/surveys/${surveyId}/results`);
-      const data = await res.json();
+      const res = await apiClient.get(`/surveys/${surveyId}/results`);
+      const data = res.data;
       if (data.success) {
         setResponses((data.data.submissions || []).map((s: any) => ({
           id: s.id,
@@ -318,17 +319,13 @@ export default function SurveyBuilder() {
     if (!activeSurvey) return;
     try {
       setSaving(true);
-      const res = await fetch(`/api/surveys/${activeSurvey.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: activeSurvey.name,
-          description: activeSurvey.settings?.thankYouMessage || '',
-          questions: activeSurvey.questions.map(q => ({ id: q.id, type: q.type, label: q.label, placeholder: q.placeholder, required: q.required, options: q.options })),
-          status: activeSurvey.status,
-        }),
+      const res = await apiClient.put(`/surveys/${activeSurvey.id}`, {
+        name: activeSurvey.name,
+        description: activeSurvey.settings?.thankYouMessage || '',
+        questions: activeSurvey.questions.map(q => ({ id: q.id, type: q.type, label: q.label, placeholder: q.placeholder, required: q.required, options: q.options })),
+        status: activeSurvey.status,
       });
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         setSurveys(prev => prev.map(s => s.id === activeSurvey.id ? activeSurvey : s));
         alert('Survey saved successfully!');
@@ -340,12 +337,8 @@ export default function SurveyBuilder() {
   const handleCreateSurvey = async (name: string, type: SurveyType) => {
     try {
       setSaving(true);
-      const res = await fetch('/api/surveys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, questions: [createDefaultQuestion('text')], description: '' }),
-      });
-      const data = await res.json();
+      const res = await apiClient.post('/surveys', { name, questions: [createDefaultQuestion('text')], description: '' });
+      const data = res.data;
       if (data.success) {
         const newSurvey: Survey = { ...data.data.survey, type, questions: (data.data.survey.questions || []).map((q: any) => ({ ...q, validation: q.validation || { minLength: 0, maxLength: 0, pattern: '', customMessage: '' }, conditionalLogic: q.conditionalLogic || { enabled: false, questionId: '', operator: 'equals', value: '' } })), settings: { thankYouMessage: 'Thank you!', redirectUrl: '', notificationEmail: '', allowMultipleSubmissions: true } };
         setSurveys(prev => [newSurvey, ...prev]);
@@ -359,8 +352,8 @@ export default function SurveyBuilder() {
   const handleDeleteSurvey = async (id: string) => {
     if (!confirm('Delete this survey?')) return;
     try {
-      const res = await fetch(`/api/surveys/${id}`, { method: 'DELETE' });
-      const data = await res.json();
+      const res = await apiClient.delete(`/surveys/${id}`);
+      const data = res.data;
       if (data.success) {
         setSurveys(prev => prev.filter(s => s.id !== id));
       } else { alert(data.error); }
