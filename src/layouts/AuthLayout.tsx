@@ -157,6 +157,53 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
 
   const isActive = (path: string) => location.pathname === path;
 
+  const sidebarColors: Record<string, string> = {
+    dashboard: 'bg-[#0f172a]',
+    whatsapp: 'bg-[#064E3B]',
+    crm: 'bg-[#1e3a5f]',
+    leads: 'bg-[#2e1065]',
+    appointments: 'bg-[#134e4a]',
+    ecommerce: 'bg-[#431407]',
+    email: 'bg-[#4c0519]',
+    documents: 'bg-[#1e293b]',
+    social: 'bg-[#0c4a6e]',
+    google: 'bg-[#1c1917]',
+    'ai-chatbot': 'bg-[#1e1b4b]',
+    'voice-call': 'bg-[#451a03]',
+    creative: 'bg-[#4a044e]',
+    reviews: 'bg-[#0f172a]',
+    automation: 'bg-[#0f766e]',
+    analytics: 'bg-[#1e293b]',
+    reports: 'bg-[#0f172a]',
+    settings: 'bg-[#18181b]',
+    billing: 'bg-[#0f0f23]',
+    profile: 'bg-[#1e293b]',
+    team: 'bg-[#1c1917]',
+    funnels: 'bg-[#2e1065]',
+    workflows: 'bg-[#0f766e]',
+    surveys: 'bg-[#4c0519]',
+    blog: 'bg-[#1e3a5f]',
+    courses: 'bg-[#134e4a]',
+    'website-builder-product': 'bg-[#1c1917]',
+    'vcard-maker': 'bg-[#0c4a6e]',
+    'google-reviews-qr': 'bg-[#1c1917]',
+    'trigger-links': 'bg-[#1e1b4b]',
+    conversations: 'bg-[#1e3a5f]',
+    'client-portal': 'bg-[#0f172a]',
+    'custom-fields': 'bg-[#18181b]',
+    store: 'bg-[#431407]',
+    'payment-links': 'bg-[#0f0f23]',
+    'review-requests': 'bg-[#0f172a]',
+    'bulk-import': 'bg-[#1e293b]',
+    'ca-copilot': 'bg-[#0f0f23]',
+    'missed-call-settings': 'bg-[#451a03]',
+    'dograh-settings': 'bg-[#1e1b4b]',
+    snapshots: 'bg-[#18181b]',
+  };
+
+  const currentSection = location.pathname.split('/')[1] || 'dashboard';
+  const sidebarBg = sidebarColors[currentSection] || 'bg-slate-900';
+
   const filteredMenuItems = menuItems.filter(
     (item) => !item.roles || item.roles.includes(userRole)
   );
@@ -191,7 +238,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       {/* Tablet (md-lg): slide-out drawer with w-72 (fixed position) */}
       {/* Desktop (lg+): always visible, collapsible w-64/w-20 (flex item, not fixed) */}
       <div
-        className={`bg-slate-900 dark:bg-slate-900 flex-col transition-all duration-300 ${
+        className={`${sidebarBg} flex-col transition-all duration-300 ${
           isMobile ? 'hidden' :
           isTablet ? `fixed left-0 top-0 z-50 ${sidebarOpen ? 'flex w-72 shadow-2xl' : 'hidden'}` :
           `flex flex-shrink-0 ${collapsed ? 'w-20' : 'w-64'}`
