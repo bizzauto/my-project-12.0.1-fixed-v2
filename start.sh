@@ -35,13 +35,14 @@ if [ -z "$REDIS_URL" ]; then
   fi
 fi
 
-# Auto-enable REDIS_ENABLED if we have a valid URL with auth
-if [ -n "$REDIS_URL" ] && echo "$REDIS_URL" | grep -q '@'; then
-  if [ -z "$REDIS_ENABLED" ]; then
-    export REDIS_ENABLED=true
-    echo "Auto-enabled REDIS_ENABLED=true (valid URL with auth detected)"
-  fi
-fi
+# IMPORTANT: Redis is ONLY enabled when REDIS_ENABLED=true is EXPLICITLY set in env vars.
+# We do NOT auto-enable based on REDIS_URL presence. This prevents Coolify's
+# auto-injected env vars from causing cascading timeout floods when the
+# Redis endpoint is unreachable from the app container.
+# To enable Redis, set REDIS_ENABLED=true in Coolify or docker environment.
+# The TypeScript circuit breaker in redis-connection.ts provides a second
+# line of defense (redisUnreachable flag) that stops all Redis activity on
+# first timeout, even if REDIS_ENABLED=true.
 
 echo "Redis URL present: $([ -n \"$REDIS_URL\" ] && echo 'YES' || echo 'NO')"
 echo "Running Prisma generate + db push..."
