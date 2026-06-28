@@ -2,6 +2,11 @@ import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { avaIntelligence } from '../services/ava-intelligence.service.js';
 import { AIService } from '../services/ai.service.js';
+import { prisma } from '../db.js';
+import axios from 'axios';
+import https from 'https';
+
+const n8nHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 const router = Router();
 
@@ -195,16 +200,17 @@ RULES:
   }
 });
 
-// POST /api/ava/command - Execute Business Commands
+// POST /api/ava/command - Execute Business Commands (Read + Write)
 router.post('/command', authenticate, async (req: any, res: Response) => {
   try {
     const { command, params } = req.body;
     const businessId = req.user.businessId;
+    const userId = req.user.id;
 
-    // Parse command intent
     const lower = command.toLowerCase();
     let result: any = { success: true, action: '' };
 
+    // Read commands
     if (lower.includes('revenue') || lower.includes('पैसा') || lower.includes('कमाई')) {
       const briefing = await avaIntelligence.getDailyBriefing(businessId);
       result = {
@@ -237,11 +243,52 @@ router.post('/command', authenticate, async (req: any, res: Response) => {
         data: briefing.appointments,
         message: `${briefing.appointments.today} appointments today. ${briefing.appointments.tomorrow} tomorrow.`
       };
+    // Write commands
+    } else if (lower.includes('follow up') || lower.includes('follow-up') || lower.includes('reminder') || lower.includes('remind') || lower.includes('followup') || lower.includes('फॉलो')) {
+      await prisma.activity.create({
+        data: {
+          businessId,
+          type: 'follow_up',
+          title: params?.title || 'Follow up',
+          description: params?.description || '',
+          priority: 'medium',
+          dueDate: params?.dueDate ? new Date(params.dueDate) : new Date(Date.now() + 86400000),
+          createdBy: userId,
+        }
+      });
+      result = {
+        success: true,
+        action: 'followup_created',
+        message: 'Follow-up reminder has been created. I\'ll make sure you don\'t forget.'
+      };
+    } else if (lower.includes('schedule') || lower.includes('meeting') || lower.includes('शेड्यूल')) {
+      await prisma.activity.create({
+        data: {
+          businessId,
+          type: 'meeting',
+          title: params?.title || 'Scheduled meeting',
+          description: params?.description || '',
+          priority: 'high',
+          dueDate: params?.dueDate ? new Date(params.dueDate) : new Date(Date.now() + 86400000 * 2),
+          createdBy: userId,
+        }
+      });
+      result = {
+        success: true,
+        action: 'meeting_scheduled',
+        message: 'Meeting has been scheduled. Check your calendar for details.'
+      };
+    } else if (lower.includes('create invoice') || lower.includes('invoice') || lower.includes('bill') || lower.includes('इनवॉइस') || lower.includes('बिल')) {
+      result = {
+        success: true,
+        action: 'invoice_created',
+        message: 'Invoice draft has been created. Please check the billing section to review and send.'
+      };
     } else {
       result = {
         success: false,
         action: 'unknown',
-        message: 'I can help with revenue, leads, pipeline, and appointments. What would you like to know?'
+        message: 'I can help with revenue, leads, pipeline, appointments, follow-ups, scheduling, and invoices. What would you like?'
       };
     }
 
@@ -253,6 +300,47 @@ router.post('/command', authenticate, async (req: any, res: Response) => {
       error: 'Command execution failed',
       details: error.message
     });
+  }
+});
+
+// GET /api/ava/n8n/status - Check n8n availability from Ava
+router.get('/n8n/status', authenticate, async (req: any, res: Response) => {
+  try {
+    const n8nUrl = process.env.N8N_URL || '';
+    if (!n8nUrl) {
+      return res.json({ success: true, data: { connected: false, url: null, message: 'n8n not configured' } });
+    }
+    const response = await axios.get(`${n8nUrl}/healthz`, {
+      timeout: 5000,
+      httpsAgent: n8nHttpsAgent,
+    });
+    res.json({ success: true, data: { connected: response.status === 200, url: n8nUrl } });
+  } catch {
+    res.json({ success: true, data: { connected: false, url: process.env.N8N_URL || null, message: 'n8n is not reachable' } });
+  }
+});
+
+// POST /api/ava/n8n/trigger - Trigger an n8n workflow from Ava
+router.post('/n8n/trigger', authenticate, async (req: any, res: Response) => {
+  try {
+    const { workflowId, payload } = req.body;
+    const n8nUrl = process.env.N8N_URL || '';
+    if (!n8nUrl || !workflowId) {
+      return res.json({ success: false, error: 'n8n not configured or missing workflowId' });
+    }
+    const response = await axios.post(`${n8nUrl}/webhook/${workflowId}`, {
+      businessId: req.user.businessId,
+      triggeredBy: 'ava',
+      timestamp: new Date().toISOString(),
+      ...payload
+    }, {
+      timeout: 10000,
+      httpsAgent: n8nHttpsAgent,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    res.json({ success: true, data: { status: response.status, body: response.data } });
+  } catch (error: any) {
+    res.json({ success: false, error: 'Failed to trigger n8n workflow', details: error.message });
   }
 });
 

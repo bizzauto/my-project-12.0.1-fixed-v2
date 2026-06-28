@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, X, Send, Volume2, VolumeX, Bot, User, Globe, Briefcase, Settings, TrendingUp, Users, Calendar, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { avaService } from '../services/ava.service.ts';
 
 interface Message {
   id: string;
@@ -153,14 +154,7 @@ const AvaExecutiveAssistant: React.FC = () => {
   const fetchBriefing = async () => {
     setIsLoadingBriefing(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/ava/briefing', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
+      const data = await avaService.getBriefing();
       if (data.success) {
         setBriefing(data.data);
         setShowBriefing(true);
@@ -343,22 +337,12 @@ const AvaExecutiveAssistant: React.FC = () => {
 
     // General AI chat
     try {
-      const token = localStorage.getItem('token');
       const history = messages.slice(-10).map(m => ({
         role: m.isUser ? 'user' : 'assistant',
         content: m.text
       }));
 
-      const response = await fetch('/api/ava/chat', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: userMessage, history, language: selectedLang })
-      });
-
-      const data = await response.json();
+      const data = await avaService.chat(userMessage, history, selectedLang);
       if (data.success) {
         addMessage(data.data.text, false);
         speakText(data.data.text);
@@ -398,17 +382,7 @@ const AvaExecutiveAssistant: React.FC = () => {
 
   const handleCommand = async (command: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/ava/command', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ command })
-      });
-
-      const data = await response.json();
+      const data = await avaService.executeCommand(command);
       if (data.success) {
         addMessage(data.message, false, 'metric', data.data);
         speakText(data.message);
