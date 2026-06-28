@@ -265,24 +265,24 @@ const AgencyDashboard: React.FC = () => {
       ]);
 
       if (agencyRes.status === 'fulfilled' && agencyRes.value?.data) {
-        setAgency(agencyRes.value.data);
+        setAgency(agencyRes.value.data.data);
       }
 
       if (subAccountsRes.status === 'fulfilled' && subAccountsRes.value?.data) {
-        const data = subAccountsRes.value.data;
+        const data = subAccountsRes.value.data.data;
         setSubAccounts(Array.isArray(data) ? data : data?.subAccounts || []);
       }
 
       if (statsRes.status === 'fulfilled' && statsRes.value?.data) {
-        setStats(statsRes.value.data);
+        setStats(statsRes.value.data.data);
       }
 
       if (brandingRes.status === 'fulfilled' && brandingRes.value?.data) {
-        setBranding(brandingRes.value.data);
+        setBranding(brandingRes.value.data.data);
       }
 
       if (whiteLabelRes.status === 'fulfilled' && whiteLabelRes.value?.data) {
-        setWhiteLabel(whiteLabelRes.value.data);
+        setWhiteLabel(whiteLabelRes.value.data.data);
       }
     } catch (err: any) {
       console.error('Failed to fetch agency data:', err);
@@ -308,7 +308,7 @@ const AgencyDashboard: React.FC = () => {
     setSaving(true);
     try {
       const res = await agencyAPI.createAgency(agencyForm);
-      setAgency(res.data);
+      setAgency(res.data.data);
       setShowCreateAgency(false);
       setAgencyForm({ name: '', logo: '', website: '', customDomain: '', plan: 'STARTER' });
       toast.success('Agency created successfully');
@@ -327,7 +327,7 @@ const AgencyDashboard: React.FC = () => {
     setSaving(true);
     try {
       const res = await agencyAPI.updateAgency(agencyForm);
-      setAgency(res.data);
+      setAgency(res.data.data);
       setEditingAgency(false);
       toast.success('Agency updated successfully');
     } catch (err: any) {
@@ -353,7 +353,7 @@ const AgencyDashboard: React.FC = () => {
     setSaving(true);
     try {
       const res = await agencyAPI.createSubAccount(subAccountForm);
-      setSubAccounts((prev) => [...prev, res.data]);
+      setSubAccounts((prev) => [...prev, res.data.data]);
       setShowCreateSubAccount(false);
       setSubAccountForm({ name: '', plan: 'FREE' });
       toast.success('Sub-account created successfully');
@@ -426,7 +426,7 @@ const AgencyDashboard: React.FC = () => {
     setSaving(true);
     try {
       const res = await agencyAPI.updateBranding(branding);
-      setBranding(res.data);
+      setBranding(res.data.data.branding || res.data.data);
       setEditingBranding(false);
       toast.success('Branding updated');
     } catch (err: any) {
