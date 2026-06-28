@@ -153,7 +153,7 @@ describe('API Key Auth - Middleware Logic Flow', () => {
     isActive: true,
     expiresAt: null,
     permissions: ['contacts:read', 'contacts:write'],
-    business: { id: 'biz-1', name: 'Test Business', plan: 'PROFESSIONAL', isActive: true },
+    business: { id: 'biz-1', name: 'Test Business', plan: 'PRO', isActive: true },
   };
 
   it('should return 401 when no key is provided', () => {

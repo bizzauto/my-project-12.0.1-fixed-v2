@@ -1,8 +1,18 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
+import multer from 'multer';
+import { CloudinaryService } from '../services/cloudinary.service.js';
+import { CourseAIService } from '../services/course-ai.service.js';
+import crypto from 'crypto';
 
 const router = Router();
+
+// Multer for video/image upload
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 500 * 1024 * 1024, files: 1 }, // 500MB max
+});
 
 // ==================== COURSES ====================
 
@@ -48,6 +58,65 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// List published courses (public — for student store)
+router.get('/published/list', async (req: any, res: Response) => {
+  try {
+    const { page = '1', limit = '20', search, businessId } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+    const where: any = { isPublished: true, isActive: true };
+    if (businessId) where.businessId = businessId;
+    if (search) where.name = { contains: search as string, mode: 'insensitive' };
+
+    const [courses, total] = await Promise.all([
+      prisma.course.findMany({
+        where,
+        skip,
+        take: parseInt(limit as string),
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          thumbnail: true,
+          price: true,
+          currency: true,
+          accessType: true,
+          enrollmentCount: true,
+          rating: true,
+          business: { select: { name: true, logoUrl: true } },
+          modules: {
+            where: { isPublished: true },
+            select: { lessons: { where: { isPublished: true, isFree: true }, select: { id: true } } },
+          },
+          _count: { select: { modules: true, enrollments: true } },
+        },
+      }),
+      prisma.course.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        courses: courses.map(c => ({
+          ...c,
+          freeLessonCount: c.modules.reduce((sum, m) => sum + m.lessons.length, 0),
+          modules: undefined,
+        })),
+        pagination: {
+          total,
+          page: parseInt(page as string),
+          limit: parseInt(limit as string),
+          totalPages: Math.ceil(total / parseInt(limit as string)),
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('List published courses error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch courses', details: error.message });
+  }
+});
+
 // Get course with modules and lessons
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -70,6 +139,49 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     res.json({ success: true, data: course });
   } catch (error: any) {
     console.error('Get course error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch course', details: error.message });
+  }
+});
+
+// Get student view of course (with enrollment + progress)
+router.get('/:id/student-view', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const course = await prisma.course.findFirst({
+      where: { id: req.params.id, isPublished: true, isActive: true },
+      include: {
+        modules: {
+          where: { isPublished: true },
+          orderBy: { order: 'asc' },
+          include: {
+            lessons: {
+              where: { isPublished: true },
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
+        business: { select: { name: true, logoUrl: true } },
+      },
+    });
+
+    if (!course) {
+      return res.status(404).json({ success: false, error: 'Course not found' });
+    }
+
+    // Check enrollment
+    const enrollment = await prisma.courseEnrollment.findFirst({
+      where: { courseId: course.id, userId: req.user.id },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ...course,
+        isEnrolled: !!enrollment,
+        enrollment,
+      },
+    });
+  } catch (error: any) {
+    console.error('Student view error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch course', details: error.message });
   }
 });
@@ -158,6 +270,264 @@ router.delete('/:id', authenticate, requireRole('OWNER', 'ADMIN'), async (req: A
   } catch (error: any) {
     console.error('Delete course error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete course', details: error.message });
+  }
+});
+
+// ==================== AI COURSE CONTENT GENERATION ====================
+
+// Generate course description + curriculum using AI
+router.post('/ai/generate', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { courseTitle, targetAudience, difficulty, language } = req.body;
+
+    if (!courseTitle) {
+      return res.status(400).json({ success: false, error: 'Course title is required' });
+    }
+
+    const result = await CourseAIService.generateCourseContent(courseTitle, {
+      targetAudience,
+      difficulty,
+      language,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        description: result.description,
+        curriculum: result.curriculum,
+      },
+    });
+  } catch (error: any) {
+    console.error('AI course generation error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate course content', details: error.message });
+  }
+});
+
+// AI Doubt Solver
+router.post('/:id/doubt-solver', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { question, lessonTitle, moduleTitle } = req.body;
+
+    if (!question) {
+      return res.status(400).json({ success: false, error: 'Question is required' });
+    }
+
+    // Get course context
+    const course = await prisma.course.findFirst({
+      where: { id: req.params.id, isPublished: true, isActive: true },
+      select: { id: true, name: true, description: true },
+    });
+
+    if (!course) {
+      return res.status(404).json({ success: false, error: 'Course not found' });
+    }
+
+    const result = await CourseAIService.solveDoubt(question, {
+      courseTitle: course.name,
+      lessonTitle,
+      moduleTitle,
+      courseContent: course.description || '',
+    });
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('Doubt solver error:', error);
+    res.status(500).json({ success: false, error: 'Failed to solve doubt', details: error.message });
+  }
+});
+
+// ==================== CLOUDINARY UPLOAD ====================
+
+// Get Cloudinary upload config
+router.get('/cloudinary/config', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const config = CloudinaryService.getUploadSignature();
+    res.json({ success: true, data: config });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'Failed to get Cloudinary config', details: error.message });
+  }
+});
+
+// Upload video to Cloudinary
+router.post('/upload/video', authenticate, requireRole('OWNER', 'ADMIN'), upload.single('video'), async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No video file provided' });
+    }
+
+    const result = await CloudinaryService.uploadVideo(req.file.buffer, {
+      folder: `courses/${req.user.businessId}/videos`,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        url: result.secureUrl,
+        publicId: result.publicId,
+        duration: result.duration,
+        width: result.width,
+        height: result.height,
+        format: result.format,
+        size: result.bytes,
+      },
+    });
+  } catch (error: any) {
+    console.error('Video upload error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to upload video' });
+  }
+});
+
+// Upload thumbnail to Cloudinary
+router.post('/upload/thumbnail', authenticate, requireRole('OWNER', 'ADMIN'), upload.single('image'), async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image file provided' });
+    }
+
+    const result = await CloudinaryService.uploadImage(req.file.buffer, {
+      folder: `courses/${req.user.businessId}/thumbnails`,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        url: result.secureUrl,
+        publicId: result.publicId,
+        width: result.width,
+        height: result.height,
+      },
+    });
+  } catch (error: any) {
+    console.error('Thumbnail upload error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to upload thumbnail' });
+  }
+});
+
+// ==================== COURSE PURCHASE & CHECKOUT ====================
+
+// Create checkout (Razorpay order) for a course
+router.post('/:id/checkout', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const course = await prisma.course.findFirst({
+      where: { id: req.params.id, isPublished: true, isActive: true },
+    });
+
+    if (!course) {
+      return res.status(404).json({ success: false, error: 'Course not found' });
+    }
+
+    if (course.accessType === 'free' || course.price === 0) {
+      return res.status(400).json({ success: false, error: 'Free courses can be enrolled directly' });
+    }
+
+    // Check if already enrolled
+    const existingEnrollment = await prisma.courseEnrollment.findFirst({
+      where: { courseId: course.id, userId: req.user.id },
+    });
+
+    if (existingEnrollment) {
+      return res.status(409).json({ success: false, error: 'Already enrolled in this course' });
+    }
+
+    // Create Razorpay order
+    const Razorpay = (await import('razorpay')).default;
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID || '',
+      key_secret: process.env.RAZORPAY_KEY_SECRET || '',
+    });
+
+    const amountInPaise = Math.round(course.price * 100);
+    const order = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: course.currency || 'INR',
+      receipt: `course_${course.id}_${Date.now()}`,
+      notes: {
+        courseId: course.id,
+        businessId: course.businessId,
+        userId: req.user.id,
+        type: 'course_purchase',
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: process.env.RAZORPAY_KEY_ID,
+        course: {
+          id: course.id,
+          name: course.name,
+          price: course.price,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('Course checkout error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create checkout', details: error.message });
+  }
+});
+
+// Verify payment and enroll
+router.post('/:id/purchase/verify', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ success: false, error: 'Missing payment verification details' });
+    }
+
+    // Verify signature
+    const body = razorpay_order_id + '|' + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
+      .update(body)
+      .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ success: false, error: 'Invalid payment signature' });
+    }
+
+    const course = await prisma.course.findFirst({
+      where: { id: req.params.id, isPublished: true, isActive: true },
+    });
+
+    if (!course) {
+      return res.status(404).json({ success: false, error: 'Course not found' });
+    }
+
+    // Create enrollment
+    const enrollment = await prisma.courseEnrollment.create({
+      data: {
+        courseId: course.id,
+        businessId: course.businessId,
+        userId: req.user.id,
+        status: 'active',
+        progress: 0,
+        enrolledAt: new Date(),
+      },
+    });
+
+    // Increment enrollment count
+    await prisma.course.update({
+      where: { id: course.id },
+      data: { enrollmentCount: { increment: 1 } },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        enrollment,
+        message: 'Successfully enrolled in course',
+      },
+    });
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ success: false, error: 'Already enrolled in this course' });
+    }
+    console.error('Course purchase verify error:', error);
+    res.status(500).json({ success: false, error: 'Failed to complete purchase', details: error.message });
   }
 });
 
@@ -261,7 +631,7 @@ router.post('/modules/:moduleId/lessons', authenticate, requireRole('OWNER', 'AD
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    const { title, description, type, content, duration, isFree, isPublished } = req.body;
+    const { title, description, type, content, duration, videoUrl, isFree, isPublished } = req.body;
 
     if (!title) {
       return res.status(400).json({ success: false, error: 'Title is required' });
@@ -276,19 +646,19 @@ router.post('/modules/:moduleId/lessons', authenticate, requireRole('OWNER', 'AD
       ? Math.max(...existingModule.lessons.map((l) => l.order))
       : -1;
 
-    const lesson = await prisma.courseLesson.create({
-      data: {
-        moduleId: existingModule.id,
-        title,
-        description,
-        type: type || 'text',
-        content: content || {},
-        duration: duration ?? null,
-        isFree: isFree ?? false,
-        isPublished: isPublished ?? false,
-        order: maxOrder + 1,
-      },
-    });
+    const lessonData: any = {
+      moduleId: existingModule.id,
+      title,
+      description,
+      type: type || 'text',
+      content: { ...(content || {}), ...(videoUrl ? { videoUrl } : {}) },
+      duration: duration ?? null,
+      isFree: isFree ?? false,
+      isPublished: isPublished ?? false,
+      order: maxOrder + 1,
+    };
+
+    const lesson = await prisma.courseLesson.create({ data: lessonData });
 
     res.status(201).json({ success: true, data: lesson });
   } catch (error: any) {
@@ -308,16 +678,19 @@ router.put('/lessons/:lessonId', authenticate, requireRole('OWNER', 'ADMIN'), as
       return res.status(404).json({ success: false, error: 'Lesson not found' });
     }
 
-    const { title, description, type, content, duration, order, isFree, isPublished } = req.body;
+    const { title, description, type, content, duration, videoUrl, order, isFree, isPublished } = req.body;
 
     const validTypes = ['video', 'text', 'quiz', 'assignment', 'download'];
     if (type && !validTypes.includes(type)) {
       return res.status(400).json({ success: false, error: `Invalid type. Must be one of: ${validTypes.join(', ')}` });
     }
 
+    const updatedContent = { ...(existing.content as any || {}), ...(content || {}) };
+    if (videoUrl) updatedContent.videoUrl = videoUrl;
+
     const lesson = await prisma.courseLesson.update({
       where: { id: req.params.lessonId },
-      data: { title, description, type, content, duration, order, isFree, isPublished },
+      data: { title, description, type, content: updatedContent, duration, order, isFree, isPublished },
     });
 
     res.json({ success: true, data: lesson });
@@ -349,49 +722,37 @@ router.delete('/lessons/:lessonId', authenticate, requireRole('OWNER', 'ADMIN'),
 
 // ==================== ENROLLMENTS ====================
 
-// Enroll contact in course
-router.post('/:id/enroll', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+// Enroll user in course (direct — for free courses)
+router.post('/:id/enroll', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const course = await prisma.course.findFirst({
-      where: { id: req.params.id, businessId: req.user.businessId },
+      where: { id: req.params.id, isPublished: true, isActive: true },
     });
 
     if (!course) {
       return res.status(404).json({ success: false, error: 'Course not found' });
     }
 
-    const { contactId, userId } = req.body;
-
-    if (!contactId && !userId) {
-      return res.status(400).json({ success: false, error: 'contactId or userId is required' });
-    }
-
-    // Check for existing enrollment
+    // Check if already enrolled
     const existingEnrollment = await prisma.courseEnrollment.findFirst({
-      where: {
-        courseId: course.id,
-        ...(contactId ? { contactId } : {}),
-        ...(userId ? { userId } : {}),
-      },
+      where: { courseId: course.id, userId: req.user.id },
     });
 
     if (existingEnrollment) {
-      return res.status(409).json({ success: false, error: 'Contact is already enrolled in this course' });
+      return res.status(409).json({ success: false, error: 'Already enrolled in this course' });
     }
 
     const enrollment = await prisma.courseEnrollment.create({
       data: {
         courseId: course.id,
-        businessId: req.user.businessId,
-        contactId: contactId || null,
-        userId: userId || null,
+        businessId: course.businessId,
+        userId: req.user.id,
         status: 'active',
         progress: 0,
         enrolledAt: new Date(),
       },
     });
 
-    // Increment enrollment count
     await prisma.course.update({
       where: { id: course.id },
       data: { enrollmentCount: { increment: 1 } },
@@ -400,9 +761,9 @@ router.post('/:id/enroll', authenticate, requireRole('OWNER', 'ADMIN'), async (r
     res.status(201).json({ success: true, data: enrollment });
   } catch (error: any) {
     if (error.code === 'P2002') {
-      return res.status(409).json({ success: false, error: 'Contact is already enrolled in this course' });
+      return res.status(409).json({ success: false, error: 'Already enrolled' });
     }
-    console.error('Enroll in course error:', error);
+    console.error('Enroll error:', error);
     res.status(500).json({ success: false, error: 'Failed to enroll', details: error.message });
   }
 });
@@ -453,14 +814,68 @@ router.get('/:id/enrollments', authenticate, async (req: AuthRequest, res: Respo
   }
 });
 
+// Get student's enrolled courses
+router.get('/my/enrolled', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const enrollments = await prisma.courseEnrollment.findMany({
+      where: { userId: req.user.id },
+      include: {
+        course: {
+          include: {
+            _count: { select: { modules: true } },
+            modules: {
+              where: { isPublished: true },
+              select: {
+                lessons: {
+                  where: { isPublished: true },
+                  select: { id: true, type: true },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { enrolledAt: 'desc' },
+    });
+
+    // Calculate total lessons per course
+    const data = enrollments.map(e => {
+      const totalLessons = e.course.modules.reduce((sum, m) => sum + m.lessons.length, 0);
+      return {
+        enrollment: {
+          id: e.id,
+          status: e.status,
+          progress: e.progress,
+          enrolledAt: e.enrolledAt,
+          lastAccessedAt: e.lastAccessedAt,
+          completedAt: e.completedAt,
+        },
+        course: {
+          id: e.course.id,
+          name: e.course.name,
+          description: e.course.description,
+          thumbnail: e.course.thumbnail,
+          price: e.course.price,
+          currency: e.course.currency,
+          accessType: e.course.accessType,
+          totalModules: e.course._count.modules,
+          totalLessons,
+        },
+      };
+    });
+
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('My enrolled courses error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch enrolled courses', details: error.message });
+  }
+});
+
 // Update enrollment progress
-router.patch('/enrollments/:enrollmentId/progress', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+router.patch('/enrollments/:enrollmentId/progress', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const existing = await prisma.courseEnrollment.findFirst({
-      where: {
-        id: req.params.enrollmentId,
-        businessId: req.user.businessId,
-      },
+      where: { id: req.params.enrollmentId, userId: req.user.id },
     });
 
     if (!existing) {
@@ -509,6 +924,7 @@ router.get('/public/:courseId', async (req: any, res: Response) => {
         isActive: true,
       },
       include: {
+        business: { select: { name: true, logoUrl: true } },
         modules: {
           where: { isPublished: true },
           orderBy: { order: 'asc' },

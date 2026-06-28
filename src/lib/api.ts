@@ -920,5 +920,61 @@ export const adminAnalyticsAPI = {
   getAuditLog: (params?: Record<string, any>) => apiClient.get('/admin/analytics/audit-log', { params }),
 };
 
+// ==================== COURSES API (Enhanced) ====================
+export const coursesAPI = {
+  // Instructor endpoints
+  list: (params?: any) => apiClient.get('/courses', { params }),
+  get: (id: string) => apiClient.get(`/courses/${id}`),
+  create: (data: any) => apiClient.post('/courses', data),
+  update: (id: string, data: any) => apiClient.put(`/courses/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/courses/${id}`),
+  
+  // AI Generation
+  generateWithAI: (data: { courseTitle: string; targetAudience?: string; difficulty?: string; language?: string }) =>
+    apiClient.post('/courses/ai/generate', data),
+  
+  // Video Upload
+  uploadVideo: (formData: FormData) => apiClient.post('/courses/upload/video', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000, // 5 min for video upload
+  }),
+  uploadThumbnail: (formData: FormData) => apiClient.post('/courses/upload/thumbnail', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  getCloudinaryConfig: () => apiClient.get('/courses/cloudinary/config'),
+  
+  // Modules
+  addModule: (courseId: string, data: any) => apiClient.post(`/courses/${courseId}/modules`, data),
+  updateModule: (moduleId: string, data: any) => apiClient.put(`/courses/modules/${moduleId}`, data),
+  deleteModule: (moduleId: string) => apiClient.delete(`/courses/modules/${moduleId}`),
+  
+  // Lessons
+  addLesson: (moduleId: string, data: any) => apiClient.post(`/courses/modules/${moduleId}/lessons`, data),
+  updateLesson: (lessonId: string, data: any) => apiClient.put(`/courses/lessons/${lessonId}`, data),
+  deleteLesson: (lessonId: string) => apiClient.delete(`/courses/lessons/${lessonId}`),
+  
+  // Student endpoints
+  getStudentView: (courseId: string) => apiClient.get(`/courses/${courseId}/student-view`),
+  getMyEnrolled: () => apiClient.get('/courses/my/enrolled'),
+  enrollFree: (courseId: string) => apiClient.post(`/courses/${courseId}/enroll`),
+  
+  // Purchases
+  createCheckout: (courseId: string) => apiClient.post(`/courses/${courseId}/checkout`),
+  verifyPurchase: (courseId: string, data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+    apiClient.post(`/courses/${courseId}/purchase/verify`, data),
+  
+  // Progress
+  updateProgress: (enrollmentId: string, data: { progress: number; status?: string }) =>
+    apiClient.patch(`/courses/enrollments/${enrollmentId}/progress`, data),
+  
+  // Doubt Solver
+  solveDoubt: (courseId: string, data: { question: string; lessonTitle?: string; moduleTitle?: string }) =>
+    apiClient.post(`/courses/${courseId}/doubt-solver`, data),
+  
+  // Public endpoints (no auth)
+  getPublished: (params?: any) => apiClient.get('/courses/published/list', { params }),
+  getPublicView: (courseId: string) => apiClient.get(`/courses/public/${courseId}`),
+};
+
 export default apiClient;
 

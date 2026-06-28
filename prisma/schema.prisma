@@ -40,6 +40,7 @@ model User {
   platformReferral     PlatformReferral?
   themePref            ThemePreference?
   business             Business?         @relation(fields: [businessId], references: [id])
+  courseEnrollments    CourseEnrollment[]
 
   @@index([businessId])
   @@index([appleId])
@@ -1856,8 +1857,10 @@ model CourseEnrollment {
   course         Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, contactId])
+  @@unique([courseId, userId])
   @@index([courseId])
   @@index([businessId])
+  @@index([userId])
 }
 
 model TriggerLink {
@@ -2700,8 +2703,9 @@ model FeatureFlag {
 
 enum Plan {
   FREE
-  BASIC
-  PROFESSIONAL
+  STARTER
+  GROWTH
+  PRO
   ENTERPRISE
   AGENCY
 }

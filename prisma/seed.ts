@@ -70,7 +70,7 @@ async function seed() {
       address: 'Office 42, IT Park, Hinjewadi',
       website: 'https://bizzautoai.com',
       timezone: 'Asia/Kolkata',
-      plan: 'PROFESSIONAL',
+      plan: 'PRO',
       planStartedAt: new Date(),
       planExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       aiCreditsUsed: 0,
@@ -638,7 +638,7 @@ async function seed() {
   console.log(`✅ ${posterTemplates.length} poster templates seeded for Creative Studio`);
 
   console.log('\n📊 Seeded data summary:');
-  console.log('  • 1 Business (PROFESSIONAL plan)');
+  console.log('  • 1 Business (PRO plan)');
   console.log('  • 1 User (Owner)');
   console.log('  • 1 Pipeline with 6 stages');
   console.log('  • 15 Contacts in various stages');

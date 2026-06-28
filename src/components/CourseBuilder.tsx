@@ -1,6 +1,7 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, BookOpen, Users, Clock, BarChart3, Loader2, Search, Edit2, Trash2, Copy, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, BookOpen, Users, Clock, BarChart3, Loader2, Search, Edit2, Trash2, Copy, Eye, Sparkles, Upload, Video, Image, Wand2 } from 'lucide-react';
+import { coursesAPI } from '../lib/api';
 
 interface Course {
   id: string;
@@ -47,6 +48,15 @@ export default function CourseBuilder() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+
+  // AI Generation
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiTargetAudience, setAiTargetAudience] = useState('');
+  const [aiDifficulty, setAiDifficulty] = useState('beginner');
+  
+  // Thumbnail Upload
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
 
   const fetchCourses = useCallback(async () => {
     try {
@@ -253,8 +263,31 @@ export default function CourseBuilder() {
             <div className="p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Course Name *</label>
-                <input type="text" value={newCourse.name} onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })} placeholder="Introduction to Marketing"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+                <div className="flex gap-2">
+                  <input type="text" value={newCourse.name} onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })} placeholder="Introduction to Marketing"
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+                  <button
+                    onClick={() => {
+                      if (!newCourse.name.trim()) { setError('Enter a course name first'); return; }
+                      setAiGenerating(true);
+                      coursesAPI.generateWithAI({
+                        courseTitle: newCourse.name,
+                        targetAudience: aiTargetAudience || undefined,
+                        difficulty: aiDifficulty,
+                      }).then(res => {
+                        if (res.data.success) {
+                          setNewCourse(prev => ({ ...prev, description: res.data.data.description }));
+                        }
+                      }).catch(() => setError('AI generation failed. Try again.')).finally(() => setAiGenerating(false));
+                    }}
+                    disabled={aiGenerating || !newCourse.name.trim()}
+                    className="px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-1.5"
+                    title="Generate with AI"
+                  >
+                    {aiGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                    AI
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
@@ -276,6 +309,34 @@ export default function CourseBuilder() {
                     <option value="subscription">Subscription</option>
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Thumbnail</label>
+                <div className="flex gap-2">
+                  <input type="text" value={newCourse.thumbnail} onChange={(e) => setNewCourse({ ...newCourse, thumbnail: e.target.value })} placeholder="Paste image URL or upload"
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+                  <input ref={thumbnailInputRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingThumbnail(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append('image', file);
+                      const res = await coursesAPI.uploadThumbnail(formData);
+                      if (res.data.success) {
+                        setNewCourse(prev => ({ ...prev, thumbnail: res.data.data.url }));
+                      }
+                    } catch { setError('Failed to upload thumbnail'); }
+                    finally { setUploadingThumbnail(false); }
+                  }} />
+                  <button onClick={() => thumbnailInputRef.current?.click()} disabled={uploadingThumbnail}
+                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm disabled:opacity-50">
+                    {uploadingThumbnail ? <Loader2 className="animate-spin" size={16} /> : <Image size={16} />}
+                  </button>
+                </div>
+                {newCourse.thumbnail && (
+                  <img src={newCourse.thumbnail} alt="Thumbnail preview" className="mt-2 h-20 rounded-lg object-cover" />
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Publish immediately</label>
@@ -304,13 +365,30 @@ export default function CourseBuilder() {
             <div className="p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Course Name *</label>
-                <input type="text" value={editCourse.name} onChange={(e) => setEditCourse({ ...editCourse, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+                <div className="flex gap-2">
+                  <input type="text" value={editCourse.name} onChange={(e) => setEditCourse({ ...editCourse, name: e.target.value })}
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+                  <button onClick={() => {
+                    setAiGenerating(true);
+                    coursesAPI.generateWithAI({ courseTitle: editCourse.name })
+                      .then(res => { if (res.data.success) setEditCourse(prev => prev ? { ...prev, description: res.data.data.description } : prev); })
+                      .catch(() => {})
+                      .finally(() => setAiGenerating(false));
+                  }} disabled={aiGenerating} className="px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-sm disabled:opacity-50" title="Generate with AI">
+                    {aiGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                 <textarea value={editCourse.description || ''} onChange={(e) => setEditCourse({ ...editCourse, description: e.target.value })} rows={3}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Thumbnail</label>
+                <input type="text" value={editCourse.thumbnail || ''} onChange={(e) => setEditCourse({ ...editCourse, thumbnail: e.target.value })}
+                  placeholder="Image URL" className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+                {editCourse.thumbnail && <img src={editCourse.thumbnail} alt="" className="mt-2 h-20 rounded-lg object-cover" />}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

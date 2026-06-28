@@ -117,6 +117,9 @@ const TriggerLinks = lazy(() => import('./components/TriggerLinks'));
 const PaymentLinks = lazy(() => import('./components/PaymentLinks'));
 const ClientPortal = lazy(() => import('./components/ClientPortal'));
 const ConversationsPage = lazy(() => import('./components/ConversationsPage'));
+const CoursePlayer = lazy(() => import('./components/CoursePlayer'));
+const CourseStore = lazy(() => import('./components/CourseStore'));
+const MyLearning = lazy(() => import('./components/MyLearning'));
 const CustomFieldsBuilder = lazy(() => import('./components/CustomFieldsBuilder'));
 const SupportTicketsPage = lazy(() => import('./components/SupportTicketsPage'));
 const ChangelogPage = lazy(() => import('./components/ChangelogPage'));
@@ -637,7 +640,7 @@ function AppRoutes() {
         }
       />
 
-      {/* Growth */}
+      {/* Courses */}
       <Route
         path="/courses"
         element={
@@ -645,6 +648,30 @@ function AppRoutes() {
             <ModeAwareAuthLayout>
               <CourseBuilder />
             </ModeAwareAuthLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/course-store"
+        element={
+            <CourseStore />
+        }
+      />
+      <Route
+        path="/my-learning"
+        element={
+          <ProtectedRoute>
+            <ModeAwareAuthLayout>
+              <MyLearning />
+            </ModeAwareAuthLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/course-player/:courseId"
+        element={
+          <ProtectedRoute>
+            <CoursePlayer />
           </ProtectedRoute>
         }
       />
