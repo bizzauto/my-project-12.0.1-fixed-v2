@@ -15,6 +15,12 @@ if [ -n "$REDIS_URL" ] && echo "$REDIS_URL" | grep -qE '^redis://[^@]*$'; then
   unset REDIS_URL
 fi
 
+# Coolify quirk: sometimes injects full Redis URL into REDIS_USERNAME
+if [ -z "$REDIS_URL" ] && [ -n "$REDIS_USERNAME" ] && echo "$REDIS_USERNAME" | grep -qE '^redis://'; then
+  export REDIS_URL="$REDIS_USERNAME"
+  echo "Detected Redis URL from REDIS_USERNAME (Coolify quirk)"
+fi
+
 # Build REDIS_URL only if not already set
 # IMPORTANT: Only build URL WITH auth. Never connect without password.
 if [ -z "$REDIS_URL" ]; then
@@ -26,6 +32,14 @@ if [ -z "$REDIS_URL" ]; then
   else
     echo "No REDIS_URL or REDIS_PASSWORD set — Redis will be disabled"
     unset REDIS_HOST 2>/dev/null || true
+  fi
+fi
+
+# Auto-enable REDIS_ENABLED if we have a valid URL with auth
+if [ -n "$REDIS_URL" ] && echo "$REDIS_URL" | grep -q '@'; then
+  if [ -z "$REDIS_ENABLED" ]; then
+    export REDIS_ENABLED=true
+    echo "Auto-enabled REDIS_ENABLED=true (valid URL with auth detected)"
   fi
 fi
 

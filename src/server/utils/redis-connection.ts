@@ -23,9 +23,15 @@ export function createRedisConnection() {
     : (redisUsername && redisUsername.startsWith('redis://')) ? redisUsername
     : null;
 
+  // Auto-enable if we found a valid URL with auth from Coolify quirk
+  if (!redisEnabled && effectiveUrl && effectiveUrl.includes('@')) {
+    console.log('[Redis] Auto-enabling — valid URL with auth detected in REDIS_USERNAME (Coolify quirk)');
+    process.env.REDIS_ENABLED = 'true';
+  }
+
   // NUCLEAR: Redis is completely disabled unless REDIS_ENABLED=true
   // This prevents Coolify auto-injected env vars from causing connection floods
-  if (!redisEnabled) {
+  if (!process.env.REDIS_ENABLED) {
     console.log('[Redis] REDIS_ENABLED not set to true — Redis disabled entirely. Set REDIS_ENABLED=true in env to enable.');
     redisDisabled = true;
     return null;
