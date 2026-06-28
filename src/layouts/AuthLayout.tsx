@@ -56,7 +56,7 @@ const menuSections: { label: string; items: MenuItem[] }[] = [
     items: [
       { id: '/google-reviews-qr', label: 'Reviews QR', icon: <QrCode size={20} /> },
       { id: '/vcard-maker', label: 'V-Card Maker', icon: <CreditCard size={20} /> },
-      { id: '/website-builder-product', label: 'Website Builder', icon: <Globe size={20} /> },
+
     ],
   },
   {
