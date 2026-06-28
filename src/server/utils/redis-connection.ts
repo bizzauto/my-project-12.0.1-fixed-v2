@@ -1,36 +1,59 @@
 import IORedis from 'ioredis';
 
 let redisDisabled = false;
+let connectionAttempted = false;
+/** Global — once set, ALL Redis activity stops immediately with no retries */
+let redisUnreachable = false;
 
 export function isRedisDisabled(): boolean {
-  return redisDisabled;
+  return redisDisabled || redisUnreachable;
+}
+
+function maskUrl(url: string): string {
+  try {
+    return url.replace(/rediss?:\/\/.*@/, (match) => {
+      return match.startsWith('rediss://') ? 'rediss://***@' : 'redis://***@';
+    });
+  } catch {
+    return 'invalid-url';
+  }
 }
 
 export function createRedisConnection() {
-  if (redisDisabled) return null;
+  if (redisDisabled || redisUnreachable) return null;
+  if (connectionAttempted) {
+    // Prevent cascade — if a previous call already attempted, return null
+    // to avoid multiple modules all creating independent connections
+    return null;
+  }
+  connectionAttempted = true;
 
   const redisUrl = process.env.REDIS_URL;
   const redisPassword = process.env.REDIS_PASSWORD;
   const redisHost = process.env.REDIS_HOST;
+  const redisPort = process.env.REDIS_PORT;
   // Coolify sometimes injects the full Redis URL into REDIS_USERNAME by mistake
   const redisUsername = process.env.REDIS_USERNAME;
   const redisEnabled = process.env.REDIS_ENABLED;
 
-  console.log(`[Redis] REDIS_URL: ${redisUrl ? 'SET' : 'NOT SET'}, REDIS_PASSWORD: ${redisPassword ? 'SET' : 'NOT SET'}, REDIS_HOST: ${redisHost || 'NOT SET'}, REDIS_USERNAME: ${redisUsername ? `SET (prefix: ${redisUsername.slice(0, 8)}...)` : 'NOT SET'}, REDIS_ENABLED: ${redisEnabled || 'NOT SET'}`);
+  console.log(`[Redis] REDIS_URL: ${redisUrl ? `SET (${maskUrl(redisUrl)})` : 'NOT SET'}, REDIS_PASSWORD: ${redisPassword ? 'SET' : 'NOT SET'}, REDIS_HOST: ${redisHost || 'NOT SET'}, REDIS_PORT: ${redisPort || 'NOT SET (default 6379)'}, REDIS_USERNAME: ${redisUsername ? `SET (prefix: ${redisUsername.slice(0, 12)}...)` : 'NOT SET'}, REDIS_ENABLED: ${redisEnabled || 'NOT SET'}`);
 
   // Check if REDIS_USERNAME contains a full Redis URL (Coolify quirk)
   const effectiveUrl = (redisUrl && redisUrl.includes('@')) ? redisUrl
     : (redisUsername && redisUsername.startsWith('redis://')) ? redisUsername
     : null;
 
-  // Auto-enable if we found a valid URL with auth from Coolify quirk
-  if (!redisEnabled && effectiveUrl && effectiveUrl.includes('@')) {
-    console.log('[Redis] Auto-enabling — valid URL with auth detected in REDIS_USERNAME (Coolify quirk)');
-    process.env.REDIS_ENABLED = 'true';
+  // Log the effective URL (masked) for debugging
+  if (effectiveUrl) {
+    console.log(`[Redis] Effective URL: ${maskUrl(effectiveUrl)}`);
+  } else if (redisPassword) {
+    console.log(`[Redis] Will connect via password to ${redisHost || 'coolify-redis'}:${redisPort || '6379'}`);
   }
 
   // NUCLEAR: Redis is completely disabled unless REDIS_ENABLED=true
   // This prevents Coolify auto-injected env vars from causing connection floods
+  // Note: We do NOT auto-enable even if Coolify injects a URL into REDIS_USERNAME.
+  // The user must explicitly set REDIS_ENABLED=true to confirm Redis should be used.
   if (!process.env.REDIS_ENABLED) {
     console.log('[Redis] REDIS_ENABLED not set to true — Redis disabled entirely. Set REDIS_ENABLED=true in env to enable.');
     redisDisabled = true;
@@ -58,7 +81,7 @@ export function createRedisConnection() {
       redisDisabled = true;
       return null;
     }
-    console.log('[Redis] Connecting via REDIS_URL...');
+    console.log(`[Redis] Connecting via URL: ${maskUrl(effectiveUrl)}`);
     return connectToRedis(effectiveUrl);
   }
 
@@ -79,25 +102,44 @@ export function createRedisConnection() {
   return null;
 }
 
+function getTimeoutConfig() {
+  const cmdTimeout = parseInt(process.env.REDIS_COMMAND_TIMEOUT || '8000', 10);
+  const connTimeout = parseInt(process.env.REDIS_CONNECT_TIMEOUT || '8000', 10);
+  return { commandTimeout: cmdTimeout, connectTimeout: connTimeout };
+}
+
 function connectToRedis(url: string) {
+  const { commandTimeout, connectTimeout } = getTimeoutConfig();
+
+  console.log(`[Redis] Timeouts — connect: ${connectTimeout}ms, command: ${commandTimeout}ms. Set REDIS_CONNECT_TIMEOUT / REDIS_COMMAND_TIMEOUT env vars to override.`);
+
   const client = new IORedis(url, {
     maxRetriesPerRequest: null,
     retryStrategy(times: number) {
-      if (redisDisabled || times > 2) return null;
-      return Math.min(times * 200, 2000);
+      if (redisDisabled || redisUnreachable || times > 3) return null;
+      // If we're retrying, it means connection failed — mark as unreachable
+      // to prevent retries and cascade connections from other modules
+      if (times >= 2) {
+        console.log('[Redis] ⛔ Multiple connection attempts failed — marking Redis as unreachable. No further retries.');
+        redisUnreachable = true;
+        return null;
+      }
+      const delay = Math.min(times * 500, 3000);
+      console.log(`[Redis] Retry #${times + 1} in ${delay}ms...`);
+      return delay;
     },
     enableOfflineQueue: false,
-    connectTimeout: 3000,
-    commandTimeout: 3000,
+    connectTimeout,
+    commandTimeout,
     lazyConnect: true,
   });
 
   function handleNoAuth(ctx: string) {
     return (err: any) => {
-      if (err?.message?.includes('NOAUTH') || err?.message?.includes('AUTH') || err?.message?.includes('ERR')) {
-        console.warn(`[Redis] Auth failed (${ctx}), retrying in 10s...`);
+      if (err?.message?.includes('NOAUTH') || err?.message?.includes('AUTH') || err?.message?.includes('WRONGPASS')) {
+        console.warn(`[Redis] Auth failed (${ctx}) — disabling Redis. Check REDIS_PASSWORD or REDIS_URL credentials.`);
         redisDisabled = true;
-        setTimeout(() => { redisDisabled = false; }, 10000);
+        setTimeout(() => { redisDisabled = false; }, 30000);
         return true;
       }
       return false;
@@ -106,15 +148,25 @@ function connectToRedis(url: string) {
 
   client.on('error', (err: any) => {
     if (handleNoAuth('error event')(err)) return;
-    console.error(`[Redis] Connection error: ${err.message}`);
+    if (err?.message?.includes('timed out')) {
+      console.error(`[Redis] ⏱ Command timed out after ${commandTimeout}ms. Redis marked UNREACHABLE — no further Redis activity. Error: ${err.message}`);
+      redisUnreachable = true;
+      redisDisabled = true;
+      try { client.quit(); } catch {}
+    } else {
+      console.error(`[Redis] Connection error: ${err.message}`);
+    }
   });
 
   client.on('connect', () => {
-    console.log('[Redis] TCP connected, waiting for ready...');
+    console.log('[Redis] ✅ TCP connected, waiting for ready...');
   });
 
   client.on('ready', () => {
-    console.log('[Redis] Connected successfully');
+    console.log('[Redis] ✅ Connected and ready — Redis is operational');
+    // Reset disabled/unreachable flags since we connected successfully
+    redisDisabled = false;
+    redisUnreachable = false;
   });
 
   client.on('reconnecting', () => {
@@ -122,12 +174,22 @@ function connectToRedis(url: string) {
   });
 
   client.on('reconnected', () => {
-    console.log('[Redis] Reconnected successfully — queues are operational again');
+    console.log('[Redis] ✅ Reconnected successfully — queues are operational again');
+    redisDisabled = false;
+  });
+
+  client.on('close', () => {
+    console.log('[Redis] Connection closed');
   });
 
   client.connect().catch((err: any) => {
     if (handleNoAuth('on connect')(err)) return;
-    console.error(`[Redis] Connect failed: ${err.message}`);
+    if (err?.message?.includes('timed out') || err?.message?.includes('ETIMEDOUT')) {
+      console.error(`[Redis] ⏱ Connection timed out after ${connectTimeout}ms. Redis marked UNREACHABLE — no further Redis activity. Check that Redis is running and reachable. Set REDIS_ENABLED=false in env vars to fully disable. Error: ${err.message}`);
+      redisUnreachable = true;
+    } else {
+      console.error(`[Redis] Connect failed: ${err.message}`);
+    }
     redisDisabled = true;
     try { client.quit(); } catch {}
   });
