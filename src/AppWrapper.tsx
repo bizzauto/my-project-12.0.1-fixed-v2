@@ -370,7 +370,13 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="/store" element={<PublicStorefront />} />
+      <Route path="/store" element={
+        <ProtectedRoute>
+          <ModeAwareAuthLayout>
+            <PublicStorefront />
+          </ModeAwareAuthLayout>
+        </ProtectedRoute>
+      } />
       <Route path="/store/:businessId" element={<PublicStorefront />} />
       <Route path="/checkout" element={
         <ProtectedRoute>
