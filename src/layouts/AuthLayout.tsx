@@ -157,53 +157,6 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const sidebarColors: Record<string, string> = {
-    dashboard: 'bg-[#0f172a]',
-    whatsapp: 'bg-[#064E3B]',
-    crm: 'bg-[#1e3a5f]',
-    leads: 'bg-[#2e1065]',
-    appointments: 'bg-[#134e4a]',
-    ecommerce: 'bg-[#431407]',
-    email: 'bg-[#4c0519]',
-    documents: 'bg-[#1e293b]',
-    social: 'bg-[#0c4a6e]',
-    google: 'bg-[#1c1917]',
-    'ai-chatbot': 'bg-[#1e1b4b]',
-    'voice-call': 'bg-[#451a03]',
-    creative: 'bg-[#4a044e]',
-    reviews: 'bg-[#0f172a]',
-    automation: 'bg-[#0f766e]',
-    analytics: 'bg-[#1e293b]',
-    reports: 'bg-[#0f172a]',
-    settings: 'bg-[#18181b]',
-    billing: 'bg-[#0f0f23]',
-    profile: 'bg-[#1e293b]',
-    team: 'bg-[#1c1917]',
-    funnels: 'bg-[#2e1065]',
-    workflows: 'bg-[#0f766e]',
-    surveys: 'bg-[#4c0519]',
-    blog: 'bg-[#1e3a5f]',
-    courses: 'bg-[#134e4a]',
-    'website-builder-product': 'bg-[#1c1917]',
-    'vcard-maker': 'bg-[#0c4a6e]',
-    'google-reviews-qr': 'bg-[#1c1917]',
-    'trigger-links': 'bg-[#1e1b4b]',
-    conversations: 'bg-[#1e3a5f]',
-    'client-portal': 'bg-[#0f172a]',
-    'custom-fields': 'bg-[#18181b]',
-    store: 'bg-[#431407]',
-    'payment-links': 'bg-[#0f0f23]',
-    'review-requests': 'bg-[#0f172a]',
-    'bulk-import': 'bg-[#1e293b]',
-    'ca-copilot': 'bg-[#0f0f23]',
-    'missed-call-settings': 'bg-[#451a03]',
-    'dograh-settings': 'bg-[#1e1b4b]',
-    snapshots: 'bg-[#18181b]',
-  };
-
-  const currentSection = location.pathname.split('/')[1] || 'dashboard';
-  const sidebarBg = sidebarColors[currentSection] || 'bg-slate-900';
-
   const filteredMenuItems = menuItems.filter(
     (item) => !item.roles || item.roles.includes(userRole)
   );
@@ -238,7 +191,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       {/* Tablet (md-lg): slide-out drawer with w-72 (fixed position) */}
       {/* Desktop (lg+): always visible, collapsible w-64/w-20 (flex item, not fixed) */}
       <div
-        className={`${sidebarBg} flex-col transition-all duration-300 ${
+        className={`bg-slate-900 flex-col transition-all duration-300 ${
           isMobile ? 'hidden' :
           isTablet ? `fixed left-0 top-0 z-50 ${sidebarOpen ? 'flex w-72 shadow-2xl' : 'hidden'}` :
           `flex flex-shrink-0 ${collapsed ? 'w-20' : 'w-64'}`
@@ -365,14 +318,14 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       }`}>
         {/* ===== MOBILE TOP BAR (visible only on mobile) =====
             backdrop-blur removed on mobile — kills Android scroll perf. */}
-        <div className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between sticky top-0 z-40 ios-status-bar" style={{ transform: 'translateZ(0)' }}>
+        <div className="md:hidden bg-slate-800 border-b border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between sticky top-0 z-40 ios-status-bar" style={{ transform: 'translateZ(0)' }}>
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
               <Zap size={14} className="text-white sm:w-4 sm:h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">BizzAuto</h1>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 capitalize truncate">
+              <h1 className="text-xs sm:text-sm font-bold text-white truncate">BizzAuto</h1>
+              <p className="text-[10px] text-slate-300 capitalize truncate">
                 {location.pathname.split('/')[1]?.replace('-', ' ') || 'Dashboard'}
               </p>
             </div>
@@ -380,14 +333,14 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             <button
               onClick={toggleTheme}
-              className="p-1.5 sm:p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-1.5 sm:p-2 text-slate-300 hover:bg-white/10 rounded-lg transition-colors"
             >
               {isDark ? <Sun size={16} className="sm:w-[18px] sm:h-[18px]" /> : <Moon size={16} className="sm:w-[18px] sm:h-[18px]" />}
             </button>
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-1.5 sm:p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="relative p-1.5 sm:p-2 text-slate-300 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <Bell size={16} className="sm:w-[18px] sm:h-[18px]" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -408,38 +361,38 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         </div>
 
         {/* ===== TABLET TOP BAR ===== */}
-        <div className="hidden md:flex lg:hidden bg-white dark:bg-gray-900 border-b border-gray-200/50 dark:border-gray-700/50 px-4 sm:px-6 py-3 items-center justify-between sticky top-0 z-40">
+        <div className="hidden md:flex lg:hidden bg-slate-800 border-b border-white/10 px-4 sm:px-6 py-3 items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
+              className="p-2 text-slate-300 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
               title="Toggle sidebar"
             >
               <Menu size={20} />
             </button>
-            <div className="text-base font-semibold text-gray-900 dark:text-white capitalize truncate">
+            <div className="text-base font-semibold text-white capitalize truncate">
               {location.pathname.split('/')[1]?.replace('-', ' ') || 'Dashboard'}
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <div className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium ${
               userRole === 'SUPER_ADMIN' || userRole === 'OWNER'
-                ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                ? 'bg-white/15 text-white'
                 : userRole === 'ADMIN'
-                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                ? 'bg-white/15 text-white'
                 : userRole === 'MEMBER'
-                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                ? 'bg-white/15 text-white'
+                : 'bg-white/15 text-white'
             }`}>
               {userRole}
             </div>
-            <button onClick={toggleTheme} className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            <button onClick={toggleTheme} className="p-2 text-slate-300 hover:bg-white/10 rounded-lg transition-colors">
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="relative p-2 text-slate-300 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <Bell size={18} />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -456,48 +409,47 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </div>
               )}
             </div>
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">{businessPlan} Plan</span>
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
+              <span className="text-sm font-medium text-slate-200 whitespace-nowrap">{businessPlan} Plan</span>
             </div>
           </div>
         </div>
 
-        {/* ===== DESKTOP TOP BAR (hidden on mobile/tablet) =====
-            backdrop-blur-x removed — only on desktop, but still costly during scroll */}
-        <div className="hidden lg:flex bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 px-6 xl:px-8 py-3.5 items-center justify-between sticky top-0 z-40">
+        {/* ===== DESKTOP TOP BAR ===== */}
+        <div className="hidden lg:flex bg-slate-800 border-b border-white/10 px-6 xl:px-8 py-3.5 items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-4 flex-1 min-w-0">
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
+              className="p-2 text-slate-300 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={collapsed ? 'M13 5l7 7-7 7M5 5l7 7-7 7' : 'M11 19l-7-7 7-7m8 14l-7-7 7-7'} />
               </svg>
             </button>
-            <div className="text-lg font-semibold text-gray-900 dark:text-white capitalize truncate">
+            <div className="text-lg font-semibold text-white capitalize truncate">
               {location.pathname.split('/')[1]?.replace('-', ' ') || 'Dashboard'}
             </div>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
             <div className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
               userRole === 'SUPER_ADMIN' || userRole === 'OWNER'
-                ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                ? 'bg-white/15 text-white'
                 : userRole === 'ADMIN'
-                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                ? 'bg-white/15 text-white'
                 : userRole === 'MEMBER'
-                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                ? 'bg-white/15 text-white'
+                : 'bg-white/15 text-white'
             }`}>
               {userRole}
             </div>
-            <button onClick={toggleTheme} className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            <button onClick={toggleTheme} className="p-2 text-slate-300 hover:bg-white/10 rounded-lg transition-colors">
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="relative p-2 text-slate-300 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <Bell size={20} />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -514,8 +466,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{businessPlan} Plan</span>
+            <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg">
+              <span className="text-sm font-medium text-slate-200">{businessPlan} Plan</span>
             </div>
           </div>
         </div>
