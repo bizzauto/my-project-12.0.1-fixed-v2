@@ -191,7 +191,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       {/* Tablet (md-lg): slide-out drawer with w-72 (fixed position) */}
       {/* Desktop (lg+): always visible, collapsible w-64/w-20 (flex item, not fixed) */}
       <div
-        className={`bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex-col transition-all duration-300 sidebar-glow ${
+        className={`bg-slate-900 dark:bg-slate-900 flex-col transition-all duration-300 ${
           isMobile ? 'hidden' :
           isTablet ? `fixed left-0 top-0 z-50 ${sidebarOpen ? 'flex w-72 shadow-2xl' : 'hidden'}` :
           `flex flex-shrink-0 ${collapsed ? 'w-20' : 'w-64'}`
@@ -213,7 +213,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               onClick={() => navigate(item.id)}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                 isActive(item.id)
-                  ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium relative nav-indicator'
+                  ? 'bg-blue-600 text-white shadow-sm font-medium relative'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
               title={collapsed ? item.label : undefined}
@@ -246,7 +246,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   onClick={() => navigate(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                     isActive(item.id)
-                      ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium relative nav-indicator'
+                      ? 'bg-blue-600 text-white shadow-sm font-medium relative'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                   title={collapsed ? item.label : undefined}
@@ -268,7 +268,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               onClick={() => navigate(item.id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                 isActive(item.id)
-                  ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white shadow-lg shadow-blue-500/20 font-medium relative nav-indicator'
+                  ? 'bg-blue-600 text-white shadow-sm font-medium relative'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
               title={collapsed ? item.label : undefined}
@@ -288,7 +288,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             className="flex items-center gap-3 w-full hover:bg-white/5 rounded-xl p-2.5 transition-colors"
             title={collapsed ? 'Profile' : undefined}
           >
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm ring-2 ring-white/20 flex-shrink-0">
+            <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
               {(userName || 'A').charAt(0).toUpperCase()}
             </div>
             {!collapsed && (
@@ -320,7 +320,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             backdrop-blur removed on mobile — kills Android scroll perf. */}
         <div className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between sticky top-0 z-40 ios-status-bar" style={{ transform: 'translateZ(0)' }}>
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
               <Zap size={14} className="text-white sm:w-4 sm:h-4" />
             </div>
             <div className="min-w-0 flex-1">
@@ -540,7 +540,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             {/* User info */}
             <div className="px-5 pb-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-lg ring-2 ring-white/20">
+                <div className="w-11 h-11 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
                   {(userName || 'A').charAt(0).toUpperCase()}
                 </div>
                 <div>

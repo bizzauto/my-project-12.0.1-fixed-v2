@@ -241,8 +241,8 @@ const ModernDashboard: React.FC = () => {
       </div>
 
       {/* CONVERSION CTA BANNER */}
-      <div className="relative overflow-hidden ai-glass neon-border rounded-2xl p-4 sm:p-5 md:p-6 ai-glow-pulse">
-        <div className="absolute -top-20 -right-10 w-60 h-60 bg-gradient-to-br from-pink-500/30 to-purple-500/30 rounded-full blur-3xl" />
+      <div className="relative overflow-hidden ai-glass border border-blue-500/20 rounded-2xl p-4 sm:p-5 md:p-6 ai-glow-pulse">
+        <div className="absolute -top-20 -right-10 w-60 h-60 bg-gradient-to-br from-blue-500/20 to-orange-500/20 rounded-full blur-3xl" />
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl ai-aurora flex items-center justify-center ai-float flex-shrink-0">
             <Crown size={24} className="text-white" />
