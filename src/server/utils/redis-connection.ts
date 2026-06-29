@@ -4,8 +4,6 @@ let redisDisabled = false;
 let connectionAttempted = false;
 /** Global — once set, ALL Redis activity stops immediately with no retries */
 let redisUnreachable = false;
-/** Prevent multiple timeout handlers from firing */
-let timeoutHandled = false;
 
 export function isRedisDisabled(): boolean {
   return redisDisabled || redisUnreachable;
@@ -22,14 +20,14 @@ function maskUrl(url: string): string {
 }
 
 export function createRedisConnection() {
-  if (redisDisabled || redisUnreachable) return null;
-  if (connectionAttempted) {
-    // Prevent cascade — if a previous call already attempted, return null
-    // to avoid multiple modules all creating independent connections
+  // IMMEDIATE FAIL FAST: If already unreachable, don't even check env vars
+  if (redisUnreachable) {
+    return null;
+  }
+  if (redisDisabled || connectionAttempted) {
     return null;
   }
   connectionAttempted = true;
-  timeoutHandled = false; // Reset timeout flag for new connection attempt
 
   const redisUrl = process.env.REDIS_URL;
   const redisPassword = process.env.REDIS_PASSWORD;
@@ -106,12 +104,17 @@ export function createRedisConnection() {
 }
 
 function getTimeoutConfig() {
-  const cmdTimeout = parseInt(process.env.REDIS_COMMAND_TIMEOUT || '8000', 10);
-  const connTimeout = parseInt(process.env.REDIS_CONNECT_TIMEOUT || '8000', 10);
+  const cmdTimeout = parseInt(process.env.REDIS_COMMAND_TIMEOUT || '3000', 10);
+  const connTimeout = parseInt(process.env.REDIS_CONNECT_TIMEOUT || '3000', 10);
   return { commandTimeout: cmdTimeout, connectTimeout: connTimeout };
 }
 
 function connectToRedis(url: string) {
+  // FAIL FAST: If already marked unreachable, don't even attempt
+  if (redisUnreachable || redisDisabled) {
+    console.log('[Redis] Already unreachable — skipping connection attempt');
+    return null;
+  }
   const { commandTimeout, connectTimeout } = getTimeoutConfig();
 
   console.log(`[Redis] Timeouts — connect: ${connectTimeout}ms, command: ${commandTimeout}ms. Set REDIS_CONNECT_TIMEOUT / REDIS_COMMAND_TIMEOUT env vars to override.`);
@@ -119,17 +122,11 @@ function connectToRedis(url: string) {
   const client = new IORedis(url, {
     maxRetriesPerRequest: null,
     retryStrategy(times: number) {
-      if (redisDisabled || redisUnreachable || times > 3) return null;
-      // If we're retrying, it means connection failed — mark as unreachable
-      // to prevent retries and cascade connections from other modules
-      if (times >= 2) {
-        console.log('[Redis] ⛔ Multiple connection attempts failed — marking Redis as unreachable. No further retries.');
-        redisUnreachable = true;
-        return null;
-      }
-      const delay = Math.min(times * 500, 3000);
-      console.log(`[Redis] Retry #${times + 1} in ${delay}ms...`);
-      return delay;
+      // NO RETRIES: If connection fails once, mark unreachable and stop
+      if (redisDisabled || redisUnreachable || times > 0) return null;
+      console.log('[Redis] ⛔ First connection attempt failed — marking Redis as unreachable. No further retries.');
+      redisUnreachable = true;
+      return null;
     },
     enableOfflineQueue: false,
     connectTimeout,
@@ -152,8 +149,6 @@ function connectToRedis(url: string) {
   client.on('error', (err: any) => {
     if (handleNoAuth('error event')(err)) return;
     if (err?.message?.includes('timed out')) {
-      if (timeoutHandled) return;
-      timeoutHandled = true;
       console.error(`[Redis] ⏱ Command timed out after ${commandTimeout}ms. Redis marked UNREACHABLE — no further Redis activity. Error: ${err.message}`);
       redisUnreachable = true;
       redisDisabled = true;
