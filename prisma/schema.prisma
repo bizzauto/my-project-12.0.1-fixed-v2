@@ -1855,6 +1855,7 @@ model CourseEnrollment {
   completedAt    DateTime?
   lastAccessedAt DateTime?
   course         Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user           User?     @relation(fields: [userId], references: [id])
 
   @@unique([courseId, contactId])
   @@unique([courseId, userId])

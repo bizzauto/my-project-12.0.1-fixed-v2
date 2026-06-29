@@ -4,6 +4,8 @@ let redisDisabled = false;
 let connectionAttempted = false;
 /** Global — once set, ALL Redis activity stops immediately with no retries */
 let redisUnreachable = false;
+/** Prevent multiple timeout handlers from firing */
+let timeoutHandled = false;
 
 export function isRedisDisabled(): boolean {
   return redisDisabled || redisUnreachable;
@@ -27,6 +29,7 @@ export function createRedisConnection() {
     return null;
   }
   connectionAttempted = true;
+  timeoutHandled = false; // Reset timeout flag for new connection attempt
 
   const redisUrl = process.env.REDIS_URL;
   const redisPassword = process.env.REDIS_PASSWORD;
@@ -149,6 +152,8 @@ function connectToRedis(url: string) {
   client.on('error', (err: any) => {
     if (handleNoAuth('error event')(err)) return;
     if (err?.message?.includes('timed out')) {
+      if (timeoutHandled) return;
+      timeoutHandled = true;
       console.error(`[Redis] ⏱ Command timed out after ${commandTimeout}ms. Redis marked UNREACHABLE — no further Redis activity. Error: ${err.message}`);
       redisUnreachable = true;
       redisDisabled = true;
