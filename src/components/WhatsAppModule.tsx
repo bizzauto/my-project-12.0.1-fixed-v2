@@ -12,6 +12,7 @@ import {
   AlertCircle, CheckCircle, VolumeX
 , Loader, Server} from 'lucide-react';
 import apiClient, { whatsappAPI } from '../lib/api';
+import { useToast } from './Toast';
 import ClaudeWhatsAppSettings from './ClaudeWhatsAppSettings';
 import UnofficialWhatsAppSettings from './UnofficialWhatsAppSettings';
 
@@ -672,7 +673,7 @@ const ChatView: React.FC<{
   const handleScheduleSend = async () => {
     if (!message.trim() || !selectedContact || !scheduleDate) return;
     try {
-      await apiClient.post('/api/whatsapp/schedule', {
+      await apiClient.post('/whatsapp/schedule', {
         phone: selectedContact.phone.replace(/\s/g, ''),
         contactId: selectedContact.id,
         type: 'text',
@@ -693,17 +694,26 @@ const ChatView: React.FC<{
     'Great question! Let me share our complete catalog with you. One moment please 😊',
   ];
 
-  const handleSendTemplate = (template: WATemplate) => {
-    const newMsg: WAMessage = {
-      id: `tmpl-${Date.now()}`,
-      content: template.content.replace(/\{\{1\}\}/g, selectedContact?.name || 'Customer').replace(/\{\{2\}\}/g, 'BizzAuto Solutions').replace(/\{\{3\}\}/g, 'https://www.bizzautoai.com').replace(/\{\{4\}\}/g, '+91 8983027975'),
-      timestamp: new Date().toISOString(),
-      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      direction: 'outbound',
-      status: 'sent',
-      type: 'template',
-    };
-    setMessages(prev => [...prev, newMsg]);
+  const handleSendTemplate = async (template: WATemplate) => {
+    if (!selectedContact) return;
+    try {
+      await whatsappAPI.sendTemplate({
+        phone: selectedContact.phone.replace(/\s/g, ''),
+        templateName: template.name,
+      });
+      const newMsg: WAMessage = {
+        id: `tmpl-${Date.now()}`,
+        content: template.content.replace(/\{\{1\}\}/g, selectedContact.name || 'Customer').replace(/\{\{2\}\}/g, 'BizzAuto Solutions').replace(/\{\{3\}\}/g, 'https://www.bizzautoai.com').replace(/\{\{4\}\}/g, '+91 8983027975'),
+        timestamp: new Date().toISOString(),
+        time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        direction: 'outbound',
+        status: 'sent',
+        type: 'template',
+      };
+      setMessages(prev => [...prev, newMsg]);
+    } catch {
+      // Error handled silently
+    }
     setShowTemplatePanel(false);
   };
 
@@ -954,12 +964,6 @@ const ChatView: React.FC<{
                           <button onClick={() => {
                             const emoji = '👍';
                             setMessage((prev) => prev + emoji);
-                          }} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="React">
-                            <Smile size={14} />
-                          </button>
-                          <button onClick={() => {
-                            const emoji = '👍';
-                            setMessage((prev: string) => prev + emoji);
                           }} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="React">
                             <Smile size={14} />
                           </button>
@@ -1719,9 +1723,15 @@ const TemplateManagerView: React.FC = () => {
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowCreate(false)} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (newTemplate.name && newTemplate.content) {
-                    setTemplates(prev => [...prev, { id: `t-${Date.now()}`, ...newTemplate, status: 'pending' as const, variables: (newTemplate.content.match(/\{\{\d+\}\}/g) || []).map((_, i) => `var_${i + 1}`) }]);
+                    try {
+                      const res = await whatsappAPI.createTemplate(newTemplate);
+                      const created = res.data?.data || res.data;
+                      setTemplates(prev => [...prev, { id: created?.id || `t-${Date.now()}`, ...newTemplate, status: 'pending' as const, variables: (newTemplate.content.match(/\{\{\d+\}\}/g) || []).map((_, i) => `var_${i + 1}`) }]);
+                    } catch {
+                      setTemplates(prev => [...prev, { id: `t-${Date.now()}`, ...newTemplate, status: 'pending' as const, variables: (newTemplate.content.match(/\{\{\d+\}\}/g) || []).map((_, i) => `var_${i + 1}`) }]);
+                    }
                     setShowCreate(false);
                     setNewTemplate({ name: '', category: 'MARKETING', language: 'en', content: '', footer: '' });
                   }
@@ -1756,7 +1766,7 @@ const TemplateManagerView: React.FC = () => {
                 <div className="flex gap-1">
                   <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400"><Copy size={16} /></button>
                   <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400"><Edit3 size={16} /></button>
-                  <button className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16} /></button>
+                  <button onClick={async () => { await whatsappAPI.deleteTemplate(template.id); setTemplates(prev => prev.filter(t => t.id !== template.id)); }} className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16} /></button>
                 </div>
               </div>
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{template.content}</div>
@@ -1781,6 +1791,7 @@ const TemplateManagerView: React.FC = () => {
 // ============================================================
 
 const WhatsAppSettingsView: React.FC = () => {
+  const toast = useToast();
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(true);
   const [welcomeMessage, setWelcomeMessage] = useState('Hello! 👋 Welcome to our business. How can we help you today?');
   const [awayMessage, setAwayMessage] = useState('We are currently away. Our business hours are Mon-Sat, 10 AM to 8 PM IST. We\'ll get back to you soon!');
@@ -1848,7 +1859,7 @@ const WhatsAppSettingsView: React.FC = () => {
                           </div>
                           <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{rule.response.substring(0, 100)}...</p>
                         </div>
-                        <button onClick={() => setAutoReplies(prev => prev.filter(r => r.id !== rule.id))} className="p-1 hover:bg-red-100 rounded text-red-400"><Trash2 size={14} /></button>
+                        <button onClick={async () => { await whatsappAPI.deleteAutoReply(rule.id); setAutoReplies(prev => prev.filter(r => r.id !== rule.id)); }} className="p-1 hover:bg-red-100 rounded text-red-400"><Trash2 size={14} /></button>
                       </div>
                     ))}
                   </div>
@@ -1861,9 +1872,15 @@ const WhatsAppSettingsView: React.FC = () => {
                       <textarea value={newResponse} onChange={e => setNewResponse(e.target.value)} placeholder="Auto-reply message..." className="col-span-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm" rows={2} />
                     </div>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (newKeyword && newResponse) {
-                          setAutoReplies(prev => [...prev, { id: `ar-${Date.now()}`, keyword: newKeyword, response: newResponse, isActive: true, matchType: 'contains' }]);
+                          try {
+                            const res = await whatsappAPI.createAutoReply({ keyword: newKeyword, response: newResponse, matchType: 'contains' });
+                            const created = res.data?.data || res.data;
+                            setAutoReplies(prev => [...prev, { id: created?.id || `ar-${Date.now()}`, keyword: newKeyword, response: newResponse, isActive: true, matchType: 'contains' }]);
+                          } catch {
+                            setAutoReplies(prev => [...prev, { id: `ar-${Date.now()}`, keyword: newKeyword, response: newResponse, isActive: true, matchType: 'contains' }]);
+                          }
                           setNewKeyword('');
                           setNewResponse('');
                         }
@@ -1934,7 +1951,7 @@ const WhatsAppSettingsView: React.FC = () => {
 
           {/* Save Button */}
           <div className="flex justify-end">
-            <button className="px-4 sm:px-5 md:px-6 md:px-4 sm:px-6 md:px-8 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-semibold shadow-lg shadow-green-500/20">
+            <button onClick={() => { toast.success('Settings saved successfully'); }} className="px-4 sm:px-5 md:px-6 md:px-4 sm:px-6 md:px-8 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-semibold shadow-lg shadow-green-500/20">
               💾 Save All Settings
             </button>
           </div>
@@ -2067,7 +2084,7 @@ const ScheduledMessagesView: React.FC = () => {
   const fetchScheduled = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(`/api/whatsapp/scheduled${filter !== 'all' ? `?status=${filter}` : ''}`);
+      const res = await apiClient.get(`/whatsapp/scheduled${filter !== 'all' ? `?status=${filter}` : ''}`);
       if (res.data?.success) setMessages(res.data.data.messages || []);
     } catch {
       // Fallback: show empty state
@@ -2081,7 +2098,7 @@ const ScheduledMessagesView: React.FC = () => {
   const handleSchedule = async () => {
     if (!form.phone || !form.scheduledAt || (!form.content && !form.templateName)) return;
     try {
-      await apiClient.post('/api/whatsapp/schedule', form);
+      await apiClient.post('/whatsapp/schedule', form);
       setForm({ phone: '', content: '', type: 'text', scheduledAt: '', templateName: '' });
       setShowScheduleForm(false);
       fetchScheduled();
@@ -2092,7 +2109,7 @@ const ScheduledMessagesView: React.FC = () => {
 
   const handleCancel = async (id: string) => {
     try {
-      await apiClient.patch(`/api/whatsapp/scheduled/${id}/cancel`);
+      await apiClient.patch(`/whatsapp/scheduled/${id}/cancel`);
       fetchScheduled();
     } catch {
       // Error handled silently

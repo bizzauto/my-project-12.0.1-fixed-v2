@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAuthStore } from '../lib/authStore';
 import { useToast } from '../components/Toast';
-import { campaignsAPI } from '../lib/api';
+import { campaignsAPI, whatsappAPI } from '../lib/api';
 import { Send, Users, FileText, Clock, CheckCircle2, AlertCircle, Upload, Filter, Loader2 } from 'lucide-react';
 
 interface BulkMessage {
@@ -16,7 +15,6 @@ interface BulkMessage {
 }
 
 export default function BulkMessagingPage() {
-  const { token } = useAuthStore();
   const toast = useToast();
   const [channel, setChannel] = useState<'whatsapp' | 'sms'>('whatsapp');
   const [content, setContent] = useState('');
@@ -52,12 +50,8 @@ export default function BulkMessagingPage() {
     if (!content.trim()) { toast.error('Enter message content'); return; }
     setSending(true);
     try {
-      const res = await fetch('/api/whatsapp/send-bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ channel, message: content, filter: recipientFilter }),
-      });
-      const data = await res.json();
+      const res = await whatsappAPI.sendBroadcast({ channel, message: content, filter: recipientFilter });
+      const data = res.data;
       if (data.success) {
         toast.success(`Bulk ${channel.toUpperCase()} sending initiated!`);
         setContent('');
