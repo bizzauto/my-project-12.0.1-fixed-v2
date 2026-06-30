@@ -58,30 +58,16 @@ const TeamManagement: React.FC = () => {
       return;
     }
     try {
-      const res = await teamAPI.inviteMember({ email: newUser.email, role: newUser.role });
+      const res = await teamAPI.inviteMember({ email: newUser.email, role: newUser.role, name: newUser.name, phone: newUser.phone });
       if (res.data.success) {
         fetchTeam();
         setNewUser({ email: '', name: '', role: 'MEMBER', phone: '' });
         setShowInviteModal(false);
         showToast('Invitation sent successfully!');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to invite member:', error);
-      // Optimistic update for demo
-      const member = {
-        id: Date.now().toString(),
-        name: newUser.name || newUser.email.split('@')[0],
-        email: newUser.email,
-        role: newUser.role,
-        isActive: true,
-        lastLoginAt: 'Never',
-        avatar: (newUser.name || newUser.email).charAt(0).toUpperCase(),
-        createdAt: new Date().toISOString().split('T')[0],
-      };
-      setTeam([...team, member]);
-      setNewUser({ email: '', name: '', role: 'MEMBER', phone: '' });
-      setShowInviteModal(false);
-      showToast(`${member.name} invited successfully!`);
+      showToast(error.response?.data?.error || 'Failed to send invitation', 'error');
     }
   };
 
@@ -91,11 +77,9 @@ const TeamManagement: React.FC = () => {
       setTeam(team.map((m) => (m.id === selectedUser.id ? { ...m, role } : m)));
       setShowRoleModal(false);
       showToast(`${selectedUser.name}'s role changed to ${role}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update role:', error);
-      setTeam(team.map((m) => (m.id === selectedUser.id ? { ...m, role } : m)));
-      setShowRoleModal(false);
-      showToast(`${selectedUser.name}'s role changed to ${role}`);
+      showToast(error.response?.data?.error || 'Failed to change role', 'error');
     }
   };
 
@@ -112,10 +96,9 @@ const TeamManagement: React.FC = () => {
       await teamAPI.removeMember(userId);
       setTeam(team.filter((m) => m.id !== userId));
       showToast(`${user?.name || 'User'} removed successfully`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to remove user:', error);
-      setTeam(team.filter((m) => m.id !== userId));
-      showToast(`${user?.name || 'User'} removed successfully`);
+      showToast(error.response?.data?.error || 'Failed to remove user', 'error');
     }
   };
 
@@ -126,10 +109,9 @@ const TeamManagement: React.FC = () => {
       await teamAPI.updateMember(userId, { isActive: newStatus });
       setTeam(team.map((m) => (m.id === userId ? { ...m, isActive: newStatus } : m)));
       showToast(`${user?.name} ${newStatus ? 'activated' : 'suspended'}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update status:', error);
-      setTeam(team.map((m) => (m.id === userId ? { ...m, isActive: newStatus } : m)));
-      showToast(`${user?.name} ${newStatus ? 'activated' : 'suspended'}`);
+      showToast(error.response?.data?.error || 'Failed to update status', 'error');
     }
   };
 

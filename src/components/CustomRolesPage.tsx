@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../components/Toast';
 import { Shield, Plus, Edit, Trash2, Users, Check, Loader2 } from 'lucide-react';
+import apiClient from '../lib/api';
 
 interface Permission {
   id: string;
@@ -49,9 +50,8 @@ export default function CustomRolesPage() {
   const fetchRoles = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/custom-roles', { credentials: 'include' });
-      const data = await res.json();
-      if (data.success) setRoles(data.data);
+      const res = await apiClient.get('/custom-roles');
+      if (res.data.success) setRoles(res.data.data);
     } catch { toast.error('Failed to load roles'); }
     finally { setLoading(false); }
   }, []);
@@ -71,15 +71,11 @@ export default function CustomRolesPage() {
     if (!form.name.trim()) { toast.error('Role name required'); return; }
     try {
       setSaving(true);
-      const res = await fetch('/api/custom-roles', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (data.success) {
+      const res = await apiClient.post('/custom-roles', form);
+      if (res.data.success) {
         setIsCreating(false); setForm({ name: '', color: 'bg-purple-100 text-purple-700', permissions: [] });
         fetchRoles(); toast.success('Role created!');
-      } else { toast.error(data.error || 'Failed to create'); }
+      } else { toast.error(res.data.error || 'Failed to create'); }
     } catch { toast.error('Network error'); }
     finally { setSaving(false); }
   };
@@ -88,15 +84,11 @@ export default function CustomRolesPage() {
     if (!editingId || !form.name.trim()) return;
     try {
       setSaving(true);
-      const res = await fetch(`/api/custom-roles/${editingId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (data.success) {
+      const res = await apiClient.put(`/custom-roles/${editingId}`, form);
+      if (res.data.success) {
         setEditingId(null); setForm({ name: '', color: 'bg-purple-100 text-purple-700', permissions: [] });
         fetchRoles(); toast.success('Role updated!');
-      } else { toast.error(data.error || 'Failed to update'); }
+      } else { toast.error(res.data.error || 'Failed to update'); }
     } catch { toast.error('Network error'); }
     finally { setSaving(false); }
   };
@@ -104,10 +96,9 @@ export default function CustomRolesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this custom role?')) return;
     try {
-      const res = await fetch(`/api/custom-roles/${id}`, { method: 'DELETE', credentials: 'include' });
-      const data = await res.json();
-      if (data.success) { fetchRoles(); toast.success('Role deleted'); }
-      else { toast.error(data.error || 'Failed to delete'); }
+      const res = await apiClient.delete(`/custom-roles/${id}`);
+      if (res.data.success) { fetchRoles(); toast.success('Role deleted'); }
+      else { toast.error(res.data.error || 'Failed to delete'); }
     } catch { toast.error('Network error'); }
   };
 

@@ -152,6 +152,11 @@ export const authAPI = {
   verifyOTP: (email: string, otp: string) => apiClient.post('/auth/verify-otp', { email, otp }),
   resetPassword: (email: string, otp: string, newPassword: string) =>
     apiClient.post('/auth/reset-password', { email, otp, newPassword }),
+  // 2FA
+  get2FAStatus: () => apiClient.get('/two-factor/status'),
+  disable2FA: (password: string) => apiClient.delete('/two-factor/disable', { data: { password } }),
+  // Account
+  deleteAccount: (password: string) => apiClient.post('/user/delete-account', { password }),
 };
 
 // Contacts API
@@ -970,6 +975,12 @@ export const coursesAPI = {
   // Doubt Solver
   solveDoubt: (courseId: string, data: { question: string; lessonTitle?: string; moduleTitle?: string }) =>
     apiClient.post(`/courses/${courseId}/doubt-solver`, data),
+  
+  // Quizzes
+  submitQuiz: (lessonId: string, data: { answers: Record<string, string> }) =>
+    apiClient.post(`/courses/lessons/${lessonId}/submit-quiz`, data),
+  getQuizAttempts: (lessonId: string) =>
+    apiClient.get(`/courses/lessons/${lessonId}/quiz-attempts`),
   
   // Public endpoints (no auth)
   getPublished: (params?: any) => apiClient.get('/courses/published/list', { params }),

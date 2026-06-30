@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAuthStore } from '../lib/authStore';
 import { useToast } from '../components/Toast';
 import { Bell, Mail, MessageSquare, Save, Loader2 } from 'lucide-react';
+import apiClient from '../lib/api';
 
 interface NotificationPreferences {
   emailNotifications: boolean;
@@ -34,7 +34,6 @@ const defaultPreferences: NotificationPreferences = {
 };
 
 export default function NotificationPreferencesPage() {
-  const { token } = useAuthStore();
   const toast = useToast();
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [loading, setLoading] = useState(true);
@@ -46,10 +45,8 @@ export default function NotificationPreferencesPage() {
 
   const fetchPreferences = async () => {
     try {
-      const res = await fetch('/api/user/notification-preferences', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const res = await apiClient.get('/notifications/preferences');
+      const data = res.data;
       if (data.success && data.data) {
         setPreferences({ ...defaultPreferences, ...data.data });
       }
@@ -63,15 +60,8 @@ export default function NotificationPreferencesPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/user/notification-preferences', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(preferences),
-      });
-      const data = await res.json();
+      const res = await apiClient.put('/notifications/preferences', preferences);
+      const data = res.data;
       if (data.success) {
         toast.success('Notification preferences saved');
       } else {

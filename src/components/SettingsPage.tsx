@@ -43,13 +43,9 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetch2FAStatus = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/two-factor/status', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await response.json();
-        if (data.success) {
-          setTwoFactorStatus(data.data);
+        const response = await authAPI.get2FAStatus();
+        if (response.data.success) {
+          setTwoFactorStatus(response.data.data);
         }
       } catch (error) {
         console.error('Failed to fetch 2FA status:', error);
@@ -83,24 +79,14 @@ export default function SettingsPage() {
   const handleDisable2FA = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/two-factor/disable', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ password: disablePassword }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
+      const response = await authAPI.disable2FA(disablePassword);
+      if (response.data.success) {
         setTwoFactorStatus({ enabled: false, setupPending: false });
         setShowDisableConfirm(false);
         setDisablePassword('');
         toast.success('Two-factor authentication disabled');
       } else {
-        toast.error(data.error || 'Failed to disable 2FA');
+        toast.error(response.data.error || 'Failed to disable 2FA');
       }
     } catch (error) {
       toast.error('Failed to disable 2FA');
@@ -801,23 +787,13 @@ function AccountDeletionSection() {
 
     setDeleting(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/user/delete-account', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ password, confirmText }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
+      const response = await authAPI.deleteAccount(password);
+      if (response.data.success) {
         toast.success('Account deleted successfully');
         localStorage.removeItem('token');
         window.location.href = '/';
       } else {
-        toast.error(data.error || 'Failed to delete account');
+        toast.error(response.data.error || 'Failed to delete account');
       }
     } catch {
       toast.error('Failed to delete account');

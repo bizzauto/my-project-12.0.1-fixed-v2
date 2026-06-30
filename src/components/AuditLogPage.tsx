@@ -6,12 +6,13 @@ import { useToast } from './Toast';
 
 interface LogEntry {
   id: string;
-  user: string;
   action: string;
-  resource: string;
-  time: string;
-  ip: string;
-  severity: string;
+  entity: string;
+  entityId?: string;
+  description?: string;
+  userEmail: string;
+  ipAddress?: string;
+  createdAt: string;
 }
 
 const AuditLogPage: React.FC = () => {
@@ -21,17 +22,6 @@ const AuditLogPage: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fallbackLogs: LogEntry[] = [
-    { id: '1', user: 'Admin User', action: 'user.created', resource: 'New user: priya@indiacrm.in', time: '2 min ago', ip: '103.21.55.12', severity: 'info' },
-    { id: '2', user: 'Admin User', action: 'contact.imported', resource: 'Imported 250 contacts via CSV', time: '1 hour ago', ip: '103.21.55.12', severity: 'info' },
-    { id: '3', user: 'Rahul Verma', action: 'campaign.sent', resource: 'Sent campaign: Diwali Sale Blast', time: '3 hours ago', ip: '103.21.55.45', severity: 'info' },
-    { id: '4', user: 'System', action: 'whatsapp.failed', resource: 'WhatsApp message failed: +91 98765 43210', time: '5 hours ago', ip: '-', severity: 'error' },
-    { id: '5', user: 'Admin User', action: 'settings.updated', resource: 'Updated business hours', time: '1 day ago', ip: '103.21.55.12', severity: 'warning' },
-    { id: '6', user: 'System', action: 'subscription.renewed', resource: 'Starter plan renewed automatically', time: '2 days ago', ip: '-', severity: 'info' },
-    { id: '7', user: 'Admin User', action: 'contact.deleted', resource: 'Deleted contact: Test User', time: '3 days ago', ip: '103.21.55.12', severity: 'warning' },
-    { id: '8', user: 'Sneha Patel', action: 'user.login', resource: 'Logged in from Chrome on Windows', time: '3 days ago', ip: '103.21.55.78', severity: 'info' },
-  ];
-
   useEffect(() => {
     loadLogs();
   }, []);
@@ -39,10 +29,11 @@ const AuditLogPage: React.FC = () => {
   const loadLogs = async () => {
     try {
       setLoading(true);
-      const res = await auditLogAPI.list({ severity: filter !== 'all' ? filter : undefined, search });
-      setLogs(res.data?.data || []);
+      const res = await auditLogAPI.list({ search });
+      const rawLogs = res.data?.data?.logs || res.data?.data || [];
+      setLogs(Array.isArray(rawLogs) ? rawLogs : []);
     } catch {
-      setLogs(fallbackLogs);
+      setLogs([]);
     } finally {
       setLoading(false);
     }
@@ -50,7 +41,7 @@ const AuditLogPage: React.FC = () => {
 
   const handleExport = async () => {
     try {
-      const res = await auditLogAPI.export({ severity: filter, search });
+      const res = await auditLogAPI.export({ search });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -63,14 +54,36 @@ const AuditLogPage: React.FC = () => {
     }
   };
 
-  const filtered = (logs.length > 0 ? logs : fallbackLogs).filter(l => {
-    if (filter !== 'all' && l.severity !== filter) return false;
-    if (search && !l.resource.toLowerCase().includes(search.toLowerCase()) && !l.user.toLowerCase().includes(search.toLowerCase())) return false;
+  const filtered = logs.filter(l => {
+    if (search && !l.description?.toLowerCase().includes(search.toLowerCase()) && !l.userEmail?.toLowerCase().includes(search.toLowerCase()) && !l.entity?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const severityColor = (s: string) => s === 'error' ? 'bg-red-100 text-red-700' : s === 'warning' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700';
-  const severityLabel = (s: string) => s === 'error' ? 'Error' : s === 'warning' ? 'Warning' : 'Info';
+  const actionLabel = (action: string) => {
+    if (action.includes('create') || action.includes('add')) return { color: 'bg-green-100 text-green-700', label: 'Created' };
+    if (action.includes('delete') || action.includes('remove')) return { color: 'bg-red-100 text-red-700', label: 'Deleted' };
+    if (action.includes('update') || action.includes('edit')) return { color: 'bg-yellow-100 text-yellow-700', label: 'Updated' };
+    if (action.includes('login')) return { color: 'bg-blue-100 text-blue-700', label: 'Login' };
+    return { color: 'bg-gray-100 text-gray-700', label: action };
+  };
+
+  const formatTime = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) return 'Just now';
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 7) return `${diffDay}d ago`;
+      return d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
 
   if (loading) return <PageSkeleton />;
 
@@ -104,29 +117,32 @@ const AuditLogPage: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
         <div className="divide-y divide-gray-100">
-          {filtered.map(log => (
-            <div key={log.id} className="flex items-center justify-between p-4 hover:bg-gray-50">
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${severityColor(log.severity)}`}>
-                  {log.severity === 'error' ? <Shield size={18} /> : <Clock size={18} />}
+          {filtered.map(log => {
+            const al = actionLabel(log.action);
+            return (
+              <div key={log.id} className="flex items-center justify-between p-4 hover:bg-gray-50">
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${al.color}`}>
+                    <Shield size={18} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{log.description || log.action}</p>
+                    <p className="text-sm text-gray-500">{log.entity}{log.entityId ? ` (${log.entityId.slice(0, 8)}...)` : ''}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900">{log.action}</p>
-                  <p className="text-sm text-gray-500">{log.resource}</p>
+                <div className="flex items-center gap-4 text-right">
+                  <div>
+                    <p className="text-sm text-gray-500">{log.userEmail || 'System'}</p>
+                    <p className="text-xs text-gray-400">{formatTime(log.createdAt)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">{log.ipAddress || '-'}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${al.color}`}>{al.label}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-right">
-                <div>
-                  <p className="text-sm text-gray-500">{log.user}</p>
-                  <p className="text-xs text-gray-400">{log.time}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">{log.ip}</p>
-                </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${severityColor(log.severity)}`}>{severityLabel(log.severity)}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {filtered.length === 0 && <div className="text-center py-12 text-gray-500">No logs found matching your criteria</div>}
       </div>
