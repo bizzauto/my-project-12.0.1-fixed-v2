@@ -7,7 +7,6 @@ import {
   Zap, Shield, Flag, MessageCircle, Paperclip, Camera, Video, Headphones, Heart, ThumbsUp, Send, Brain
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../lib/authStore';
 import { contactsAPI, businessAPI, appointmentsAPI, ledgerAPI, dealsAPI, pipelinesAPI, crmInvoicesAPI, goalsAPI } from '../lib/api';
 import { useToast } from './Toast';
 import PipelineViewEnhanced from './PipelineViewEnhanced';
@@ -287,8 +286,6 @@ const StageBadge: React.FC<{ stage: string }> = ({ stage }) => (
 
 export default function CRMPage() {
   const navigate = useNavigate();
-  const { business, isDemoMode } = useAuthStore();
-  const { info } = useToast();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -313,7 +310,6 @@ export default function CRMPage() {
   const [quickNoteContactId, setQuickNoteContactId] = useState<string | null>(null);
   const [quickNoteText, setQuickNoteText] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'quarter'>('month');
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
@@ -472,15 +468,34 @@ export default function CRMPage() {
   };
 
   // Add Deal
-  const handleAddDeal = (dealData: any) => {
-    const newDeal: Deal = {
-      ...dealData,
-      id: `deal-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setDeals(prev => [newDeal, ...prev]);
+  const handleAddDeal = async (dealData: any) => {
+    try {
+      const res = await contactsAPI.create({
+        name: dealData.contactName || dealData.title,
+        phone: dealData.contactPhone || '',
+        email: dealData.contactEmail || '',
+        dealValue: dealData.value,
+        dealStage: dealData.stage || 'lead',
+        source: dealData.source || 'manual',
+      });
+      const created = res?.data?.data || res?.data;
+      const newDeal: Deal = {
+        ...dealData,
+        id: created?.id || `deal-${Date.now()}`,
+        contactId: created?.id || dealData.contactId,
+        createdAt: new Date().toISOString().split('T')[0],
+      };
+      setDeals(prev => [newDeal, ...prev]);
+    } catch {
+      const newDeal: Deal = {
+        ...dealData,
+        id: `deal-${Date.now()}`,
+        createdAt: new Date().toISOString().split('T')[0],
+      };
+      setDeals(prev => [newDeal, ...prev]);
+    }
     setShowDealModal(false);
-    showToast(`New deal created: ${newDeal.title}`);
+    showToast(`New deal created: ${dealData.title}`);
   };
 
   // Create Invoice
@@ -514,13 +529,31 @@ export default function CRMPage() {
   };
 
   // Create Appointment
-  const handleCreateAppointment = (appointmentData: any) => {
-    const newAppointment: Appointment = {
-      ...appointmentData,
-      id: `apt-${Date.now()}`,
-      status: 'scheduled',
-    };
-    setAppointments(prev => [...prev, newAppointment]);
+  const handleCreateAppointment = async (appointmentData: any) => {
+    try {
+      const res = await appointmentsAPI.create({
+        title: appointmentData.service,
+        description: `${appointmentData.service} - ${appointmentData.clientName}`,
+        startTime: new Date(`${appointmentData.date}T${appointmentData.time}`).toISOString(),
+        endTime: new Date(new Date(`${appointmentData.date}T${appointmentData.time}`).getTime() + (appointmentData.duration || 30) * 60000).toISOString(),
+        contactId: appointmentData.contactId,
+        location: appointmentData.location,
+      });
+      const created = res?.data?.data || res?.data;
+      const newAppointment: Appointment = {
+        ...appointmentData,
+        id: created?.id || `apt-${Date.now()}`,
+        status: 'scheduled',
+      };
+      setAppointments(prev => [...prev, newAppointment]);
+    } catch {
+      const newAppointment: Appointment = {
+        ...appointmentData,
+        id: `apt-${Date.now()}`,
+        status: 'scheduled',
+      };
+      setAppointments(prev => [...prev, newAppointment]);
+    }
     setShowAppointmentModal(false);
     showToast('Appointment booked!');
   };
@@ -554,16 +587,12 @@ export default function CRMPage() {
   };
 
   // Add Quick Note
-  const handleAddQuickNote = () => {
+  const handleAddQuickNote = async () => {
     if (!quickNoteContactId || !quickNoteText.trim()) return;
+    const newNote = { id: `n-${Date.now()}`, content: quickNoteText, createdAt: new Date().toISOString().split('T')[0], type: 'note' as const, author: 'You' };
     setContacts(prev => prev.map(c => {
       if (c.id === quickNoteContactId) {
-        const notes = c.notes || [];
-        return {
-          ...c,
-          notes: [...notes, { id: `n-${Date.now()}`, content: quickNoteText, createdAt: new Date().toISOString().split('T')[0], type: 'note' as const, author: 'You' }],
-          lastActivity: 'Just now',
-        };
+        return { ...c, notes: [...(c.notes || []), newNote], lastActivity: 'Just now' };
       }
       return c;
     }));
@@ -571,17 +600,28 @@ export default function CRMPage() {
     setQuickNoteContactId(null);
     setShowQuickNoteModal(false);
     showToast('Note added');
+    try {
+      const contact = contacts.find(c => c.id === quickNoteContactId);
+      if (contact) {
+        await contactsAPI.update(quickNoteContactId, { notes: [...(contact.notes || []), newNote] });
+      }
+    } catch {
+      // Note saved locally
+    }
   };
 
   // Delete Contact
   const deleteContact = async (id: string) => {
+    const contact = contacts.find(c => c.id === id);
+    if (!confirm(`Delete "${contact?.name || 'this contact'}"? This cannot be undone.`)) return;
     setContacts(prev => prev.filter(c => c.id !== id));
     try {
       await contactsAPI.delete(id);
+      showToast('Contact deleted', 'info');
     } catch {
-      // Already removed from local state
+      if (contact) setContacts(prev => [...prev, contact]);
+      showToast('Failed to delete contact', 'error');
     }
-    showToast('Contact deleted', 'info');
   };
 
   // Loading state
@@ -631,11 +671,11 @@ export default function CRMPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5 sm:gap-3">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 text-gray-500 mb-1"><DollarSign size={14} /><span className="text-xs">Pipeline</span></div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">?{(totalDealValue / 100000).toFixed(1)}L</p>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">₹{(totalDealValue / 100000).toFixed(1)}L</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 text-green-500 mb-1"><TrendingUp size={14} /><span className="text-xs">Won</span></div>
-          <p className="text-xl font-bold text-green-600">?{(wonDeals / 100000).toFixed(1)}L</p>
+          <p className="text-xl font-bold text-green-600">₹{(wonDeals / 100000).toFixed(1)}L</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 text-blue-500 mb-1"><Users size={14} /><span className="text-xs">Contacts</span></div>
@@ -643,11 +683,11 @@ export default function CRMPage() {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 text-green-500 mb-1"><BarChart3 size={14} /><span className="text-xs">Revenue</span></div>
-          <p className="text-xl font-bold text-green-600">?{(totalRevenue / 100000).toFixed(1)}L</p>
+          <p className="text-xl font-bold text-green-600">₹{(totalRevenue / 100000).toFixed(1)}L</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 text-red-500 mb-1"><ArrowDown size={14} /><span className="text-xs">Expenses</span></div>
-          <p className="text-xl font-bold text-red-600">?{(totalExpenses / 100000).toFixed(1)}L</p>
+          <p className="text-xl font-bold text-red-600">₹{(totalExpenses / 100000).toFixed(1)}L</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 text-purple-500 mb-1"><Target size={14} /><span className="text-xs">Goals</span></div>
@@ -717,7 +757,7 @@ export default function CRMPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">{c.name}</p>
-                        <p className="text-[10px] sm:text-xs text-gray-500 truncate">?{((c.dealValue ?? 0) / 1000).toFixed(0)}K � {c.lastActivity}</p>
+                        <p className="text-[10px] sm:text-xs text-gray-500 truncate">₹{((c.dealValue ?? 0) / 1000).toFixed(0)}K · {c.lastActivity}</p>
                   </div>
                   <button className="flex-shrink-0 p-1.5 bg-emerald-500 text-white rounded-md hover:bg-emerald-600">
                     <MessageSquare size={12} />
@@ -827,13 +867,13 @@ export default function CRMPage() {
                             </div>
                             <div>
                               <p className="font-medium text-gray-900 dark:text-white">{contact.name}</p>
-                              <p className="text-xs text-gray-500">{contact.email} � {contact.phone}</p>
+                              <p className="text-xs text-gray-500">{contact.email} · {contact.phone}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 hidden md:table-cell">{contact.company}</td>
                         <td className="px-4 py-3"><StageBadge stage={contact.stage} /></td>
-                        <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">?{(contact.dealValue ?? 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">₹{(contact.dealValue ?? 0).toLocaleString()}</td>
                         <td className="px-4 py-3 hidden lg:table-cell"><LeadScoreBadge score={contact.leadScore} /></td>
                         <td className="px-4 py-3 hidden lg:table-cell">
                           <span className="text-xs text-gray-500">{contact.source || 'Direct'}</span>
@@ -886,7 +926,7 @@ export default function CRMPage() {
                   <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400 mb-3">
                     <p className="flex items-center gap-1.5"><Mail size={13} /> {contact.email}</p>
                     <p className="flex items-center gap-1.5"><Phone size={13} /> {contact.phone}</p>
-                    <p className="flex items-center gap-1.5"><DollarSign size={13} /> ?{(contact.dealValue ?? 0).toLocaleString()}</p>
+                    <p className="flex items-center gap-1.5"><DollarSign size={13} /> ₹{(contact.dealValue ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="flex items-center justify-between">
                     <StageBadge stage={contact.stage} />
@@ -918,7 +958,7 @@ export default function CRMPage() {
                 <p className="text-sm text-gray-500 mb-2">{deal.contactName}</p>
                 {deal.notes && <p className="text-xs text-gray-400 mb-3 italic">{deal.notes}</p>}
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
-                  <span className="text-xl font-bold text-green-600">?{deal.value.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-green-600">₹{deal.value.toLocaleString()}</span>
                   <span className="text-xs text-gray-400">Close: {new Date(deal.expectedClose).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                 </div>
                 {deal.products && (
@@ -926,8 +966,8 @@ export default function CRMPage() {
                     <p className="text-xs font-medium text-gray-500 mb-1">Products:</p>
                     {deal.products.map((p, i) => (
                       <div key={i} className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                        <span>{p.name} � {p.quantity}</span>
-                        <span>?{p.price.toLocaleString()}</span>
+                        <span>{p.name} × {p.quantity}</span>
+                        <span>₹{p.price.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -966,10 +1006,10 @@ export default function CRMPage() {
                         {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500">{invoice.customerName} � {invoice.customerEmail}</p>
+                    <p className="text-sm text-gray-500">{invoice.customerName} · {invoice.customerEmail}</p>
                   </div>
                 </div>
-                <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">?{invoice.total.toLocaleString()}</span>
+                <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">₹{invoice.total.toLocaleString()}</span>
               </div>
 
               {/* Items */}
@@ -988,15 +1028,15 @@ export default function CRMPage() {
                       <tr key={i}>
                         <td className="py-2 text-gray-700 dark:text-gray-300">{item.description}</td>
                         <td className="py-2 text-center text-gray-600">{item.quantity}</td>
-                        <td className="py-2 text-right text-gray-600">?{item.rate.toLocaleString()}</td>
-                        <td className="py-2 text-right font-medium">?{item.amount.toLocaleString()}</td>
+                        <td className="py-2 text-right text-gray-600">₹{item.rate.toLocaleString()}</td>
+                        <td className="py-2 text-right font-medium">₹{item.amount.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="border-t-2 border-gray-300 dark:border-gray-500">
-                    <tr><td colSpan={3} className="pt-2 text-right text-gray-500">Subtotal:</td><td className="pt-2 text-right">?{invoice.subtotal.toLocaleString()}</td></tr>
-                    <tr><td colSpan={3} className="text-right text-gray-500">Tax:</td><td className="text-right">?{invoice.tax.toLocaleString()}</td></tr>
-                    <tr className="font-bold"><td colSpan={3} className="text-right text-gray-900 dark:text-white">Total:</td><td className="text-right text-gray-900 dark:text-white">?{invoice.total.toLocaleString()}</td></tr>
+                    <tr><td colSpan={3} className="pt-2 text-right text-gray-500">Subtotal:</td><td className="pt-2 text-right">₹{invoice.subtotal.toLocaleString()}</td></tr>
+                    <tr><td colSpan={3} className="text-right text-gray-500">Tax:</td><td className="text-right">₹{invoice.tax.toLocaleString()}</td></tr>
+                    <tr className="font-bold"><td colSpan={3} className="text-right text-gray-900 dark:text-white">Total:</td><td className="text-right text-gray-900 dark:text-white">₹{invoice.total.toLocaleString()}</td></tr>
                   </tfoot>
                 </table>
               </div>
@@ -1036,17 +1076,17 @@ export default function CRMPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-5 rounded-xl border border-green-200 dark:border-green-800">
               <p className="text-sm text-green-600 dark:text-green-400 mb-1">Total Income</p>
-              <p className="text-2xl sm:text-3xl font-bold text-green-600">?{totalRevenue.toLocaleString()}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-600">₹{totalRevenue.toLocaleString()}</p>
               <p className="text-xs text-green-500 mt-1 flex items-center gap-1"><ArrowUp size={12} /> 12% vs last month</p>
             </div>
             <div className="bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 p-5 rounded-xl border border-red-200 dark:border-red-800">
               <p className="text-sm text-red-600 dark:text-red-400 mb-1">Total Expenses</p>
-              <p className="text-2xl sm:text-3xl font-bold text-red-600">?{totalExpenses.toLocaleString()}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-red-600">₹{totalExpenses.toLocaleString()}</p>
               <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><ArrowUp size={12} /> 5% vs last month</p>
             </div>
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-5 rounded-xl border border-blue-200 dark:border-blue-800">
               <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Net Profit</p>
-              <p className="text-2xl sm:text-3xl font-bold text-blue-600">?{(totalRevenue - totalExpenses).toLocaleString()}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-blue-600">₹{(totalRevenue - totalExpenses).toLocaleString()}</p>
               <p className="text-xs text-blue-500 mt-1 flex items-center gap-1">Profit Margin: {totalRevenue > 0 ? Math.round(((totalRevenue - totalExpenses) / totalRevenue) * 100) : 0}%</p>
             </div>
           </div>
@@ -1068,16 +1108,16 @@ export default function CRMPage() {
                       <p className="font-medium text-gray-900 dark:text-white">{entry.description}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span>{entry.category}</span>
-                        <span>�</span>
+                        <span>·</span>
                         <span>{entry.date}</span>
-                        {entry.paymentMethod && <><span>�</span><span className="capitalize">{entry.paymentMethod}</span></>}
-                        {entry.recurring && <><span>�</span><span className="text-blue-500">?? Recurring</span></>}
+                        {entry.paymentMethod && <><span>·</span><span className="capitalize">{entry.paymentMethod}</span></>}
+                        {entry.recurring && <><span>·</span><span className="text-blue-500">🔁 Recurring</span></>}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className={`font-bold ${entry.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                      {entry.type === 'income' ? '+' : '-'}?{entry.amount.toLocaleString()}
+                      {entry.type === 'income' ? '+' : '-'}₹{entry.amount.toLocaleString()}
                     </p>
                     {entry.reference && <p className="text-xs text-gray-400">Ref: {entry.reference}</p>}
                   </div>
@@ -1115,9 +1155,9 @@ export default function CRMPage() {
                 {apt.staff && <p className="flex items-center gap-1.5"><Users size={14} /> {apt.staff}</p>}
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'confirmed' as const } : a)); showToast('Appointment confirmed!'); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Confirm</button>
+                <button onClick={async () => { setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'confirmed' as const } : a)); showToast('Appointment confirmed!'); try { await appointmentsAPI.confirm(apt.id); } catch {} }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Confirm</button>
                 <button onClick={() => showToast('Reschedule link sent to client', 'info')} className="flex-1 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">Reschedule</button>
-                <button onClick={() => { setAppointments(prev => prev.filter(a => a.id !== apt.id)); showToast('Appointment cancelled', 'info'); }} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"><X size={16} /></button>
+                <button onClick={async () => { setAppointments(prev => prev.filter(a => a.id !== apt.id)); showToast('Appointment cancelled', 'info'); try { await appointmentsAPI.cancel(apt.id); } catch {} }} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"><X size={16} /></button>
               </div>
             </div>
           ))}
@@ -1155,7 +1195,7 @@ export default function CRMPage() {
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{goal.title}</h3>
                   <p className="text-sm text-gray-500 mb-3 capitalize">{goal.period} target</p>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-500">?{goal.current.toLocaleString()} / ?{goal.target.toLocaleString()}</span>
+                    <span className="text-sm text-gray-500">₹{goal.current.toLocaleString()} / ₹{goal.target.toLocaleString()}</span>
                     <span className="text-xs text-gray-400">{goal.progress}%</span>
                   </div>
                   <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
@@ -1308,7 +1348,7 @@ const ContactDetailModal: React.FC<{ contact: Contact; onClose: () => void }> = 
                 <div><p className="text-xs text-gray-500 uppercase mb-1">Phone</p><p className="font-medium flex items-center gap-1"><Phone size={14} /> {contact.phone}</p></div>
                 {contact.address && <div><p className="text-xs text-gray-500 uppercase mb-1">Address</p><p className="font-medium flex items-center gap-1"><MapPin size={14} /> {contact.address}</p></div>}
                 {contact.website && <div><p className="text-xs text-gray-500 uppercase mb-1">Website</p><p className="font-medium flex items-center gap-1"><Globe size={14} /> {contact.website}</p></div>}
-                <div><p className="text-xs text-gray-500 uppercase mb-1">Deal Value</p><p className="font-bold text-green-600 text-xl">?{(contact.dealValue ?? 0).toLocaleString()}</p></div>
+                <div><p className="text-xs text-gray-500 uppercase mb-1">Deal Value</p><p className="font-bold text-green-600 text-xl">₹{(contact.dealValue ?? 0).toLocaleString()}</p></div>
                 <div><p className="text-xs text-gray-500 uppercase mb-1">Lead Score</p><LeadScoreBadge score={contact.leadScore} /></div>
                 <div><p className="text-xs text-gray-500 uppercase mb-1">Source</p><p className="font-medium">{contact.source || 'Direct'}</p></div>
                 <div><p className="text-xs text-gray-500 uppercase mb-1">Created</p><p className="font-medium">{contact.createdAt}</p></div>
@@ -1380,8 +1420,8 @@ const ContactDetailModal: React.FC<{ contact: Contact; onClose: () => void }> = 
                         }`}>
                           <Flag size={10} /> {task.priority}
                         </span>
-                        {task.category && <span>� {task.category}</span>}
-                        <span>� Due: {task.dueDate}</span>
+                        {task.category && <span>· {task.category}</span>}
+                        <span>· Due: {task.dueDate}</span>
                       </div>
                     </div>
                   </div>
@@ -1412,7 +1452,7 @@ const ContactDetailModal: React.FC<{ contact: Contact; onClose: () => void }> = 
                     {act.description && <p className="text-xs text-gray-500 mt-0.5">{act.description}</p>}
                     <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
                       <span>{act.date}</span>
-                      {act.duration && <><span>�</span><span>{act.duration}</span></>}
+                      {act.duration && <><span>·</span><span>{act.duration}</span></>}
                     </div>
                   </div>
                 </div>
@@ -1578,7 +1618,7 @@ const InvoiceModal: React.FC<{ contacts: any[]; onClose: () => void; onCreate: (
                 <input type="text" placeholder="Description" value={item.description} onChange={e => updateItem(i, 'description', e.target.value)} className="col-span-5 px-3 py-2 border rounded-lg text-sm" />
                 <input type="number" placeholder="Qty" value={item.quantity} onChange={e => updateItem(i, 'quantity', parseInt(e.target.value) || 1)} className="col-span-2 px-3 py-2 border rounded-lg text-sm" />
                 <input type="number" placeholder="Rate" value={item.rate} onChange={e => updateItem(i, 'rate', parseFloat(e.target.value) || 0)} className="col-span-3 px-3 py-2 border rounded-lg text-sm" />
-                <span className="col-span-2 flex items-center justify-end font-semibold text-sm">?{(item.quantity * item.rate).toLocaleString()}</span>
+                <span className="col-span-2 flex items-center justify-end font-semibold text-sm">₹{(item.quantity * item.rate).toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -1587,9 +1627,9 @@ const InvoiceModal: React.FC<{ contacts: any[]; onClose: () => void; onCreate: (
             <div><label className="text-sm font-medium mb-1 block">Notes</label><input type="text" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 border rounded-xl" /></div>
           </div>
           <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl">
-            <div className="flex justify-between text-sm text-gray-600 mb-1"><span>Subtotal:</span><span>?{subtotal.toLocaleString()}</span></div>
-            <div className="flex justify-between text-sm text-gray-600 mb-1"><span>Tax ({form.taxRate}%):</span><span>?{tax.toLocaleString()}</span></div>
-            <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-white border-t pt-2 mt-2"><span>Total:</span><span>?{total.toLocaleString()}</span></div>
+            <div className="flex justify-between text-sm text-gray-600 mb-1"><span>Subtotal:</span><span>₹{subtotal.toLocaleString()}</span></div>
+            <div className="flex justify-between text-sm text-gray-600 mb-1"><span>Tax ({form.taxRate}%):</span><span>₹{tax.toLocaleString()}</span></div>
+            <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-white border-t pt-2 mt-2"><span>Total:</span><span>₹{total.toLocaleString()}</span></div>
           </div>
         </div>
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
