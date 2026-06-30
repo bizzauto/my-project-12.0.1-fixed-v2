@@ -3,7 +3,7 @@ import {
   Calendar, Clock, Plus, ChevronLeft, ChevronRight, User, MapPin, Phone, X, Check,
   Settings, Bell, Repeat, Video, Mail, RefreshCw, AlertCircle, CheckCircle, Loader2, Globe
 } from 'lucide-react';
-import apiClient from '../lib/api';
+import apiClient, { appointmentsAPI } from '../lib/api';
 
 interface Appointment {
   id: string;
@@ -58,17 +58,6 @@ const typeIcons: Record<string, string> = {
 const SERVICE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-const appointmentsAPI = {
-  list: (params?: any) => apiClient.get('/appointments', { params }),
-  create: (data: any) => apiClient.post('/appointments', data),
-  update: (id: string, data: any) => apiClient.put(`/appointments/${id}`, data),
-  delete: (id: string) => apiClient.delete(`/appointments/${id}`),
-  confirm: (id: string) => apiClient.patch(`/appointments/${id}/confirm`),
-  cancel: (id: string) => apiClient.patch(`/appointments/${id}/cancel`),
-  complete: (id: string) => apiClient.patch(`/appointments/${id}/complete`),
-  sendReminder: (id: string) => apiClient.post(`/appointments/${id}/remind`),
-};
 
 const formatDateStr = (date: Date): string => {
   const year = date.getFullYear();
@@ -183,7 +172,16 @@ const AppointmentsPage: React.FC = () => {
 
   const handleAddAppointment = async (apptData: Omit<Appointment, 'id'>) => {
     try {
-      const res = await appointmentsAPI.create(apptData);
+      const startTime = new Date(`${apptData.date}T${apptData.time}`).toISOString();
+      const endTime = new Date(new Date(`${apptData.date}T${apptData.time}`).getTime() + (apptData.duration || 30) * 60000).toISOString();
+      const res = await appointmentsAPI.create({
+        title: apptData.title,
+        description: apptData.notes || '',
+        startTime,
+        endTime,
+        service: apptData.type || 'General',
+        location: apptData.location,
+      });
       const created = res.data?.data || res.data;
       if (created?.id) {
         setAppointments(prev => [{ ...apptData, id: created.id }, ...prev]);
@@ -198,13 +196,17 @@ const AppointmentsPage: React.FC = () => {
   };
 
   const handleStatusChange = async (id: string, status: Appointment['status']) => {
+    const oldApt = appointments.find(a => a.id === id);
     setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     try {
       if (status === 'confirmed') await appointmentsAPI.confirm(id);
       else if (status === 'cancelled') await appointmentsAPI.cancel(id);
       else if (status === 'completed') await appointmentsAPI.complete(id);
       else await appointmentsAPI.update(id, { status });
-    } catch { /* optimistic update */ }
+    } catch {
+      if (oldApt) setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: oldApt.status } : a));
+      showToast('Failed to update status', 'error');
+    }
   };
 
   const handleSendReminder = async (id: string) => {
@@ -479,7 +481,7 @@ const AppointmentsPage: React.FC = () => {
                           <p className="font-medium text-gray-900 dark:text-white text-sm">{appt.title}</p>
                           <span className="text-xs text-gray-500">{appt.time}</span>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{(appt as any).contact}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{appt.contactName}</p>
                       </div>
                     ))}
                     {hourAppts.length === 0 && <div className="h-8" />}

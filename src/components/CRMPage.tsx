@@ -138,7 +138,7 @@ interface Appointment {
   date: string;
   time: string;
   duration: number;
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
   notes?: string;
   reminder: boolean;
   location?: string;
@@ -546,11 +546,12 @@ export default function CRMPage() {
   const handleCreateAppointment = async (appointmentData: any) => {
     try {
       const res = await appointmentsAPI.create({
-        title: appointmentData.service,
+        title: appointmentData.title,
         description: `${appointmentData.service} - ${appointmentData.clientName}`,
         startTime: new Date(`${appointmentData.date}T${appointmentData.time}`).toISOString(),
         endTime: new Date(new Date(`${appointmentData.date}T${appointmentData.time}`).getTime() + (appointmentData.duration || 30) * 60000).toISOString(),
-        contactId: appointmentData.contactId,
+        contactId: appointmentData.clientId || undefined,
+        service: appointmentData.service || 'General',
         location: appointmentData.location,
       });
       const created = res?.data?.data || res?.data;
@@ -1164,7 +1165,7 @@ export default function CRMPage() {
                   apt.status === 'confirmed' ? 'bg-green-100 text-green-700' :
                   apt.status === 'completed' ? 'bg-gray-100 text-gray-700' :
                   apt.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                  apt.status === 'no-show' ? 'bg-yellow-100 text-yellow-700' :
+                  apt.status === 'no_show' ? 'bg-yellow-100 text-yellow-700' :
                   'bg-blue-100 text-blue-700'
                 }`}>
                   {apt.status.toUpperCase()}
@@ -1182,7 +1183,7 @@ export default function CRMPage() {
               </div>
               <div className="flex gap-2">
                 <button onClick={async () => { const oldApt = appointments.find(a => a.id === apt.id); setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'confirmed' as const } : a)); showToast('Appointment confirmed!'); try { await appointmentsAPI.confirm(apt.id); } catch { if (oldApt) setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: oldApt.status } : a)); showToast('Failed to confirm appointment', 'error'); } }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Confirm</button>
-                <button onClick={() => showToast('Reschedule link sent to client', 'info')} className="flex-1 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">Reschedule</button>
+                <button onClick={() => showToast(`To reschedule: cancel this appointment and create a new one for ${apt.title}`, 'info')} className="flex-1 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">Reschedule</button>
                 <button onClick={async () => { const oldApt = appointments.find(a => a.id === apt.id); setAppointments(prev => prev.filter(a => a.id !== apt.id)); showToast('Appointment cancelled', 'info'); try { await appointmentsAPI.cancel(apt.id); } catch { if (oldApt) setAppointments(prev => [...prev, oldApt].sort((a, b) => a.date.localeCompare(b.date))); showToast('Failed to cancel appointment', 'error'); } }} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"><X size={16} /></button>
               </div>
             </div>

@@ -435,6 +435,7 @@ export const appointmentsAPI = {
   confirm: (id: string) => apiClient.patch(`/appointments/${id}/confirm`),
   cancel: (id: string) => apiClient.patch(`/appointments/${id}/cancel`),
   complete: (id: string) => apiClient.patch(`/appointments/${id}/complete`),
+  sendReminder: (id: string) => apiClient.post(`/appointments/${id}/remind`),
 };
 
 // Documents API
