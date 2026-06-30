@@ -115,6 +115,52 @@ router.get('/', authenticate, async (req: AuthRequest, res: any) => {
   }
 });
 
+// POST /api/deals - Create a deal (creates or updates a contact with deal info)
+router.post('/', authenticate, requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: any) => {
+  try {
+    const businessId = req.user.businessId;
+    const { contactName, contactPhone, contactEmail, title, value, stage, source } = req.body;
+
+    // Find existing contact by phone or create new one
+    let contact;
+    if (contactPhone) {
+      contact = await prisma.contact.findFirst({
+        where: { businessId, phone: contactPhone },
+      });
+    }
+
+    if (contact) {
+      // Update existing contact with deal info
+      contact = await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          dealValue: value || 0,
+          dealStage: stage || 'lead',
+          source: source || contact.source,
+        },
+      });
+    } else {
+      // Create new contact with deal info
+      contact = await prisma.contact.create({
+        data: {
+          businessId,
+          name: contactName || title || 'New Deal',
+          phone: contactPhone || '',
+          email: contactEmail || '',
+          dealValue: value || 0,
+          dealStage: stage || 'lead',
+          source: source || 'manual',
+        },
+      });
+    }
+
+    res.json({ success: true, data: contact });
+  } catch (error: any) {
+    console.error('Error creating deal:', error);
+    res.status(500).json({ error: error.message || 'Failed to create deal' });
+  }
+});
+
 // GET /api/deals/stats - Get deal statistics
 router.get('/stats', authenticate, cacheResponse(30), async (req: AuthRequest, res: any) => {
   try {

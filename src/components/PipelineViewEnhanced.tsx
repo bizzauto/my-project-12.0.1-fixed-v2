@@ -51,13 +51,13 @@ const getStageProbability = (stageName: string): number => {
 };
 
 const PIPELINE_STAGES: { id: string; name: string; color: string }[] = [
-  { id: 'lead', name: 'Lead Inbox', color: '#3B82F6' },
+  { id: 'lead', name: 'New Lead', color: '#3B82F6' },
   { id: 'contacted', name: 'Contacted', color: '#F59E0B' },
   { id: 'qualified', name: 'Qualified', color: '#8B5CF6' },
   { id: 'proposal', name: 'Proposal', color: '#F97316' },
   { id: 'negotiation', name: 'Negotiation', color: '#EC4899' },
-  { id: 'closed_won', name: 'Closed Won', color: '#10B981' },
-  { id: 'closed_lost', name: 'Closed Lost', color: '#EF4444' },
+  { id: 'closed_won', name: 'Won', color: '#10B981' },
+  { id: 'closed_lost', name: 'Lost', color: '#EF4444' },
 ];
 
 // ============================================================
@@ -76,25 +76,27 @@ export default function PipelineViewEnhanced({ deals, onDealStageChange }: Pipel
       const stageName = stage.name.toLowerCase();
       return dealStage === stageName ||
         dealStage === stage.id.replace('_', ' ') ||
-        (stage.name === 'Closed Won' && (dealStage === 'won' || dealStage === 'closed won')) ||
-        (stage.name === 'Closed Lost' && (dealStage === 'lost' || dealStage === 'closed lost')) ||
-        (stage.name === 'Lead Inbox' && dealStage === 'new lead');
+        dealStage === stage.id ||
+        (stage.name === 'Won' && (dealStage === 'won' || dealStage === 'closed won')) ||
+        (stage.name === 'Lost' && (dealStage === 'lost' || dealStage === 'closed lost')) ||
+        (stage.name === 'New Lead' && (dealStage === 'new lead' || dealStage === 'lead'));
     }),
     total: deals.filter(d => {
       const dealStage = (d.stage || '').toLowerCase();
       const stageName = stage.name.toLowerCase();
       return dealStage === stageName ||
         dealStage === stage.id.replace('_', ' ') ||
-        (stage.name === 'Closed Won' && (dealStage === 'won' || dealStage === 'closed won')) ||
-        (stage.name === 'Closed Lost' && (dealStage === 'lost' || dealStage === 'closed lost')) ||
-        (stage.name === 'Lead Inbox' && dealStage === 'new lead');
+        dealStage === stage.id ||
+        (stage.name === 'Won' && (dealStage === 'won' || dealStage === 'closed won')) ||
+        (stage.name === 'Lost' && (dealStage === 'lost' || dealStage === 'closed lost')) ||
+        (stage.name === 'New Lead' && (dealStage === 'new lead' || dealStage === 'lead'));
     }).reduce((s, d) => s + d.value, 0),
   }));
 
   // Analytics calculations
   const weightedPipeline = deals.reduce((s, d) => s + Math.round(d.value * d.probability / 100), 0);
-  const wonDeals = deals.filter(d => ['Closed Won', 'Won'].includes(d.stage));
-  const totalActiveDeals = deals.filter(d => !['Closed Won', 'Closed Lost', 'Won', 'Lost'].includes(d.stage));
+  const wonDeals = deals.filter(d => ['Won', 'Closed Won'].includes(d.stage));
+  const totalActiveDeals = deals.filter(d => !['Won', 'Lost', 'Closed Won', 'Closed Lost'].includes(d.stage));
   const winRate = deals.length > 0 ? Math.round(wonDeals.length / deals.length * 100) : 0;
   const conversionRate = deals.length > 0 ? Math.round(totalActiveDeals.length / deals.length * 100) : 0;
   const avgDealValue = deals.length > 0 ? Math.round(deals.reduce((s, d) => s + d.value, 0) / deals.length) : 0;

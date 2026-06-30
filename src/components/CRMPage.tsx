@@ -411,13 +411,20 @@ export default function CRMPage() {
 
   const handleDealStageChange = (dealId: string, newStageId: string) => {
     const stageName = stageIdToName[newStageId] || newStageId;
+    // Save old stage for rollback
+    const oldStage = deals.find(d => d.id === dealId)?.stage;
     // Optimistic update
     setDeals((prev) => prev.map((d) =>
       d.id === dealId ? { ...d, stage: stageName } : d
     ));
     // Persist to API
     dealsAPI.updateStage(dealId, { stage: stageName }).catch(() => {
-      // Revert on failure - reload deals
+      // Rollback on failure
+      if (oldStage) {
+        setDeals((prev) => prev.map((d) =>
+          d.id === dealId ? { ...d, stage: oldStage } : d
+        ));
+      }
       showToast('Failed to update deal stage', 'error');
     });
   };
@@ -470,12 +477,13 @@ export default function CRMPage() {
   // Add Deal
   const handleAddDeal = async (dealData: any) => {
     try {
-      const res = await contactsAPI.create({
-        name: dealData.contactName || dealData.title,
-        phone: dealData.contactPhone || '',
-        email: dealData.contactEmail || '',
-        dealValue: dealData.value,
-        dealStage: dealData.stage || 'lead',
+      const res = await dealsAPI.create({
+        contactName: dealData.contactName || dealData.title,
+        contactPhone: dealData.contactPhone || '',
+        contactEmail: dealData.contactEmail || '',
+        title: dealData.title,
+        value: dealData.value,
+        stage: dealData.stage || 'lead',
         source: dealData.source || 'manual',
       });
       const created = res?.data?.data || res?.data;
@@ -1635,16 +1643,22 @@ const InvoiceModal: React.FC<{ contacts: any[]; onClose: () => void; onCreate: (
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 border rounded-xl hover:bg-gray-50 text-sm">Cancel</button>
           <button onClick={() => {
-            if (selectedContact && form.items.length > 0) {
-              onCreate({
-                customerName: selectedContact.name,
-                customerEmail: selectedContact.email,
-                customerPhone: selectedContact.phone,
-                items: form.items.map(i => ({ ...i, amount: i.quantity * i.rate })),
-                subtotal, tax, total,
-                notes: form.notes || undefined,
-              });
+            if (!selectedContact) {
+              showToast('Please select a contact first', 'error');
+              return;
             }
+            if (form.items.length === 0) {
+              showToast('Please add at least one item', 'error');
+              return;
+            }
+            onCreate({
+              customerName: selectedContact.name,
+              customerEmail: selectedContact.email,
+              customerPhone: selectedContact.phone,
+              items: form.items.map(i => ({ ...i, amount: i.quantity * i.rate })),
+              subtotal, tax, total,
+              notes: form.notes || undefined,
+            });
           }} className="flex-1 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 text-sm font-medium">Create Invoice</button>
         </div>
       </div>

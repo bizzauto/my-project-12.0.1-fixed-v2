@@ -715,6 +715,7 @@ export const goalsAPI = {
 export const dealsAPI = {
   list: (params?: Record<string, any>) => apiClient.get('/deals', { params }),
   stats: () => apiClient.get('/deals/stats'),
+  create: (data: Record<string, any>) => apiClient.post('/deals', data),
   updateStage: (id: string, data: { stage?: string; stageId?: string; pipelineId?: string }) =>
     apiClient.put(`/deals/${id}/stage`, data),
   update: (id: string, data: Record<string, any>) => apiClient.put(`/deals/${id}`, data),
