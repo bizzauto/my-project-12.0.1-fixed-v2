@@ -62,19 +62,16 @@ export default function CourseBuilder() {
     try {
       setLoading(true);
       setError(null);
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('limit', '20');
-      if (search) params.set('search', search);
-      if (filterPublished) params.set('isPublished', filterPublished);
+      const params: any = { page: String(page), limit: '20' };
+      if (search) params.search = search;
+      if (filterPublished) params.isPublished = filterPublished;
 
-      const res = await fetch(`/api/courses?${params.toString()}`, { credentials: 'include' });
-      const data = await res.json();
-      if (data.success) {
-        setCourses(data.data.courses);
-        setPagination(data.data.pagination);
+      const res = await coursesAPI.list(params);
+      if (res.data.success) {
+        setCourses(res.data.data.courses);
+        setPagination(res.data.data.pagination);
       } else {
-        setError(data.error || 'Failed to load courses');
+        setError(res.data.error || 'Failed to load courses');
       }
     } catch {
       setError('Network error loading courses');
@@ -89,17 +86,13 @@ export default function CourseBuilder() {
     if (!newCourse.name.trim()) { setError('Course name is required'); return; }
     try {
       setCreating(true);
-      const res = await fetch('/api/courses', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify(newCourse),
-      });
-      const data = await res.json();
-      if (data.success) {
+      const res = await coursesAPI.create(newCourse);
+      if (res.data.success) {
         setIsCreateOpen(false);
         setNewCourse({ name: '', description: '', thumbnail: '', price: 0, currency: 'INR', accessType: 'free', dripContent: false, dripInterval: 1, isActive: true, isPublished: false });
         fetchCourses();
       } else {
-        setError(data.error || 'Failed to create course');
+        setError(res.data.error || 'Failed to create course');
       }
     } catch { setError('Network error creating course'); }
     finally { setCreating(false); }
@@ -109,18 +102,14 @@ export default function CourseBuilder() {
     if (!editCourse) return;
     try {
       setUpdating(true);
-      const res = await fetch(`/api/courses/${editCourse.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({
-          name: editCourse.name, description: editCourse.description, thumbnail: editCourse.thumbnail,
-          price: editCourse.price, currency: editCourse.currency, accessType: editCourse.accessType,
-          isActive: editCourse.isActive, isPublished: editCourse.isPublished,
-        }),
+      const res = await coursesAPI.update(editCourse.id, {
+        name: editCourse.name, description: editCourse.description, thumbnail: editCourse.thumbnail,
+        price: editCourse.price, currency: editCourse.currency, accessType: editCourse.accessType,
+        isActive: editCourse.isActive, isPublished: editCourse.isPublished,
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.data.success) {
         setIsEditOpen(false); setEditCourse(null); fetchCourses();
-      } else { setError(data.error || 'Failed to update course'); }
+      } else { setError(res.data.error || 'Failed to update course'); }
     } catch { setError('Network error updating course'); }
     finally { setUpdating(false); }
   };
@@ -129,9 +118,8 @@ export default function CourseBuilder() {
     if (!confirm('Are you sure you want to delete this course? This action cannot be undone.')) return;
     try {
       setDeletingId(id);
-      const res = await fetch(`/api/courses/${id}`, { method: 'DELETE', credentials: 'include' });
-      const data = await res.json();
-      if (data.success) { fetchCourses(); } else { setError(data.error || 'Failed to delete course'); }
+      const res = await coursesAPI.delete(id);
+      if (res.data.success) { fetchCourses(); } else { setError(res.data.error || 'Failed to delete course'); }
     } catch { setError('Network error deleting course'); }
     finally { setDeletingId(null); }
   };
@@ -139,24 +127,16 @@ export default function CourseBuilder() {
   const handleDuplicateCourse = async (course: Course) => {
     try {
       setDuplicatingId(course.id);
-      const res = await fetch('/api/courses', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ name: `${course.name} (Copy)`, description: course.description, accessType: course.accessType, isPublished: false }),
-      });
-      const data = await res.json();
-      if (data.success) { fetchCourses(); } else { setError(data.error || 'Failed to duplicate course'); }
+      const res = await coursesAPI.create({ name: `${course.name} (Copy)`, description: course.description, accessType: course.accessType, isPublished: false });
+      if (res.data.success) { fetchCourses(); } else { setError(res.data.error || 'Failed to duplicate course'); }
     } catch { setError('Network error duplicating course'); }
     finally { setDuplicatingId(null); }
   };
 
   const handleTogglePublish = async (course: Course) => {
     try {
-      const res = await fetch(`/api/courses/${course.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ isPublished: !course.isPublished }),
-      });
-      const data = await res.json();
-      if (data.success) { fetchCourses(); } else { setError(data.error || 'Failed to update publish status'); }
+      const res = await coursesAPI.update(course.id, { isPublished: !course.isPublished });
+      if (res.data.success) { fetchCourses(); } else { setError(res.data.error || 'Failed to update publish status'); }
     } catch { setError('Network error updating publish status'); }
   };
 

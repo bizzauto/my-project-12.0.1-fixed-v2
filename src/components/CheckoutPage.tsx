@@ -197,13 +197,13 @@ const CheckoutPage: React.FC = () => {
 
         const rzp = new (window as any).Razorpay(options);
         rzp.open();
+        // Don't reset processing here — ondismiss handler will do it
       } else {
         showSuccess('Order placed successfully!');
         navigate(`/order-tracking/${order.orderNumber}`);
       }
     } catch (err: any) {
       showError(err.response?.data?.error || 'Failed to place order');
-    } finally {
       setProcessing(false);
     }
   };

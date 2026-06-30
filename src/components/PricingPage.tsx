@@ -208,6 +208,17 @@ export default function PricingPage({ onNavigate }: PricingPageProps) {
     setLoading(true);
 
     try {
+      // Load Razorpay SDK
+      if (!(window as any).Razorpay) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
+          document.body.appendChild(script);
+        });
+      }
+
       // Create Razorpay order
       const response = await subscriptionsAPI.createCheckout({ plan: planId, period });
       const { orderId, amount, currency, key } = response.data.data;

@@ -78,6 +78,7 @@ const AppointmentsPage = lazy(() => import('./components/AppointmentsPage'));
 const ECommercePage = lazy(() => import('./components/ECommercePage'));
 const PublicStorefront = lazy(() => import('./components/PublicStorefront'));
 const CheckoutPage = lazy(() => import('./components/CheckoutPage'));
+const PayPage = lazy(() => import('./components/PayPage'));
 const OrderTrackingPage = lazy(() => import('./components/OrderTrackingPage'));
 const StoreSharePage = lazy(() => import('./components/StoreSharePage'));
 const SalesAnalyticsPage = lazy(() => import('./components/SalesAnalyticsPage'));
@@ -381,6 +382,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       <Route path="/store/:businessId" element={<PublicStorefront />} />
+      <Route path="/pay/:shortCode" element={<PayPage />} />
       <Route path="/checkout" element={
         <ProtectedRoute>
           <CheckoutPage />

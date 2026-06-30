@@ -752,6 +752,11 @@ router.post('/checkout', async (req: AuthRequest, res: Response) => {
           amount: Math.round(total * 100),
           currency: 'INR',
           receipt: order.id,
+          notes: {
+            businessId,
+            orderId: order.id,
+            contactId: contact.id,
+          },
         });
 
         await prisma.order.update({
@@ -767,7 +772,7 @@ router.post('/checkout', async (req: AuthRequest, res: Response) => {
       success: true,
       data: {
         ...order,
-        razorpayOrder,
+        razorpayOrder: razorpayOrder ? { ...razorpayOrder as any, key_id: process.env.RAZORPAY_KEY_ID } : null,
         discount,
       },
     });

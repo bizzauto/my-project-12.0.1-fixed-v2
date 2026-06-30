@@ -205,7 +205,6 @@ const ResorPayBoard: React.FC = () => {
     } catch (error: any) {
       setError(error.response?.data?.error || 'Failed to initiate payment');
       toast.error(error.response?.data?.error || 'Payment failed');
-    } finally {
       setIsProcessing(false);
     }
   };

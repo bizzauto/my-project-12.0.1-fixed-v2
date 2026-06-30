@@ -91,10 +91,54 @@ const BillingPage: React.FC = () => {
 
   const handleUpgrade = async (plan: string) => {
     try {
-      await billingAPI.upgradeSubscription(plan);
-      loadBilling();
+      // Load Razorpay SDK
+      if (!(window as any).Razorpay) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
+          document.body.appendChild(script);
+        });
+      }
+
+      const response = await billingAPI.upgradeSubscription(plan);
+      const orderData = response.data?.data;
+
+      if (orderData?.orderId) {
+        const options = {
+          key: orderData.key,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: 'BizzAuto',
+          description: `${plan} Plan Upgrade`,
+          order_id: orderData.orderId,
+          handler: async (paymentResponse: any) => {
+            try {
+              await subscriptionsAPI.verify({
+                razorpay_order_id: paymentResponse.razorpay_order_id,
+                razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                razorpay_signature: paymentResponse.razorpay_signature,
+                plan,
+                period: billingCycle === 'yearly' ? 'year' : 'month',
+              });
+              showToast('Plan upgraded successfully!', 'success');
+              loadBilling();
+            } catch {
+              showToast('Payment verification failed. Contact support.', 'error');
+            }
+          },
+          modal: {
+            ondismiss: () => { showToast('Payment cancelled', 'info'); },
+          },
+          theme: { color: '#3B82F6' },
+        };
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      }
     } catch (err) {
       console.error('Failed to upgrade:', err);
+      showToast('Failed to initiate upgrade. Please try again.', 'error');
     }
   };
 

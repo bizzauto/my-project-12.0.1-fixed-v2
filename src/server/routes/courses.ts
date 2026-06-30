@@ -117,6 +117,46 @@ router.get('/published/list', async (req: any, res: Response) => {
   }
 });
 
+// Public course view (no auth — for student store)
+router.get('/public/:courseId', async (req: any, res: Response) => {
+  try {
+    const course = await prisma.course.findFirst({
+      where: { id: req.params.courseId, isPublished: true, isActive: true },
+      include: {
+        modules: {
+          where: { isPublished: true },
+          orderBy: { order: 'asc' },
+          include: {
+            lessons: {
+              where: { isPublished: true },
+              orderBy: { order: 'asc' },
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                type: true,
+                duration: true,
+                isFree: true,
+                order: true,
+              },
+            },
+          },
+        },
+        business: { select: { name: true, logoUrl: true } },
+      },
+    });
+
+    if (!course) {
+      return res.status(404).json({ success: false, error: 'Course not found' });
+    }
+
+    res.json({ success: true, data: course });
+  } catch (error: any) {
+    console.error('Public course view error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch course', details: error.message });
+  }
+});
+
 // Get course with modules and lessons
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -617,6 +657,122 @@ router.delete('/modules/:moduleId', authenticate, requireRole('OWNER', 'ADMIN'),
   }
 });
 
+// ==================== QUIZZES ====================
+
+interface QuizQuestion {
+  id: string;
+  type: 'multiple_choice' | 'true_false' | 'fill_blank';
+  question: string;
+  options?: string[];
+  correctAnswer: string;
+  explanation?: string;
+  points: number;
+}
+
+// Submit quiz attempt - auto-grades and returns results
+router.post('/lessons/:lessonId/submit-quiz', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { answers } = req.body;
+    
+    if (!answers || typeof answers !== 'object') {
+      return res.status(400).json({ success: false, error: 'Answers object is required' });
+    }
+
+    const lesson = await prisma.courseLesson.findFirst({
+      where: { id: req.params.lessonId },
+      include: { module: { select: { courseId: true } } },
+    });
+
+    if (!lesson) {
+      return res.status(404).json({ success: false, error: 'Lesson not found' });
+    }
+
+    // Extract quiz from lesson content
+    const content = lesson.content as any || {};
+    const quiz = content.quiz;
+    
+    if (!quiz || !Array.isArray(quiz.questions) || quiz.questions.length === 0) {
+      return res.status(400).json({ success: false, error: 'No quiz found in this lesson' });
+    }
+
+    const questions: QuizQuestion[] = quiz.questions;
+    let score = 0;
+    let totalPoints = 0;
+    const results: Array<{
+      questionId: string;
+      question: string;
+      correctAnswer: string;
+      userAnswer: string;
+      isCorrect: boolean;
+      pointsEarned: number;
+      explanation?: string;
+    }> = [];
+
+    for (const q of questions) {
+      totalPoints += q.points || 1;
+      const userAnswer = (answers[q.id] || '').trim();
+      const isCorrect = userAnswer.toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
+      const pointsEarned = isCorrect ? (q.points || 1) : 0;
+      if (isCorrect) score += pointsEarned;
+
+      results.push({
+        questionId: q.id,
+        question: q.question,
+        correctAnswer: q.correctAnswer,
+        userAnswer,
+        isCorrect,
+        pointsEarned,
+        explanation: q.explanation,
+      });
+    }
+
+    const passingScore = quiz.passingScore || 70;
+    const percentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
+    const passed = percentage >= passingScore;
+
+    // Store attempt result in lesson content or return it
+    res.json({
+      success: true,
+      data: {
+        score,
+        totalPoints,
+        percentage,
+        passingScore,
+        passed,
+        totalQuestions: questions.length,
+        correctCount: results.filter(r => r.isCorrect).length,
+        results,
+      },
+    });
+  } catch (error: any) {
+    console.error('Quiz submission error:', error);
+    res.status(500).json({ success: false, error: 'Failed to grade quiz', details: error.message });
+  }
+});
+
+// Get quiz attempts for a lesson
+router.get('/lessons/:lessonId/quiz-attempts', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const lesson = await prisma.courseLesson.findFirst({
+      where: { id: req.params.lessonId },
+    });
+
+    if (!lesson) {
+      return res.status(404).json({ success: false, error: 'Lesson not found' });
+    }
+
+    // For now, return empty attempts (no persistent storage yet)
+    // In future, add CourseQuizAttempt model
+    res.json({
+      success: true,
+      data: { attempts: [], lessonId: lesson.id },
+    });
+  } catch (error: any) {
+    console.error('Get quiz attempts error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch attempts', details: error.message });
+  }
+});
+
 // ==================== COURSE LESSONS ====================
 
 // Add lesson to module
@@ -909,52 +1065,6 @@ router.patch('/enrollments/:enrollmentId/progress', authenticate, async (req: Au
   } catch (error: any) {
     console.error('Update enrollment progress error:', error);
     res.status(500).json({ success: false, error: 'Failed to update progress', details: error.message });
-  }
-});
-
-// ==================== PUBLIC ROUTE (NO AUTH) ====================
-
-// Public course view
-router.get('/public/:courseId', async (req: any, res: Response) => {
-  try {
-    const course = await prisma.course.findFirst({
-      where: {
-        id: req.params.courseId,
-        isPublished: true,
-        isActive: true,
-      },
-      include: {
-        business: { select: { name: true, logoUrl: true } },
-        modules: {
-          where: { isPublished: true },
-          orderBy: { order: 'asc' },
-          include: {
-            lessons: {
-              where: { isPublished: true },
-              orderBy: { order: 'asc' },
-              select: {
-                id: true,
-                title: true,
-                description: true,
-                type: true,
-                duration: true,
-                isFree: true,
-                order: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!course) {
-      return res.status(404).json({ success: false, error: 'Course not found' });
-    }
-
-    res.json({ success: true, data: course });
-  } catch (error: any) {
-    console.error('Public course view error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch course', details: error.message });
   }
 });
 
