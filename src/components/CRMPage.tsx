@@ -291,7 +291,6 @@ export default function CRMPage() {
   const [goals, setGoals] = useState<Goal[]>(demoGoals);
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>(demoAutomationRules);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'contacts' | 'pipeline' | 'deals' | 'invoices' | 'ledger' | 'appointments' | 'goals' | 'automation'>('contacts');
@@ -873,7 +872,13 @@ export default function CRMPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {filteredContacts.map(contact => (
+                    {filteredContacts.length === 0 ? (
+                      <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                        <UserPlus size={32} className="mx-auto mb-2 text-gray-300" />
+                        <p className="font-medium">No contacts found</p>
+                        <p className="text-sm">Add your first contact or adjust filters</p>
+                      </td></tr>
+                    ) : filteredContacts.map(contact => (
                       <tr key={contact.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onClick={() => setSelectedContact(contact)}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -926,7 +931,13 @@ export default function CRMPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredContacts.map(contact => (
+              {filteredContacts.length === 0 ? (
+                <div className="col-span-full py-12 text-center text-gray-500">
+                  <UserPlus size={32} className="mx-auto mb-2 text-gray-300" />
+                  <p className="font-medium">No contacts found</p>
+                  <p className="text-sm">Add your first contact or adjust filters</p>
+                </div>
+              ) : filteredContacts.map(contact => (
                 <div key={contact.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedContact(contact)}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -1317,7 +1328,7 @@ const ContactDetailModal: React.FC<{ contact: Contact; onClose: () => void }> = 
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 sm:p-5 md:p-6">
           <div className="flex items-center justify-between">
