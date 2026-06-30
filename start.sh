@@ -54,7 +54,12 @@ if [ ! -f node_modules/.prisma/client/index.js ]; then
 else
   echo "Prisma client already generated, skipping."
 fi
-timeout 60 npx prisma migrate deploy 2>&1 || echo "Warning: Prisma migrate deploy failed or timed out, continuing..."
+output=$(timeout 60 npx prisma migrate deploy 2>&1) || true
+echo "$output"
+if echo "$output" | grep -q "P3005"; then
+  echo "Baselining existing migration..."
+  npx prisma migrate resolve --applied 20260624_init 2>&1 || true
+fi
 
 echo "Starting server..."
 exec node dist/server/index.js
