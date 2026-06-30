@@ -66,6 +66,7 @@ const CheckoutPage: React.FC = () => {
           variantPrice: item.variant?.price,
         })));
       } else {
+        showError('Could not load cart');
         navigate('/store');
       }
     } finally {
@@ -123,7 +124,7 @@ const CheckoutPage: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
-    if (!shippingAddress.name || !shippingAddress.phone || !shippingAddress.address || !shippingAddress.city) {
+    if (!shippingAddress.name || !shippingAddress.phone || !shippingAddress.address || !shippingAddress.city || !shippingAddress.state || !shippingAddress.pincode) {
       showError('Please fill in all required shipping details');
       return;
     }
@@ -189,14 +190,19 @@ const CheckoutPage: React.FC = () => {
           modal: {
             ondismiss: () => {
               setProcessing(false);
-              showSuccess('Order placed! You can pay later.');
+              showError('Payment was not completed. Your order is pending payment.');
               navigate(`/order-tracking/${order.orderNumber}`);
             },
           },
         };
 
         const rzp = new (window as any).Razorpay(options);
-        rzp.open();
+        try {
+          rzp.open();
+        } catch {
+          setProcessing(false);
+          showError('Failed to open payment gateway');
+        }
         // Don't reset processing here — ondismiss handler will do it
       } else {
         showSuccess('Order placed successfully!');

@@ -6,6 +6,14 @@ import crypto from 'crypto';
 const router = Router();
 router.use(authenticate);
 
+async function getOrCreateContactId(businessId: string, email: string | undefined): Promise<string> {
+  let contact = await prisma.contact.findFirst({ where: { businessId, email: email || undefined } });
+  if (!contact) {
+    contact = await prisma.contact.create({ data: { businessId, name: email || 'Customer', email: email || undefined, source: 'cart' } });
+  }
+  return contact.id;
+}
+
 // ==================== ECOMMERCE STORE ====================
 
 router.get('/store', async (req: AuthRequest, res: Response) => {
@@ -340,8 +348,12 @@ router.post('/coupons/validate', async (req: AuthRequest, res: Response) => {
     res.json({
       success: true,
       data: {
-        ...coupon,
+        code: coupon.code,
+        type: coupon.type,
+        value: coupon.value,
         discount,
+        minOrder: coupon.minOrder,
+        expiresAt: coupon.expiresAt,
       },
     });
   } catch (error: any) {
@@ -507,13 +519,14 @@ router.put('/cart/items/:itemId', async (req: AuthRequest, res: Response) => {
     const { itemId } = req.params;
     const { quantity } = req.body;
     const businessId = req.user.businessId;
+    const contactId = await getOrCreateContactId(businessId, req.user.email);
 
     if (quantity === undefined || quantity < 0) {
       return res.status(400).json({ success: false, error: 'quantity is required and must be >= 0' });
     }
 
     const cartItem = await prisma.cartItem.findFirst({
-      where: { id: itemId, cart: { businessId, contactId: req.user.id } },
+      where: { id: itemId, cart: { businessId, contactId } },
       include: { product: true },
     });
 
@@ -560,9 +573,10 @@ router.delete('/cart/items/:itemId', async (req: AuthRequest, res: Response) => 
   try {
     const { itemId } = req.params;
     const businessId = req.user.businessId;
+    const contactId = await getOrCreateContactId(businessId, req.user.email);
 
     const cartItem = await prisma.cartItem.findFirst({
-      where: { id: itemId, cart: { businessId, contactId: req.user.id } },
+      where: { id: itemId, cart: { businessId, contactId } },
     });
 
     if (!cartItem) {
@@ -993,8 +1007,8 @@ router.put('/orders/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest
 
     const { status, paymentStatus, notes, shippingAddress } = req.body;
 
-    // If cancelling or refunding, restore inventory
-    if (status === 'cancelled' || status === 'refunded') {
+    // If cancelling or refunding, restore inventory (only if not already cancelled/refunded)
+    if ((status === 'cancelled' || status === 'refunded') && order.status !== 'cancelled' && order.status !== 'refunded') {
       const orderItems = await prisma.orderItem.findMany({ where: { orderId: order.id } });
       for (const item of orderItems) {
         if (item.productId) {
@@ -1040,8 +1054,8 @@ router.patch('/orders/:id/status', requireRole('OWNER', 'ADMIN'), async (req: Au
       return res.status(404).json({ success: false, error: 'Order not found' });
     }
 
-    // If cancelling or refunding, restore inventory
-    if (status === 'cancelled' || status === 'refunded') {
+    // If cancelling or refunding, restore inventory (only if not already cancelled/refunded)
+    if ((status === 'cancelled' || status === 'refunded') && order.status !== 'cancelled' && order.status !== 'refunded') {
       const orderItems = await prisma.orderItem.findMany({ where: { orderId: order.id } });
       for (const item of orderItems) {
         if (item.productId) {

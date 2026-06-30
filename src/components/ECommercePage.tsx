@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Search, Package, ShoppingCart, TrendingUp, Eye, Edit, Trash2, Share2, X, MessageSquare, Upload, AlertTriangle, Tag, Percent, Trash, Minus, Plus as PlusIcon, Check, Clock, Truck, CreditCard, ExternalLink, Store, Copy, QrCode } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '../lib/api';
+import apiClient, { ecommerceAPI } from '../lib/api';
 import { useToast } from './Toast';
 
 interface ProductVariant {
@@ -105,22 +105,6 @@ const productStatusColors: Record<string, string> = {
   archived: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
 };
 
-const ecommerceAPI = {
-  listProducts: () => apiClient.get('/ecommerce/products'),
-  createProduct: (data: any) => apiClient.post('/ecommerce/products', data),
-  updateProduct: (id: string, data: any) => apiClient.put(`/ecommerce/products/${id}`, data),
-  deleteProduct: (id: string) => apiClient.delete(`/ecommerce/products/${id}`),
-  listOrders: () => apiClient.get('/ecommerce/orders'),
-  updateOrderStatus: (id: string, status: string) => apiClient.patch(`/ecommerce/orders/${id}/status`, { status }),
-  getCart: () => apiClient.get('/ecommerce/cart'),
-  addToCart: (data: any) => apiClient.post('/ecommerce/cart/items', data),
-  updateCartItem: (id: string, quantity: number) => apiClient.put(`/ecommerce/cart/items/${id}`, { quantity }),
-  removeCartItem: (id: string) => apiClient.delete(`/ecommerce/cart/items/${id}`),
-  listCoupons: () => apiClient.get('/ecommerce/coupons'),
-  createCoupon: (data: any) => apiClient.post('/ecommerce/coupons', data),
-  deleteCoupon: (id: string) => apiClient.delete(`/ecommerce/coupons/${id}`),
-};
-
 const ECommercePage: React.FC = () => {
   const navigate = useNavigate();
   const { error: showError, success: showSuccess } = useToast();
@@ -184,6 +168,7 @@ const ECommercePage: React.FC = () => {
     } catch {
       setProducts([]);
       setOrders([]);
+      showError('Failed to load e-commerce data');
     } finally {
       setLoading(false);
     }
@@ -205,8 +190,8 @@ const ECommercePage: React.FC = () => {
   }), [orders, searchQuery]);
 
   const lowStockProducts = useMemo(() => products.filter(p => {
-    const stock = p.stock || p.quantity || 0;
-    return stock > 0 && stock <= 10;
+    const stock = p.stock ?? p.quantity ?? 0;
+    return stock > 0 && stock <= (p.lowStockThreshold || 10);
   }), [products]);
 
   const ecommerceStats = useMemo(() => {

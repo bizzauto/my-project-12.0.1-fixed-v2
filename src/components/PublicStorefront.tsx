@@ -15,6 +15,9 @@ interface Product {
   mainImage?: string;
   description?: string;
   status: string;
+  rating?: number;
+  numReviews?: number;
+  createdAt?: string;
   variants?: { id: string; name: string; options: any; price?: number; quantity: number }[];
 }
 
@@ -60,7 +63,7 @@ const PublicStorefront: React.FC = () => {
   };
 
   const isPublicMode = !!urlBusinessId;
-  const apiBase = isPublicMode ? `/api/store/${urlBusinessId}` : '/api/ecommerce';
+  const apiBase = isPublicMode ? `/store/${urlBusinessId}` : '/ecommerce';
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -113,7 +116,7 @@ const PublicStorefront: React.FC = () => {
     if (isPublicMode) {
       setCart(loadCartLocal());
       if (urlBusinessId) {
-        apiClient.get(`/api/store/${urlBusinessId}/store`).then(res => setStoreInfo(res.data?.data)).catch(() => {});
+        apiClient.get(`/store/${urlBusinessId}/store`).then(res => setStoreInfo(res.data?.data)).catch(() => {});
       }
     }
   }, [fetchProducts, fetchCart, isPublicMode, urlBusinessId]);
@@ -129,8 +132,8 @@ const PublicStorefront: React.FC = () => {
     switch (sortBy) {
       case 'price-low': return a.price - b.price;
       case 'price-high': return b.price - a.price;
-      case 'newest': return 0; // keep original order
-      case 'popular': return 0;
+      case 'newest': return (b.createdAt || '').localeCompare(a.createdAt || '');
+      case 'popular': return (b.rating || 0) - (a.rating || 0);
       default: return 0;
     }
   });
@@ -182,9 +185,13 @@ const PublicStorefront: React.FC = () => {
   const updateQuantity = async (itemId: string, newQuantity: number) => {
     if (isPublicMode) {
       if (newQuantity <= 0) {
-        setCart(prev => prev.filter(item => item.id !== itemId));
+        const newCart = cart.filter(item => item.id !== itemId);
+        setCart(newCart);
+        saveCartLocal(newCart);
       } else {
-        setCart(prev => prev.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item));
+        const newCart = cart.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item);
+        setCart(newCart);
+        saveCartLocal(newCart);
       }
       return;
     }
@@ -217,7 +224,7 @@ const PublicStorefront: React.FC = () => {
     if (!couponCode.trim()) return;
     try {
       const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-      const url = isPublicMode ? `/api/store/${urlBusinessId}/coupons/validate` : '/ecommerce/coupons/validate';
+      const url = isPublicMode ? `/store/${urlBusinessId}/coupons/validate` : '/ecommerce/coupons/validate';
       const res = await apiClient.post(url, { code: couponCode, cartTotal: subtotal });
       setAppliedCoupon(res.data?.data);
       setCouponCode('');
@@ -333,7 +340,7 @@ const PublicStorefront: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm text-gray-500 dark:text-gray-400">{filteredProducts.length} products</p>
           {wishlist.length > 0 && (
-            <button className="flex items-center gap-1 text-sm text-pink-600 dark:text-pink-400">
+            <button onClick={() => setSearchQuery('')} className="flex items-center gap-1 text-sm text-pink-600 dark:text-pink-400 hover:text-pink-700">
               <Heart size={14} fill="currentColor" /> {wishlist.length} saved
             </button>
           )}
@@ -388,9 +395,9 @@ const PublicStorefront: React.FC = () => {
                   {/* Star rating */}
                   <div className="flex items-center gap-1 mt-1">
                     {[1,2,3,4,5].map(s => (
-                      <Star key={s} size={10} className={s <= 4 ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+                      <Star key={s} size={10} className={s <= Math.round(product.rating || 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
                     ))}
-                    <span className="text-[10px] text-gray-400 ml-0.5">(4.0)</span>
+                    {(product.rating || 0) > 0 && <span className="text-[10px] text-gray-400 ml-0.5">({product.rating?.toFixed(1)})</span>}
                   </div>
                   <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 sm:mt-2 flex-wrap">
                     <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">₹{product.price}</span>
@@ -507,14 +514,15 @@ const PublicStorefront: React.FC = () => {
                   <textarea value={reviewText} onChange={e => setReviewText(e.target.value)} rows={2}
                     className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
                     placeholder="Write your review..." />
-                  <button className="mt-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Submit Review</button>
+                  <button onClick={async () => {
+                    if (!reviewText.trim()) return;
+                    try { await apiClient.post(`/store/${urlBusinessId}/reviews`, { productId: selectedProduct.id, rating: reviewRating, text: reviewText }); showSuccess('Review submitted!'); setReviewText(''); setReviewRating(5); } catch { showError('Failed to submit review'); }
+                  }} className="mt-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Submit Review</button>
                 </div>
                 {/* Review List */}
-                {[
-                  { name: 'Rahul S.', rating: 5, text: 'Great product! Fast delivery and good quality.', date: '2 days ago' },
-                  { name: 'Priya M.', rating: 4, text: 'Good value for money. Recommended.', date: '1 week ago' },
-                  { name: 'Amit K.', rating: 4, text: 'Nice product, packaging could be better.', date: '2 weeks ago' },
-                ].map((r, i) => (
+                {(productReviews[selectedProduct.id] || []).length === 0 ? (
+                  <p className="text-sm text-gray-500 py-3">No reviews yet. Be the first to review!</p>
+                ) : (productReviews[selectedProduct.id] || []).map((r: any, i: number) => (
                   <div key={i} className="border-b border-gray-100 dark:border-gray-700 py-3 last:border-0">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-gray-900 dark:text-white">{r.name}</span>

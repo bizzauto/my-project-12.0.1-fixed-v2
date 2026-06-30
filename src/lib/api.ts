@@ -461,6 +461,16 @@ export const ecommerceAPI = {
   listOrders: (params?: any) => apiClient.get('/ecommerce/orders', { params }),
   getOrder: (id: string) => apiClient.get(`/ecommerce/orders/${id}`),
   updateOrderStatus: (id: string, status: string) => apiClient.patch(`/ecommerce/orders/${id}/status`, { status }),
+  getCart: () => apiClient.get('/ecommerce/cart'),
+  addToCart: (data: any) => apiClient.post('/ecommerce/cart/items', data),
+  updateCartItem: (id: string, quantity: number) => apiClient.put(`/ecommerce/cart/items/${id}`, { quantity }),
+  removeCartItem: (id: string) => apiClient.delete(`/ecommerce/cart/items/${id}`),
+  listCoupons: () => apiClient.get('/ecommerce/coupons'),
+  createCoupon: (data: any) => apiClient.post('/ecommerce/coupons', data),
+  deleteCoupon: (id: string) => apiClient.delete(`/ecommerce/coupons/${id}`),
+  validateCoupon: (code: string, cartTotal: number) => apiClient.post('/ecommerce/coupons/validate', { code, cartTotal }),
+  checkout: (data: any) => apiClient.post('/ecommerce/checkout', data),
+  verifyPayment: (orderId: string, data: any) => apiClient.post(`/ecommerce/orders/${orderId}/verify-payment`, data),
 };
 
 // Google Business API
