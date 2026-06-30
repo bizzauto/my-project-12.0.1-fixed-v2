@@ -10,7 +10,7 @@ import {
   BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart as RePie, Pie, Cell, LineChart, Line, Legend
 } from 'recharts';
-import { emailAPI, campaignsAPI, analyticsAPI } from '../lib/api';
+import { emailAPI, campaignsAPI } from '../lib/api';
 import { useAuthStore } from '../lib/authStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -244,11 +244,12 @@ const EmailMarketingPage: React.FC = () => {
 
       if (dripRes.status === 'fulfilled' && dripRes.value.data?.data) {
         const data = dripRes.value.data.data;
-        setDrips(Array.isArray(data) ? data : data.sequences || []);
+        setDrips(Array.isArray(data) ? data : []);
       } else setDrips([]);
     } catch (err) {
       console.error('Failed to load email data:', err);
-      setCampaigns(DEMO_CAMPAIGNS);
+      showToast('Failed to load email marketing data', 'error');
+      setCampaigns([]); setTemplates([]); setEmailLists([]); setDrips([]);
     } finally {
       setLoading(false);
     }
@@ -291,34 +292,53 @@ const EmailMarketingPage: React.FC = () => {
     setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: 'sending' } : c));
     try {
       await campaignsAPI.send(id);
-      setTimeout(() => {
-        setCampaigns(prev => prev.map(c => c.id === id ? {
-          ...c, status: 'sent', sent: c.recipients,
-          delivered: Math.floor(c.recipients * 0.96),
-          opened: Math.floor(c.recipients * 0.32),
-          clicked: Math.floor(c.recipients * 0.08),
-        } : c));
-        showToast('Campaign sent successfully!');
-      }, 2000);
-    } catch {
+      showToast('Campaign submitted for delivery');
+      loadData();
+    } catch (err: any) {
       setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: 'draft' } : c));
-      showToast('Failed to send campaign', 'error');
+      showToast(err.response?.data?.error || 'Failed to send campaign', 'error');
     }
   };
 
-  const duplicateCampaign = (campaign: EmailCampaign) => {
-    const dup: EmailCampaign = { ...campaign, id: `dup-${Date.now()}`, name: `${campaign.name} (Copy)`, status: 'draft', sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, unsubscribed: 0 };
-    setCampaigns(prev => [dup, ...prev]);
-    showToast('Campaign duplicated');
+  const duplicateCampaign = async (campaign: EmailCampaign) => {
+    try {
+      await campaignsAPI.create({
+        name: `${campaign.name} (Copy)`,
+        type: 'email',
+        status: 'draft',
+        content: { subject: campaign.subject, previewText: campaign.previewText || '' },
+        contactIds: [],
+        targetContacts: campaign.recipients || 0,
+      });
+      showToast('Campaign duplicated');
+      loadData();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to duplicate campaign', 'error');
+    }
   };
 
-  const deleteCampaign = (id: string) => {
-    setCampaigns(prev => prev.filter(c => c.id !== id));
-    showToast('Campaign deleted');
+  const deleteCampaign = async (id: string) => {
+    if (!confirm('Delete this campaign?')) return;
+    try {
+      await campaignsAPI.delete(id);
+      setCampaigns(prev => prev.filter(c => c.id !== id));
+      showToast('Campaign deleted');
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to delete (campaign may not be saved yet)', 'error');
+    }
   };
 
-  const toggleDrip = (id: string) => {
-    setDrips(prev => prev.map(d => d.id === id ? { ...d, isActive: !d.isActive } : d));
+  const toggleDrip = async (id: string) => {
+    const drip = drips.find(d => d.id === id);
+    if (!drip) return;
+    const newActive = !drip.isActive;
+    setDrips(prev => prev.map(d => d.id === id ? { ...d, isActive: newActive } : d));
+    try {
+      await emailAPI.toggleDrip(id, newActive);
+    } catch {
+      setDrips(prev => prev.map(d => d.id === id ? { ...d, isActive: !newActive } : d));
+      showToast('Failed to toggle drip', 'error');
+    }
   };
 
   // ── Formatting ─────────────────────────────────────────────────────
@@ -717,7 +737,7 @@ const EmailMarketingPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SMTP Host</label><input type="text" value={smtpConfig.host} onChange={e => setSmtpConfig({ ...smtpConfig, host: e.target.value })} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" placeholder="smtp.example.com" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Port</label><input type="number" value={smtpConfig.port} onChange={e => setSmtpConfig({ ...smtpConfig, port: parseInt(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" /></div>
+                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Port</label><input type="number" value={smtpConfig.port} onChange={e => setSmtpConfig({ ...smtpConfig, port: parseInt(e.target.value) || 587 })} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label><input type="text" value={smtpConfig.username} onChange={e => setSmtpConfig({ ...smtpConfig, username: e.target.value })} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" /></div>
@@ -732,8 +752,8 @@ const EmailMarketingPage: React.FC = () => {
                 <label htmlFor="smtp-secure" className="text-sm text-gray-700 dark:text-gray-300">Use SSL/TLS</label>
               </div>
               <div className="flex gap-3">
-                <button className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 flex items-center gap-2"><Globe size={14} /> Test Connection</button>
-                <button className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-2"><CheckCircle size={14} /> Save Configuration</button>
+                <button onClick={async () => { try { await emailAPI.testConnection(smtpConfig); showToast('Connection successful!'); } catch (err: any) { showToast(err.response?.data?.error || 'Connection failed', 'error'); } }} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 flex items-center gap-2"><Globe size={14} /> Test Connection</button>
+                <button onClick={async () => { try { await emailAPI.saveConfig(smtpConfig); showToast('Configuration saved'); } catch (err: any) { showToast(err.response?.data?.error || 'Failed to save', 'error'); } }} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-2"><CheckCircle size={14} /> Save Configuration</button>
               </div>
             </div>
           </div>
@@ -782,19 +802,24 @@ const EmailMarketingPage: React.FC = () => {
       {showComposeModal && (
         <ComposeModal
           onClose={() => setShowComposeModal(false)}
-          onSend={(data) => {
-            const newCampaign: EmailCampaign = {
-              id: `c-${Date.now()}`,
-              name: data.name,
-              subject: data.subject,
-              previewText: data.previewText || '',
-              status: data.scheduledAt ? 'scheduled' : 'draft',
-              recipients: 0,
-              ...(data.scheduledAt ? { scheduledAt: data.scheduledAt } : {}),
-            };
-            setCampaigns(prev => [newCampaign, ...prev]);
-            showToast(data.scheduledAt ? 'Campaign scheduled!' : 'Campaign saved as draft');
-            setShowComposeModal(false);
+          onSend={async (data) => {
+            try {
+              await campaignsAPI.create({
+                name: data.name,
+                type: 'email',
+                status: data.scheduledAt ? 'scheduled' : 'draft',
+                content: { subject: data.subject, previewText: data.previewText, body: data.content },
+                contactIds: [],
+                segmentId: data.listId,
+                targetContacts: 0,
+                scheduledAt: data.scheduledAt ? new Date(data.scheduledAt).toISOString() : undefined,
+              });
+              showToast(data.scheduledAt ? 'Campaign scheduled!' : 'Campaign saved');
+              setShowComposeModal(false);
+              loadData();
+            } catch (err: any) {
+              showToast(err.response?.data?.error || 'Failed to save campaign', 'error');
+            }
           }}
           showToast={showToast}
         />
@@ -821,7 +846,8 @@ const ComposeModal: React.FC<{
   const [abWinnerBy, setAbWinnerBy] = useState<'opens' | 'clicks'>('opens');
 
   const handleSubmit = () => {
-    if (!name || !subject) return;
+    if (!name?.trim() || !subject?.trim()) { showToast('Name and subject are required', 'error'); return; }
+    if (!selectedList) { showToast('Please select a recipient list', 'error'); return; }
     onSend({ name, subject, previewText, listId: selectedList, content, scheduledAt: scheduledAt || undefined, abTest: enableABTest ? { subjectB, winnerBy: abWinnerBy } : undefined });
   };
 
@@ -922,7 +948,7 @@ const ComposeModal: React.FC<{
                     <div><span className="text-sm font-medium text-gray-900 dark:text-white">Schedule for Later</span><p className="text-xs text-gray-500">Set a specific date and time</p></div>
                   </label>
                   {scheduledAt && (
-                    <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
+                    <input type="datetime-local" value={scheduledAt} min={new Date().toISOString().slice(0, 16)} onChange={e => setScheduledAt(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
                   )}
                 </div>
               </div>
