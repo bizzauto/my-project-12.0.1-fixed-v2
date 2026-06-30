@@ -205,7 +205,7 @@ const demoContacts: Contact[] = [
   },
   { id: '2', name: 'Priya Patel', phone: '+91 87654 32109', email: 'priya@example.com', company: 'Digital Marketing Co', tags: ['New', 'Startup'], stage: 'New Lead', dealValue: 45000, lastActivity: '5 hours ago', avatar: 'PP', createdAt: '1/12/2024', leadScore: 'warm', source: 'IndiaMART', address: 'Delhi, India', website: 'digitalmarketing.co' },
   { id: '3', name: 'Amit Kumar', phone: '+91 76543 21098', email: 'amit@example.com', company: 'Global Traders', tags: ['Follow up', 'Decision Maker'], stage: 'Contacted', dealValue: 120000, lastActivity: '1 day ago', avatar: 'AK', createdAt: '1/5/2024', leadScore: 'hot', source: 'Referral' },
-  { id: '4', name: 'Sneha Gupta', phone: '+91 65432 10987', email: 'sneha@example.com', company: 'Fashion Hub', tags: ['Urgent', 'High Value'], stage: 'Negotiation', dealValue: 200000, lastActivity: '3 hours ago', avatar: 'SG', createdAt: '12/28/2023', leadScore: 'hot', source: 'Website', customFields: [{ key: 'Annual Revenue', value: '?5Cr+' }] },
+  { id: '4', name: 'Sneha Gupta', phone: '+91 65432 10987', email: 'sneha@example.com', company: 'Fashion Hub', tags: ['Urgent', 'High Value'], stage: 'Negotiation', dealValue: 200000, lastActivity: '3 hours ago', avatar: 'SG', createdAt: '12/28/2023', leadScore: 'hot', source: 'Website', customFields: [{ key: 'Annual Revenue', value: '₹5Cr+' }] },
   { id: '5', name: 'Vikram Singh', phone: '+91 54321 09876', email: 'vikram@example.com', company: 'Auto Parts Ltd', tags: ['Partner'], stage: 'Won', dealValue: 350000, lastActivity: '1 week ago', avatar: 'VS', createdAt: '12/15/2023', leadScore: 'warm', source: 'Google Ads' },
   { id: '6', name: 'Neha Joshi', phone: '+91 43210 98765', email: 'neha@example.com', company: 'HealthFirst Clinic', tags: ['New'], stage: 'New Lead', dealValue: 65000, lastActivity: '30 min ago', avatar: 'NJ', createdAt: '1/20/2024', leadScore: 'warm', source: 'JustDial' },
 ];
@@ -1523,10 +1523,10 @@ const AddContactModal: React.FC<{ onClose: () => void; onAdd: (contact: any) => 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium mb-1">Stage</label><select value={form.stage} onChange={e => setForm({ ...form, stage: e.target.value })} className="w-full px-3 py-2.5 border rounded-xl bg-white dark:bg-gray-700">{['New Lead','Contacted','Qualified','Proposal','Negotiation','Won','Lost'].map(s => <option key={s}>{s}</option>)}</select></div>
-            <div><label className="block text-sm font-medium mb-1">Lead Score</label><select value={form.leadScore} onChange={e => setForm({ ...form, leadScore: e.target.value })} className="w-full px-3 py-2.5 border rounded-xl bg-white dark:bg-gray-700"><option value="hot">?? Hot</option><option value="warm">?? Warm</option><option value="cold">? Cold</option></select></div>
+            <div><label className="block text-sm font-medium mb-1">Lead Score</label><select value={form.leadScore} onChange={e => setForm({ ...form, leadScore: e.target.value })} className="w-full px-3 py-2.5 border rounded-xl bg-white dark:bg-gray-700"><option value="hot">🔥 Hot</option><option value="warm">🌡️ Warm</option><option value="cold">❄️ Cold</option></select></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium mb-1">Deal Value (?)</label><input type="number" value={form.dealValue} onChange={e => setForm({ ...form, dealValue: e.target.value })} className="w-full px-3 py-2.5 border rounded-xl bg-white dark:bg-gray-700" /></div>
+            <div><label className="block text-sm font-medium mb-1">Deal Value (₹)</label><input type="number" value={form.dealValue} onChange={e => setForm({ ...form, dealValue: e.target.value })} className="w-full px-3 py-2.5 border rounded-xl bg-white dark:bg-gray-700" /></div>
             <div><label className="block text-sm font-medium mb-1">Website</label><input type="text" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} className="w-full px-3 py-2.5 border rounded-xl bg-white dark:bg-gray-700" /></div>
           </div>
           <div><label className="block text-sm font-medium mb-1">Address</label><input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="w-full px-3 py-2.5 border rounded-xl bg-white dark:bg-gray-700" /></div>
@@ -1574,7 +1574,7 @@ const AddDealModal: React.FC<{ contacts: any[]; onClose: () => void; onAdd: (dea
           <div><label className="text-sm font-medium mb-1 block">Deal Title *</label><input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full px-3 py-2.5 border rounded-xl" /></div>
           <div><label className="text-sm font-medium mb-1 block">Contact</label><select value={form.contactId} onChange={e => setForm({...form, contactId: e.target.value})} className="w-full px-3 py-2.5 border rounded-xl"><option value="">Select contact</option>{contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-sm font-medium mb-1 block">Value (?) *</label><input type="number" value={form.value} onChange={e => setForm({...form, value: e.target.value})} className="w-full px-3 py-2.5 border rounded-xl" /></div>
+            <div><label className="text-sm font-medium mb-1 block">Value (₹) *</label><input type="number" value={form.value} onChange={e => setForm({...form, value: e.target.value})} className="w-full px-3 py-2.5 border rounded-xl" /></div>
             <div><label className="text-sm font-medium mb-1 block">Probability %</label><input type="number" min={0} max={100} value={form.probability} onChange={e => setForm({...form, probability: parseInt(e.target.value)})} className="w-full px-3 py-2.5 border rounded-xl" /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -1644,11 +1644,11 @@ const InvoiceModal: React.FC<{ contacts: any[]; onClose: () => void; onCreate: (
           <button onClick={onClose} className="flex-1 py-2.5 border rounded-xl hover:bg-gray-50 text-sm">Cancel</button>
           <button onClick={() => {
             if (!selectedContact) {
-              showToast('Please select a contact first', 'error');
+              alert('Please select a contact first');
               return;
             }
             if (form.items.length === 0) {
-              showToast('Please add at least one item', 'error');
+              alert('Please add at least one item');
               return;
             }
             onCreate({
