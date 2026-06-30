@@ -1,13 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Search, Plus, Filter, Download, MoreVertical, Mail, Phone, Tag, Edit3, Trash2, Eye, UserPlus, Upload, DollarSign,
-  TrendingUp, Calendar, Clock, MessageSquare, FileText, Bell, CheckCircle, X, Star, Activity, ArrowUp, ArrowDown,
-  BarChart3, PieChart, Target, Award, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Users, Building2, MapPin,
-  Globe, Linkedin, Twitter, Facebook, Copy, Check, List, Grid, Columns, Settings, Share2, Printer, Smartphone,
-  Zap, Shield, Flag, MessageCircle, Paperclip, Camera, Video, Headphones, Heart, ThumbsUp, Send, Brain
+  Search, Plus, Mail, Phone, Edit3, Trash2, UserPlus, DollarSign, Download,
+  TrendingUp, Calendar, Clock, MessageSquare, FileText, Bell, CheckCircle, X, Activity, ArrowUp, ArrowDown,
+  BarChart3, Target, Award, AlertCircle, Users, MapPin,
+  Globe, List, Grid, Columns, Printer, Send, Brain, Flag, Zap
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { contactsAPI, businessAPI, appointmentsAPI, ledgerAPI, dealsAPI, pipelinesAPI, crmInvoicesAPI, goalsAPI } from '../lib/api';
+import { contactsAPI, appointmentsAPI, ledgerAPI, dealsAPI, crmInvoicesAPI, goalsAPI } from '../lib/api';
 import { useToast } from './Toast';
 import PipelineViewEnhanced from './PipelineViewEnhanced';
 
@@ -285,7 +283,6 @@ const StageBadge: React.FC<{ stage: string }> = ({ stage }) => (
 // ============================================================
 
 export default function CRMPage() {
-  const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -435,7 +432,14 @@ export default function CRMPage() {
         name: contactData.name,
         phone: contactData.phone,
         email: contactData.email,
+        company: contactData.company || '',
         tags: contactData.tags || [],
+        stage: contactData.stage || 'New Lead',
+        dealValue: contactData.dealValue || 0,
+        leadScore: contactData.leadScore || 'warm',
+        source: contactData.source || 'Direct',
+        address: contactData.address || '',
+        website: contactData.website || '',
       });
       const created = res?.data?.data;
       if (created) {
@@ -485,12 +489,15 @@ export default function CRMPage() {
         value: dealData.value,
         stage: dealData.stage || 'lead',
         source: dealData.source || 'manual',
+        probability: dealData.probability || 50,
+        expectedClose: dealData.expectedClose || '',
+        notes: dealData.notes || '',
       });
       const created = res?.data?.data || res?.data;
       const newDeal: Deal = {
         ...dealData,
         id: created?.id || `deal-${Date.now()}`,
-        contactId: created?.id || dealData.contactId,
+        contactId: dealData.contactId,
         createdAt: new Date().toISOString().split('T')[0],
       };
       setDeals(prev => [newDeal, ...prev]);
@@ -1057,13 +1064,13 @@ export default function CRMPage() {
                   {invoice.paymentMethod && <span>Method: {invoice.paymentMethod}</span>}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => showToast('PDF download started')} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1">
+                  <button onClick={() => { const printContent = document.getElementById(`invoice-${invoice.id}`); if (printContent) { const w = window.open('', '_blank'); w?.document.write(`<html><head><title>Invoice ${invoice.number}</title><style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5}</style></head><body>${printContent.innerHTML}</body></html>`); w?.document.close(); w?.print(); } }} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1">
                     <Download size={14} /> PDF
                   </button>
                   <button onClick={() => window.print()} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1">
                     <Printer size={14} /> Print
                   </button>
-                  <button onClick={() => showToast('Invoice sent to customer')} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1">
+                  <button onClick={() => showToast(`Invoice ${invoice.number} ready to share — use Print to save as PDF`, 'info')} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1">
                     <Send size={14} /> Send
                   </button>
                   {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
@@ -1163,9 +1170,9 @@ export default function CRMPage() {
                 {apt.staff && <p className="flex items-center gap-1.5"><Users size={14} /> {apt.staff}</p>}
               </div>
               <div className="flex gap-2">
-                <button onClick={async () => { setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'confirmed' as const } : a)); showToast('Appointment confirmed!'); try { await appointmentsAPI.confirm(apt.id); } catch {} }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Confirm</button>
+                <button onClick={async () => { const oldApt = appointments.find(a => a.id === apt.id); setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'confirmed' as const } : a)); showToast('Appointment confirmed!'); try { await appointmentsAPI.confirm(apt.id); } catch { if (oldApt) setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: oldApt.status } : a)); showToast('Failed to confirm appointment', 'error'); } }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Confirm</button>
                 <button onClick={() => showToast('Reschedule link sent to client', 'info')} className="flex-1 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">Reschedule</button>
-                <button onClick={async () => { setAppointments(prev => prev.filter(a => a.id !== apt.id)); showToast('Appointment cancelled', 'info'); try { await appointmentsAPI.cancel(apt.id); } catch {} }} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"><X size={16} /></button>
+                <button onClick={async () => { const oldApt = appointments.find(a => a.id === apt.id); setAppointments(prev => prev.filter(a => a.id !== apt.id)); showToast('Appointment cancelled', 'info'); try { await appointmentsAPI.cancel(apt.id); } catch { if (oldApt) setAppointments(prev => [...prev, oldApt].sort((a, b) => a.date.localeCompare(b.date))); showToast('Failed to cancel appointment', 'error'); } }} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"><X size={16} /></button>
               </div>
             </div>
           ))}
@@ -1258,7 +1265,7 @@ export default function CRMPage() {
 
       {/* ================== CONTACT DETAIL MODAL ================== */}
       {selectedContact && (
-        <ContactDetailModal contact={selectedContact} onClose={() => setSelectedContact(null)} />
+        <ContactDetailModal contact={contacts.find(c => c.id === selectedContact.id) || selectedContact} onClose={() => setSelectedContact(null)} />
       )}
 
       {/* ================== QUICK NOTE MODAL ================== */}
@@ -1418,7 +1425,7 @@ const ContactDetailModal: React.FC<{ contact: Contact; onClose: () => void }> = 
               {(contact.tasks && contact.tasks.length > 0) ? contact.tasks.map(task => (
                 <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex items-center gap-3">
-                    <input type="checkbox" defaultChecked={task.completed} className="w-4 h-4 text-blue-600 rounded" />
+                    <input type="checkbox" checked={task.completed} onChange={() => {}} className="w-4 h-4 text-blue-600 rounded" />
                     <div>
                       <p className={`font-medium ${task.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'} text-sm`}>{task.title}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -1490,7 +1497,7 @@ const AddContactModal: React.FC<{ onClose: () => void; onAdd: (contact: any) => 
   });
 
   const handleSubmit = () => {
-    if (!form.name || !form.phone) return;
+    if (!form.name || !form.phone) { alert('Name and phone are required'); return; }
     onAdd({
       ...form,
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
@@ -1549,7 +1556,7 @@ const AddDealModal: React.FC<{ contacts: any[]; onClose: () => void; onAdd: (dea
   const [form, setForm] = useState({ contactId: '', title: '', value: '', stage: 'Qualified', probability: 50, expectedClose: '', notes: '' });
 
   const handleSubmit = () => {
-    if (!form.title || !form.value) return;
+    if (!form.title || !form.value) { alert('Title and value are required'); return; }
     const contact = contacts.find(c => c.id === form.contactId);
     onAdd({
       contactId: form.contactId,
@@ -1674,7 +1681,7 @@ const AppointmentModal: React.FC<{ contacts: any[]; onClose: () => void; onCreat
   const [form, setForm] = useState({ clientId: '', title: '', service: '', date: '', time: '', duration: 30, reminder: true, location: '', staff: '' });
 
   const handleCreate = () => {
-    if (!form.title || !form.date || !form.time) return;
+    if (!form.title || !form.date || !form.time) { alert('Title, date, and time are required'); return; }
     const contact = contacts.find(c => c.id === form.clientId);
     onCreate({
       title: form.title, clientName: contact?.name || 'Walk-in', clientPhone: contact?.phone || '',
@@ -1742,7 +1749,7 @@ const GoalModal: React.FC<{ onClose: () => void; onAdd: (goal: any) => void }> =
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 border rounded-xl hover:bg-gray-50 text-sm">Cancel</button>
           <button onClick={() => {
-            if (!form.title || !form.target) return;
+            if (!form.title || !form.target) { alert('Title and target are required'); return; }
             onAdd({
               title: form.title, type: form.type, target: parseInt(form.target),
               current: parseInt(form.current) || 0, period: form.period,
