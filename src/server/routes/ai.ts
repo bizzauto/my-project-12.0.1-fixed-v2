@@ -14,7 +14,11 @@ router.post('/generate', authenticate, async (req: any, res: any) => {
       return res.status(400).json({ success: false, error: 'Prompt is required' });
     }
 
-    const sanitizedPrompt = prompt.replace(/\b(hack|exploit|bypass|crack)\b/gi, '[filtered]');
+    if (prompt.length > 10000) {
+      return res.status(400).json({ success: false, error: 'Prompt too long (max 10,000 characters)' });
+    }
+
+    const sanitizedPrompt = prompt;
 
     const model = getOptimalModel(type);
     const response = await callAIProvider(model, sanitizedPrompt);

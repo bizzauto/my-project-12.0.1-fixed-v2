@@ -147,6 +147,16 @@ module.exports = {
     connectTwitter: {}, disconnectTwitter: {},
     connectYouTube: {}, disconnectYouTube: {},
   }),
+  chatbotAPI: createMockAPI({
+    list: { data: [] }, get: {}, create: {}, update: {}, delete: {},
+    activate: {}, deactivate: {}, test: {},
+  }),
+  liveChatAPI: createMockAPI({
+    getWidget: {}, createSession: {}, addMessage: {}, rateSession: {},
+    listSessions: { data: { sessions: [], pagination: { total: 0, page: 1, limit: 50, totalPages: 0 } } },
+    getStats: { data: { active: 0, waiting: 0, resolvedToday: 0, totalMessages: 0, averageSatisfaction: 0 } },
+    getSession: {}, assignSession: {}, closeSession: {}, saveWidget: {},
+  }),
   webhooksAPI: createMockAPI({ list: {}, create: {}, update: {}, delete: {}, test: {} }),
   conversationsAPI: createMockAPI({ list: {}, getStats: {}, get: {}, reply: {}, markRead: {}, archive: {} }),
   leadFinderAPI: createMockAPI({ search: {}, analyze: {}, import: {}, history: {}, score: {}, bulkScore: {}, leads: {} }),

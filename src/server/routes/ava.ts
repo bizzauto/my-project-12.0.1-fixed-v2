@@ -5,10 +5,21 @@ import { AIService } from '../services/ai.service.js';
 import { prisma } from '../db.js';
 import axios from 'axios';
 import https from 'https';
+import rateLimit from 'express-rate-limit';
 
 const n8nHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 const router = Router();
+
+// Rate limiter for Ava chat — prevent credit exhaustion
+const avaChatRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  message: { success: false, error: 'Too many requests. Please wait a moment.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+});
 
 // ==================== AVA EXECUTIVE ASSISTANT API ====================
 // All routes are FREE - uses Nvidia NIM + OpenRouter free models
@@ -56,7 +67,7 @@ router.get('/insights', authenticate, async (req: any, res: Response) => {
 });
 
 // POST /api/ava/chat - Enhanced AI Chat with Business Context
-router.post('/chat', authenticate, async (req: any, res: Response) => {
+router.post('/chat', authenticate, avaChatRateLimiter, async (req: any, res: Response) => {
   try {
     const { text, history = [], language = 'en-IN' } = req.body;
     const businessId = req.user.businessId;

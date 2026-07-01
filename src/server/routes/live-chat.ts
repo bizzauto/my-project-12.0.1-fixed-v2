@@ -1,8 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
+
+// Rate limiter for public visitor endpoints (widget)
+const visitorRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { success: false, error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+});
 
 // ==================== PUBLIC: GET WIDGET CONFIG ====================
 
@@ -31,7 +42,7 @@ router.get('/widget', async (req: Request, res: Response) => {
 
 // ==================== PUBLIC: CREATE SESSION (visitor starts chat, no auth) ====================
 
-router.post('/sessions', async (req: Request, res: Response) => {
+router.post('/sessions', visitorRateLimiter, async (req: Request, res: Response) => {
   try {
     const { businessId, visitorName, visitorEmail, visitorPhone, metadata } = req.body;
 
@@ -63,7 +74,7 @@ router.post('/sessions', async (req: Request, res: Response) => {
 
 // ==================== PUBLIC: ADD MESSAGE (visitor sends message) ====================
 
-router.post('/sessions/:id/messages', async (req: Request, res: Response) => {
+router.post('/sessions/:id/messages', visitorRateLimiter, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { senderType, senderId, content, contentType, metadata } = req.body;
@@ -322,7 +333,7 @@ router.patch('/:id/close', authenticate, async (req: AuthRequest, res: Response)
 
 // ==================== RATE SESSION ====================
 
-router.patch('/:id/rate', async (req: Request, res: Response) => {
+router.patch('/:id/rate', visitorRateLimiter, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { satisfaction } = req.body;
@@ -414,7 +425,7 @@ router.post('/widget', authenticate, requireRole('OWNER', 'ADMIN'), async (req: 
 
 // ==================== BOT AUTO-REPLY ====================
 
-router.post('/bot-reply', async (req: Request, res: Response) => {
+router.post('/bot-reply', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId } = req.body;
 
@@ -422,8 +433,8 @@ router.post('/bot-reply', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'sessionId is required' });
     }
 
-    const session = await prisma.liveChatSession.findUnique({
-      where: { id: sessionId },
+    const session = await prisma.liveChatSession.findFirst({
+      where: { id: sessionId, businessId: req.user!.businessId },
       include: {
         messages: { orderBy: { createdAt: 'desc' }, take: 5 },
       },

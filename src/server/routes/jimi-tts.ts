@@ -5,11 +5,22 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
 
 // All Jimi routes require authentication
 router.use(authenticate);
+
+// Rate limiter for Jimi TTS — prevent abuse
+const jimiTtsRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many TTS requests. Please wait.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+});
 
 // ==================== JIMI AI CHAT ====================
 // POST /api/jimi/chat - AI chat using server-side NVIDIA NIM API
@@ -100,6 +111,14 @@ STYLE: Sirf 1 line. Plain text. NO emojis.`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
 
+    const sanitizedHistory = Array.isArray(history)
+      ? history.slice(-6).filter((m: any) =>
+          m && typeof m === 'object' &&
+          (m.role === 'user' || m.role === 'assistant') &&
+          typeof m.content === 'string'
+        ).map((m: any) => ({ role: m.role, content: m.content.substring(0, 500) }))
+      : [];
+
     const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -110,8 +129,8 @@ STYLE: Sirf 1 line. Plain text. NO emojis.`;
         model: 'meta/llama-3.3-70b-instruct',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...history.slice(-6),
-          { role: 'user', content: text },
+          ...sanitizedHistory,
+          { role: 'user', content: text.substring(0, 2000) },
         ],
         max_tokens: 150,
         temperature: 0.8,
@@ -150,6 +169,14 @@ STYLE: Sirf 1 line. Plain text. NO emojis.`;
 
 // ==================== JIMI VOICE TTS ====================
 
+// Sanitize text for safe shell execution — strip shell metacharacters
+function sanitizeForShell(text: string): string {
+  return text
+    .replace(/[`$\\!|&;(){}<>[\]'"#~]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Clean text for TTS
 function cleanText(text: string): string {
   return text
@@ -186,7 +213,7 @@ function addNaturalPatterns(text: string): string {
 }
 
 // POST /api/jimi/tts - Main TTS endpoint (tries Piper > Edge > Browser)
-router.post('/tts', async (req: Request, res: Response) => {
+router.post('/tts', jimiTtsRateLimiter, async (req: Request, res: Response) => {
   try {
     const { text, lang = 'en-IN', voiceStyle = 'natural' } = req.body;
     if (!text) return res.status(400).json({ error: 'Text required' });
@@ -218,7 +245,7 @@ router.post('/tts', async (req: Request, res: Response) => {
 });
 
 // POST /api/jimi/tts/edge - Edge TTS only
-router.post('/tts/edge', async (req: Request, res: Response) => {
+router.post('/tts/edge', jimiTtsRateLimiter, async (req: Request, res: Response) => {
   try {
     const { text, lang = 'en-IN', voiceStyle = 'natural' } = req.body;
     if (!text) return res.status(400).json({ error: 'Text required' });
@@ -238,7 +265,7 @@ router.post('/tts/edge', async (req: Request, res: Response) => {
 });
 
 // POST /api/jimi/tts/gemini - Gemini TTS with MYRA's Aoede voice
-router.post('/tts/gemini', async (req: Request, res: Response) => {
+router.post('/tts/gemini', jimiTtsRateLimiter, async (req: Request, res: Response) => {
   try {
     const { text, voiceStyle = 'sweet' } = req.body;
     if (!text) return res.status(400).json({ error: 'Text required' });
@@ -324,7 +351,7 @@ router.post('/tts/gemini', async (req: Request, res: Response) => {
 });
 
 // POST /api/jimi/tts/kyutai - Kyutai Pocket TTS (English, CPU, free, never stops)
-router.post('/tts/kyutai', async (req: Request, res: Response) => {
+router.post('/tts/kyutai', jimiTtsRateLimiter, async (req: Request, res: Response) => {
   try {
     const { text, voiceStyle = 'sweet' } = req.body;
     if (!text) return res.status(400).json({ error: 'Text required' });
@@ -404,7 +431,7 @@ function tryPiperTTS(text: string, lang: string): string | null {
     const tmpMp3 = join(tmpdir(), `jimi-piper-${randomBytes(4).toString('hex')}.mp3`);
     const textFile = join(tmpdir(), `jimi-text-${randomBytes(4).toString('hex')}.txt`);
 
-    writeFileSync(textFile, text, 'utf-8');
+    writeFileSync(textFile, sanitizeForShell(text), 'utf-8');
 
     // Run Piper TTS
     execSync(
@@ -477,7 +504,7 @@ function tryEdgeTTS(text: string, lang: string, voiceStyle: string = 'natural'):
     const tmpMp3 = join(tmpdir(), `jimi-edge-${randomBytes(4).toString('hex')}.mp3`);
     const textFile = join(tmpdir(), `jimi-text-${randomBytes(4).toString('hex')}.txt`);
 
-    writeFileSync(textFile, text, 'utf-8');
+    writeFileSync(textFile, sanitizeForShell(text), 'utf-8');
 
     // Edge TTS with MYRA-like tuning
     const rateArg = `--rate="${style.rate}"`;

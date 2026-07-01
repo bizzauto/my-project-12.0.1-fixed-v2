@@ -211,11 +211,10 @@ async function generateAIResponse(
   try {
     const { AIService } = await import('./ai.service.js');
 
-    const hasCredits = await AIService.checkCredits(businessId);
+    const hasCredits = await AIService.useCredit(businessId, 1);
     if (!hasCredits) {
       return 'Thank you for your message. Our team will get back to you shortly.';
     }
-    await AIService.useCredit(businessId, 1);
 
     const business = await prisma.business.findUnique({ where: { id: businessId } });
     const tone = autopilot?.aiTone || 'professional';
