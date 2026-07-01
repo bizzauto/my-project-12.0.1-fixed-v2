@@ -32,20 +32,34 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
 router.post('/', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, type, content, html, clientName, clientPhone, clientEmail, amount, contactId } = req.body;
+    const { name, title, type, content, html, clientName, contactName, clientPhone, clientEmail, amount, contactId, items, notes, validUntil } = req.body;
+    const VALID_TYPES = ['quote', 'invoice', 'proposal'];
+    const docType = VALID_TYPES.includes(type) ? type : 'quote';
+
+    const contentJson = {
+      ...(typeof content === 'object' && content !== null ? content : {}),
+      items: Array.isArray(items) ? items : [],
+      notes: notes || '',
+      validUntil: validUntil || null,
+    };
+
+    const parsedAmount = amount !== undefined && amount !== null && !isNaN(parseFloat(amount)) ? parseFloat(amount) : undefined;
+    const finalName = name || title || 'Untitled Document';
+    const finalClientName = clientName || contactName || undefined;
+
     const docNumber = `DOC-${Date.now().toString(36).toUpperCase()}`;
     const data: any = {
       business: { connect: { id: req.user.businessId } },
       documentNumber: docNumber,
-      name: name || undefined,
-      type: type || undefined,
-      content: content || undefined,
-      html: html || undefined,
-      clientName: clientName || undefined,
+      name: finalName,
+      type: docType,
+      content: contentJson,
+      clientName: finalClientName,
       clientPhone: clientPhone || undefined,
       clientEmail: clientEmail || undefined,
-      amount: amount ? parseFloat(amount) : undefined,
+      amount: parsedAmount,
     };
+    if (html) data.html = html;
     if (contactId) data.contact = { connect: { id: contactId } };
     const document = await prisma.document.create({ data });
     res.status(201).json({ success: true, data: document });
@@ -57,8 +71,12 @@ router.post('/', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Re
 router.put('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { name, type, content, html, status, clientName, clientPhone, clientEmail, amount } = req.body;
-    const document = await prisma.document.update({
+    const existing = await prisma.document.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
+    });
+    if (!existing) return res.status(404).json({ success: false, error: 'Document not found' });
+    const document = await prisma.document.update({
+      where: { id: existing.id },
       data: { name, type, content, html, status, clientName, clientPhone, clientEmail, amount },
     });
     res.json({ success: true, data: document });
@@ -189,9 +207,13 @@ router.post('/:id/convert', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Send document via WhatsApp
-router.post('/:id/send', async (req: AuthRequest, res: Response) => {
+// Send document
+router.post('/:id/send', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
+    const { method = 'email' } = req.body as { method?: 'email' | 'whatsapp' };
+    const VALID_METHODS = ['email', 'whatsapp'];
+    const sendMethod = VALID_METHODS.includes(method) ? method : 'email';
+
     const document = await prisma.document.findFirst({
       where: { id: req.params.id, businessId: req.user.businessId },
       include: { contact: true },
@@ -200,18 +222,23 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Document or contact not found' });
     }
 
-    // Generate public link
-    const publicLink = `https://yourdomain.com/docs/${crypto.randomUUID()}`;
+    const publicId = crypto.randomUUID();
+    const baseUrl = process.env.PUBLIC_BASE_URL || process.env.FRONTEND_URL || '';
+    const publicLink = baseUrl ? `${baseUrl}/docs/${publicId}` : `/docs/${publicId}`;
+
+    const prevSentVia: string[] = document.sentVia ? String(document.sentVia).split(',').filter(Boolean) : [];
+    const newSentVia = prevSentVia.includes(sendMethod) ? prevSentVia.join(',') : [...prevSentVia, sendMethod].join(',');
+
     await prisma.document.update({
       where: { id: document.id },
       data: {
         publicLink,
         status: document.status === 'draft' ? 'sent' : document.status,
-        sentVia: document.sentVia ? `${document.sentVia},whatsapp` : 'whatsapp',
+        sentVia: newSentVia,
       },
     });
 
-    res.json({ success: true, data: { publicLink, message: 'Document sent via WhatsApp' } });
+    res.json({ success: true, data: { publicLink, method: sendMethod, message: `Document accepted for delivery via ${sendMethod}` } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -220,7 +247,11 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
 // Delete document
 router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    await prisma.document.delete({ where: { id: req.params.id, businessId: req.user.businessId } });
+    const existing = await prisma.document.findFirst({
+      where: { id: req.params.id, businessId: req.user.businessId },
+    });
+    if (!existing) return res.status(404).json({ success: false, error: 'Document not found' });
+    await prisma.document.delete({ where: { id: existing.id } });
     res.json({ success: true, message: 'Deleted' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });

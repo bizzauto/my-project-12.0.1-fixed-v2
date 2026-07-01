@@ -18,10 +18,13 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
+const noop = () => {};
+const NOOP_CONTEXT: ToastContextType = { toast: noop, success: noop, error: noop, info: noop };
+
 export const useToast = () => {
   const context = useContext(ToastContext);
   if (!context) {
-    throw new Error('useToast must be used within ToastProvider');
+    return NOOP_CONTEXT;
   }
   return context;
 };

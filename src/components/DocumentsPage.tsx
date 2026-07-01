@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, FileText, Download, Send, Eye, Edit, Trash2, X, Copy, Check, DollarSign, Clock, TrendingUp, RefreshCw, Loader2 } from 'lucide-react';
 import { documentsAPI } from '../lib/api';
+import { useToast } from './Toast';
 
 interface DocItem {
   description: string;
@@ -42,6 +43,7 @@ const typeConfig: Record<string, { icon: React.ReactNode; color: string; label: 
 };
 
 const DocumentsPage: React.FC = () => {
+  const { error: showError, success: showSuccess } = useToast();
   const [tab, setTab] = useState<'all' | 'quote' | 'invoice' | 'proposal'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -90,11 +92,11 @@ const DocumentsPage: React.FC = () => {
   const openQuotes = documents.filter(d => d.type === 'quote' && d.status === 'sent').length;
 
   const handleCreateDocument = async () => {
-    if (!newDoc.title.trim()) return;
+    if (!newDoc.title.trim()) { showError('Title is required'); return; }
     setCreating(true);
     try {
       const totalAmount = newDoc.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
-      await documentsAPI.create({
+      const res = await documentsAPI.create({
         title: newDoc.title,
         type: newDoc.type,
         contactName: newDoc.contactName,
@@ -106,9 +108,10 @@ const DocumentsPage: React.FC = () => {
       });
       setShowCreateModal(false);
       setNewDoc({ title: '', type: 'quote', contactName: '', validUntil: '', notes: '', items: [{ description: '', qty: 1, rate: 0, amount: 0 }] });
+      showSuccess('Document created');
       loadDocuments();
-    } catch (err) {
-      console.error('Failed to create document:', err);
+    } catch (err: any) {
+      showError(err.response?.data?.error || 'Failed to create document');
     } finally {
       setCreating(false);
     }
@@ -116,20 +119,27 @@ const DocumentsPage: React.FC = () => {
 
   const handleDeleteDocument = async (id: string) => {
     if (!confirm('Delete this document?')) return;
+    const prevDoc = documents.find(d => d.id === id);
+    setDocuments(documents.filter(d => d.id !== id));
     try {
       await documentsAPI.delete(id);
-      setDocuments(documents.filter(d => d.id !== id));
-    } catch (err) {
-      console.error('Failed to delete document:', err);
+      showSuccess('Document deleted');
+    } catch (err: any) {
+      if (prevDoc) setDocuments(prev => [prevDoc, ...prev]);
+      showError(err.response?.data?.error || 'Failed to delete document');
     }
   };
 
-  const handleSendDocument = async (id: string) => {
+  const handleSendDocument = async (id: string, method: 'email' | 'whatsapp' = 'email') => {
+    const prevDoc = documents.find(d => d.id === id);
+    setDocuments(docs => docs.map(d => d.id === id ? { ...d, status: 'sent' as const } : d));
     try {
-      await documentsAPI.send(id, { method: 'email' });
-      setDocuments(documents.map(d => d.id === id ? { ...d, status: 'sent' as const } : d));
-    } catch (err) {
-      console.error('Failed to send document:', err);
+      const res = await documentsAPI.send(id, { method });
+      const link = res.data?.data?.publicLink;
+      showSuccess(link ? `Document sent. Link: ${link}` : 'Document sent');
+    } catch (err: any) {
+      if (prevDoc) setDocuments(docs => docs.map(d => d.id === id ? { ...d, status: prevDoc.status } : d));
+      showError(err.response?.data?.error || 'Failed to send document');
     }
   };
 
@@ -257,16 +267,16 @@ const DocumentsPage: React.FC = () => {
                   <div className="flex items-center gap-4">
                     <p className="text-lg font-bold text-gray-900 dark:text-white">₹{(doc.amount || 0).toLocaleString()}</p>
                     <div className="flex gap-1">
-                      <button onClick={(e) => { e.stopPropagation(); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="View">
+                      <button onClick={async (e) => { e.stopPropagation(); try { const res = await documentsAPI.get(doc.id); const full = res.data?.data; showSuccess(`View ${doc.documentNumber || doc.title}`); console.log('Document details', full); } catch (err: any) { showError(err.response?.data?.error || 'Failed to load'); } }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="View">
                         <Eye size={16} className="text-gray-400" />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="Edit">
+                      <button onClick={async (e) => { e.stopPropagation(); try { await documentsAPI.update(doc.id, { name: doc.title, status: doc.status }); showSuccess('Saved'); } catch (err: any) { showError(err.response?.data?.error || 'Save failed'); } }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="Resave">
                         <Edit size={16} className="text-gray-400" />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleSendDocument(doc.id); }} className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Send">
+                      <button onClick={(e) => { e.stopPropagation(); const choice = confirm('Send via Email? Cancel for WhatsApp.'); handleSendDocument(doc.id, choice ? 'email' : 'whatsapp'); }} className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Send">
                         <Send size={16} className="text-gray-400" />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="Download PDF">
+                      <button onClick={(e) => { e.stopPropagation(); try { window.open(`/api/documents/${doc.id}/pdf`, '_blank'); } catch { showError('PDF download failed'); } }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="Download PDF">
                         <Download size={16} className="text-gray-400" />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg" title="Delete">
