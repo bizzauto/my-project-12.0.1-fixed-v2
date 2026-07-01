@@ -58,6 +58,7 @@ const VoiceCallPage: React.FC = () => {
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
   const [dialing, setDialing] = useState(false);
   const [activeTab, setActiveTab] = useState<'calls' | 'settings'>('calls');
+  const [activeCallLogId, setActiveCallLogId] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadData = useCallback(async () => {
@@ -107,8 +108,8 @@ const VoiceCallPage: React.FC = () => {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const chartData = days.map(d => ({
           name: d,
-          incoming: daily.filter((dc: any) => dc.direction === 'incoming').reduce((sum: number, dc: any) => sum + dc._count, 0) || Math.floor(Math.random() * 10),
-          outgoing: daily.filter((dc: any) => dc.direction === 'outgoing').reduce((sum: number, dc: any) => sum + dc._count, 0) || Math.floor(Math.random() * 10),
+          incoming: daily.filter((dc: any) => dc.direction === 'incoming').reduce((sum: number, dc: any) => sum + dc._count, 0),
+          outgoing: daily.filter((dc: any) => dc.direction === 'outgoing').reduce((sum: number, dc: any) => sum + dc._count, 0),
         }));
         setCallStats(chartData);
       }
@@ -162,14 +163,15 @@ const VoiceCallPage: React.FC = () => {
         setIsCallActive(true);
         setCallTimer(0);
         setCallStatus('active');
+        setActiveCallLogId(data.callLogId);
 
         timerRef.current = setInterval(() => {
           setCallTimer(t => t + 1);
         }, 1000);
 
-        // Auto-end after 5 minutes
+        // Auto-end after 5 minutes — notify server
         setTimeout(() => {
-          endCall();
+          endCall(data.callLogId);
         }, 300000);
 
         // Refresh data
@@ -195,9 +197,8 @@ const VoiceCallPage: React.FC = () => {
         setIsCallActive(true);
         setCallTimer(0);
         setCallStatus('connecting');
+        setActiveCallLogId(data.callLogId);
 
-        // Load Dograh widget for browser calling
-        // The widget handles WebRTC connection
         timerRef.current = setInterval(() => {
           setCallTimer(t => t + 1);
         }, 1000);
@@ -207,19 +208,29 @@ const VoiceCallPage: React.FC = () => {
         }, 3000);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to start browser call');
+      alert(err.response?.data?.error || 'Browser calling requires Dograh WebRTC widget configuration.');
     } finally {
       setDialing(false);
     }
   };
 
-  const endCall = () => {
+  const endCall = async (callLogId?: string) => {
+    const idToClose = callLogId || activeCallLogId;
     setIsCallActive(false);
     setCallStatus('idle');
     setIsMuted(false);
+    setActiveCallLogId(null);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    // Notify server the call ended
+    if (idToClose) {
+      try {
+        await voiceCallsAPI.end(idToClose);
+      } catch {
+        // Best-effort — server may have already ended via webhook
+      }
     }
     loadData();
   };
@@ -287,7 +298,7 @@ const VoiceCallPage: React.FC = () => {
             <button onClick={() => setIsMuted(!isMuted)} className={`p-4 rounded-full transition-all ${isMuted ? 'bg-red-500' : 'bg-white/20 hover:bg-white/30'}`}>
               {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
             </button>
-            <button onClick={endCall} className="p-5 bg-red-500 rounded-full hover:bg-red-600 transition-all shadow-lg shadow-red-500/30">
+            <button onClick={() => endCall()} className="p-5 bg-red-500 rounded-full hover:bg-red-600 transition-all shadow-lg shadow-red-500/30">
               <PhoneOff size={28} />
             </button>
             <button className="p-4 bg-white/20 rounded-full hover:bg-white/30 transition-all">

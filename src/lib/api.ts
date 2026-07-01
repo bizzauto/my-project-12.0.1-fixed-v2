@@ -620,6 +620,7 @@ export const voiceCallsAPI = {
   dial: (data: { phoneNumber?: string; contactId?: string; workflowId?: number; callType: 'phone' | 'browser'; context?: any }) =>
     apiClient.post('/voice-calls/dial', data),
   getAgents: () => apiClient.get('/voice-calls/agents'),
+  end: (id: string) => apiClient.post(`/voice-calls/${id}/end`),
   getSettings: () => apiClient.get('/voice-calls/settings'),
   updateSettings: (data: any) => apiClient.put('/voice-calls/settings', data),
   checkConnection: () => apiClient.get('/voice-calls/check'),

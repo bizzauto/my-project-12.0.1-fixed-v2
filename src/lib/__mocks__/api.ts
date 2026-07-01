@@ -173,4 +173,6 @@ module.exports = {
   goalsAPI: createMockAPI({ list: {}, create: {}, update: {}, delete: {} }),
   ledgerAPI: createMockAPI({ list: {}, stats: {}, create: {}, update: {}, delete: {} }),
   superAdminAPI: createMockAPI({ getStats: {}, getGrowth: {}, listBusinesses: {}, getBusiness: {}, updateBusinessPlan: {}, toggleBusinessStatus: {}, listUsers: {}, changeUserRole: {}, toggleUserStatus: {}, deleteUser: {}, listSubscriptions: {}, listBackgrounds: {}, createBackground: {}, updateBackground: {}, deleteBackground: {}, getSettings: {} }),
+  voiceCallsAPI: createMockAPI({ list: { data: { data: { calls: [], total: 0, page: 1, limit: 50, totalPages: 0 } } }, getStats: { data: { data: { total: 0, incoming: 0, outgoing: 0, missed: 0, avgDuration: 0, dailyCalls: [] } } }, get: {}, dial: {}, getAgents: { data: { data: [] } }, end: {}, getSettings: { data: { data: {} } }, updateSettings: {}, checkConnection: { data: { data: { connected: false } } } }),
+  walletAPI: createMockAPI({ get: { data: { data: { balance: 0 } } }, getTransactions: {}, recharge: {}, verifyRecharge: {}, balanceCheck: {}, updateThreshold: {}, getEarnings: {}, getEarningsByBusiness: {}, settleEarnings: {} }),
 };

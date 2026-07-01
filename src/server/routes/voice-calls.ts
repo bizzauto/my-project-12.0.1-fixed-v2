@@ -152,7 +152,17 @@ router.get('/settings', authenticate, async (req: AuthRequest, res: Response) =>
       },
     });
 
-    res.json({ success: true, data: business });
+    const masked = business ? {
+      ...business,
+      dograhApiKey: business.dograhApiKey
+        ? '••••••' + business.dograhApiKey.slice(-4)
+        : null,
+      dograhWebhookSecret: business.dograhWebhookSecret
+        ? '••••••' + business.dograhWebhookSecret.slice(-4)
+        : null,
+    } : null;
+
+    res.json({ success: true, data: masked });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -166,11 +176,11 @@ router.put('/settings', authenticate, async (req: AuthRequest, res: Response) =>
     await prisma.business.update({
       where: { id: req.user.businessId },
       data: {
-        ...(dograhApiKey !== undefined && { dograhApiKey }),
+        ...(dograhApiKey !== undefined && !String(dograhApiKey).startsWith('••••••') && { dograhApiKey }),
         ...(dograhApiUrl !== undefined && { dograhApiUrl }),
         ...(dograhEnabled !== undefined && { dograhEnabled }),
         ...(dograhDefaultAgentId !== undefined && { dograhDefaultAgentId: dograhDefaultAgentId ? Number(dograhDefaultAgentId) : null }),
-        ...(dograhWebhookSecret !== undefined && { dograhWebhookSecret }),
+        ...(dograhWebhookSecret !== undefined && !String(dograhWebhookSecret || '').startsWith('••••••') && { dograhWebhookSecret }),
         ...(telephonyProvider !== undefined && { telephonyProvider }),
       },
     });
@@ -236,7 +246,7 @@ router.post('/dial', authenticate, async (req: AuthRequest, res: Response) => {
         direction: 'outgoing',
         status: 'ringing',
         callType,
-        callerNumber: business.dograhApiKey!,
+        callerNumber: 'Business Line',
         calleeNumber: phoneNumber || null,
         startedAt: new Date(),
       },
@@ -264,19 +274,54 @@ router.post('/dial', authenticate, async (req: AuthRequest, res: Response) => {
         },
       });
     } else {
-      // Browser call
-      res.json({
-        success: true,
-        data: {
-          callLogId: callLog.id,
-          callType: 'browser',
-          status: 'connecting',
-          workflowName: agent?.name,
-        },
+      // Browser call - requires Dograh WebRTC widget configuration
+      await prisma.callLog.update({
+        where: { id: callLog.id },
+        data: { status: 'cancelled' },
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: 'Browser calling requires Dograh WebRTC widget. Please use phone calling or configure the widget in Voice AI Settings.',
       });
     }
   } catch (error: any) {
     console.error('Error dialing:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/voice-calls/:id/end - End an active call
+router.post('/:id/end', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const call = await prisma.callLog.findFirst({
+      where: { id: req.params.id, businessId: req.user.businessId },
+    });
+
+    if (!call) {
+      return res.status(404).json({ success: false, error: 'Call not found' });
+    }
+
+    if (call.status === 'completed' || call.status === 'ended') {
+      return res.json({ success: true, data: { status: call.status } });
+    }
+
+    const duration = call.startedAt
+      ? Math.floor((Date.now() - call.startedAt.getTime()) / 1000)
+      : req.body.duration || 0;
+
+    await prisma.callLog.update({
+      where: { id: call.id },
+      data: {
+        status: 'completed',
+        duration,
+        endedAt: new Date(),
+      },
+    });
+
+    res.json({ success: true, data: { status: 'completed', duration } });
+  } catch (error: any) {
+    console.error('Error ending call:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
