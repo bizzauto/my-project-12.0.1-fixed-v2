@@ -64,13 +64,13 @@ async function getValidAccessToken(businessId: string): Promise<string> {
 // Store OAuth state temporarily (in production, use Redis)
 const oauthStates = new Map<string, { businessId: string; expiresAt: number }>();
 
-// Cleanup expired states every 5 minutes
-setInterval(() => {
+// Lazy cleanup: purge expired states on each access instead of setInterval
+function cleanupExpiredStates() {
   const now = Date.now();
   for (const [key, val] of oauthStates) {
     if (val.expiresAt < now) oauthStates.delete(key);
   }
-}, 5 * 60 * 1000);
+}
 
 // ── GET /api/google-business/auth/url — Generate OAuth URL ──
 router.get('/auth/url', authenticate, async (req: AuthRequest, res: Response) => {
@@ -88,6 +88,7 @@ router.get('/auth/url', authenticate, async (req: AuthRequest, res: Response) =>
       timestamp: Date.now(),
     })).toString('base64');
 
+    cleanupExpiredStates();
     oauthStates.set(state, { businessId: req.user.businessId, expiresAt: Date.now() + 10 * 60 * 1000 });
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -120,6 +121,7 @@ router.get('/auth/callback', async (req: AuthRequest, res: Response) => {
     }
 
     // Validate state - try Map first, then decode directly
+    cleanupExpiredStates();
     let stateData = oauthStates.get(state as string);
     if (!stateData || stateData.expiresAt < Date.now()) {
       // Fallback: decode state directly (handles Docker restart / Map loss)
@@ -366,6 +368,8 @@ router.post('/disconnect', authenticate, async (req: AuthRequest, res: Response)
       where: { id: req.user.businessId },
       data: {
         gbpAccessToken: null,
+        gbpRefreshToken: null,
+        gbpTokenExpiry: null,
         gbpAccountId: null,
         gbpLocationId: null,
       },

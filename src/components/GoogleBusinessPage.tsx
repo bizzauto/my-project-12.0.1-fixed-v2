@@ -46,6 +46,21 @@ const GoogleBusinessPage: React.FC = () => {
 
   const toast_ = (m: string, t = 'success') => { setToast({ m, t }); setTimeout(() => setToast(null), 3000); };
 
+  const handleConnectGoogle = async () => {
+    try {
+      const authUrlRes = await googleBusinessAPI.getAuthUrl();
+      const authUrl = authUrlRes.data?.data?.authUrl || authUrlRes.data?.authUrl;
+      if (authUrl) {
+        window.location.href = authUrl;
+      } else {
+        toast_('Failed to get Google auth URL', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to initiate Google OAuth:', error);
+      toast_('Failed to connect to Google Business Profile', 'error');
+    }
+  };
+
   // Handle OAuth callback params
   useEffect(() => {
     const connected = searchParams.get('connected');
@@ -80,7 +95,7 @@ const GoogleBusinessPage: React.FC = () => {
         try {
           const reviewsRes = await googleBusinessAPI.getReviews();
           if (reviewsRes.data?.success) {
-            const rd = reviewsRes.data?.data?.data || [];
+            const rd = reviewsRes.data?.data || [];
             setReviews(Array.isArray(rd) ? rd.map((r: any) => ({
               id: r.reviewId || r.id || String(Math.random()), author: r.reviewer?.displayName || 'Anonymous',
               rating: r.starRating === 'FIVE' ? 5 : r.starRating === 'FOUR' ? 4 : r.starRating === 'THREE' ? 3 : r.starRating === 'TWO' ? 2 : 1,
@@ -93,7 +108,7 @@ const GoogleBusinessPage: React.FC = () => {
         try {
           const postsRes = await googleBusinessAPI.getPosts();
           if (postsRes.data?.success) {
-            const pd = postsRes.data?.data?.localPosts || [];
+            const pd = postsRes.data?.data || [];
             setPosts(Array.isArray(pd) ? pd.map((p: any) => ({
               id: p.name || String(Math.random()), type: 'update', title: p.topicType || 'Update',
               content: p.summary || '', startDate: p.createTime || new Date().toISOString(),
@@ -130,9 +145,14 @@ const GoogleBusinessPage: React.FC = () => {
     if (!replyTxt.trim()) return;
     setReplying(true);
     try {
-      await googleBusinessAPI.replyToReview(id, replyTxt);
-      setReviews(reviews.map(r => r.id === id ? { ...r, replied: true, replyText: replyTxt } : r));
-      setReplyOpen(null); setReplyTxt(''); toast_('Reply posted!');
+      const res = await googleBusinessAPI.replyToReview(id, replyTxt);
+      if (res.data?.success || res.data?.data) {
+        setReviews(reviews.map(r => r.id === id ? { ...r, replied: true, replyText: replyTxt } : r));
+        toast_('Reply posted!');
+      } else {
+        toast_('Failed to post reply', 'error');
+      }
+      setReplyOpen(null); setReplyTxt('');
     } catch (err: any) { toast_(err?.response?.data?.error || 'Failed to post reply', 'error'); } finally { setReplying(false); }
   };
 
@@ -141,8 +161,10 @@ const GoogleBusinessPage: React.FC = () => {
     setCreating(true);
     try {
       await googleBusinessAPI.createPost({ content: `${newPost.title}\n\n${newPost.content}` });
-      setPosts([{ id: Date.now().toString(), ...newPost, status: 'active', views: 0, clicks: 0, startDate: 'Now' }, ...posts]);
       setNewPost({ type: 'update', title: '', content: '' }); setPostOpen(false); toast_('Post created!');
+      const postsRes = await googleBusinessAPI.getPosts();
+      const pd = postsRes.data?.data || [];
+      setPosts(Array.isArray(pd) ? pd : []);
     } catch (err: any) { toast_(err?.response?.data?.error || 'Failed to create post', 'error'); } finally { setCreating(false); }
   };
 
@@ -261,21 +283,7 @@ const GoogleBusinessPage: React.FC = () => {
             <AlertCircle className="text-yellow-600 dark:text-yellow-400" size={24} />
             <div className="flex-1"><p className="font-medium text-yellow-800 dark:text-yellow-300">Google Business Not Connected</p><p className="text-sm text-yellow-600 dark:text-yellow-400">Connect your Google Business Profile to manage reviews, posts, and insights.</p></div>
             <button
-              onClick={async () => {
-                try {
-                  const res = await fetch('/api/google-business/auth/url', {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-                  });
-                  const data = await res.json();
-                  if (data.success && data.data.url) {
-                    window.location.href = data.data.url;
-                  } else {
-                    toast_(data.error || 'Failed to generate auth URL', 'error');
-                  }
-                } catch (err) {
-                  toast_('Failed to start Google authentication', 'error');
-                }
-              }}
+              onClick={handleConnectGoogle}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
@@ -340,10 +348,7 @@ const GoogleBusinessPage: React.FC = () => {
             onClick={async () => {
               if (!confirm('Disconnect Google Business Profile? You can reconnect anytime.')) return;
               try {
-                await fetch('/api/google-business/disconnect', {
-                  method: 'POST',
-                  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-                });
+                await googleBusinessAPI.disconnect();
                 setConnected(false);
                 setReviews([]);
                 setPosts([]);
@@ -702,7 +707,7 @@ const GoogleBusinessPage: React.FC = () => {
               <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label><textarea value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} rows={3} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none" /></div>
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                 <button onClick={() => setEditOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">Cancel</button>
-                <button onClick={() => { setEditOpen(false); toast_('Profile updated!'); }} className="px-4 sm:px-5 md:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+                <button onClick={() => { setEditOpen(false); toast_('Profile editing is managed directly in Google Business Profile. Changes here are for display only.', 'error'); }} className="px-4 sm:px-5 md:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
               </div>
             </div>
           </div>

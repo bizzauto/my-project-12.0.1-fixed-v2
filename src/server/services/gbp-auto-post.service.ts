@@ -142,22 +142,17 @@ export class GBPAutoPostService {
       return null;
     }
 
-    // Simple round-robin based on last posted time
-    const business = await prisma.business.findUnique({
-      where: { id: businessId },
-      select: { gbpAutoPostLastPosted: true },
-    });
-
-    if (!business?.gbpAutoPostLastPosted) {
+    if (config.templates.length === 1) {
       return config.templates[0];
     }
 
-    // Find the last posted template index
-    const lastPostedIndex = config.templates.findIndex(
-      t => t.content === (business as any).lastPostedContent
-    );
-
-    const nextIndex = (lastPostedIndex + 1) % config.templates.length;
+    // Round-robin using day-of-year modulo
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    const diff = now.getTime() - start.getTime();
+    const oneDay = 1000 * 60 * 60 * 24;
+    const dayOfYear = Math.floor(diff / oneDay);
+    const nextIndex = dayOfYear % config.templates.length;
     return config.templates[nextIndex];
   }
 
@@ -172,8 +167,10 @@ export class GBPAutoPostService {
       where: { id: businessId },
       select: {
         gbpAccessToken: true,
+        gbpRefreshToken: true,
         gbpAccountId: true,
         gbpLocationId: true,
+        gbpTokenExpiry: true,
       },
     });
 
@@ -182,8 +179,33 @@ export class GBPAutoPostService {
     }
 
     try {
-      const axios = await import('axios');
-      const accessToken = decrypt(business.gbpAccessToken);
+      const axios = (await import('axios')).default;
+
+      // Refresh token if expired
+      let accessToken = decrypt(business.gbpAccessToken);
+      if (business.gbpTokenExpiry && new Date(business.gbpTokenExpiry) <= new Date() && business.gbpRefreshToken) {
+        try {
+          const refreshRes = await axios.post('https://oauth2.googleapis.com/token', null, {
+            params: {
+              client_id: process.env.GOOGLE_CLIENT_ID,
+              client_secret: process.env.GOOGLE_CLIENT_SECRET,
+              refresh_token: decrypt(business.gbpRefreshToken),
+              grant_type: 'refresh_token',
+            },
+          });
+          accessToken = refreshRes.data.access_token;
+          await prisma.business.update({
+            where: { id: businessId },
+            data: {
+              gbpAccessToken: encrypt(accessToken),
+              gbpTokenExpiry: new Date(Date.now() + (refreshRes.data.expires_in || 3600) * 1000),
+            },
+          });
+        } catch (refreshErr: any) {
+          console.error('GBP token refresh failed:', refreshErr.message);
+          return { success: false, error: 'Token refresh failed' };
+        }
+      }
 
       const postData: any = {
         languageCode: 'en',
@@ -202,7 +224,7 @@ export class GBPAutoPostService {
         };
       }
 
-      const response = await axios.default.post(
+      const response = await axios.post(
         `https://mybusiness.googleapis.com/v4/accounts/${business.gbpAccountId}/locations/${business.gbpLocationId}/localPosts`,
         postData,
         {
