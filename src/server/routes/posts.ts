@@ -71,11 +71,11 @@ router.put('/:id', authenticate, async (req: any, res: any) => {
     if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
 
     if (post.status !== 'draft' && post.status !== 'scheduled') {
-      return res.status(400).json({ success: false, error: 'Cannot publish post' });
+      return res.status(400).json({ success: false, error: 'Cannot edit a published or failed post' });
     }
 
     const { content, mediaUrls, link, platforms, scheduledAt } = req.body;
-    const updated = await prisma.post.update({ where: { id: req.params.id, businessId: req.user.businessId }, data: { content, mediaUrls, link, platforms, scheduledAt } });
+    const updated = await prisma.post.update({ where: { id: post.id }, data: { content, mediaUrls, link, platforms, scheduledAt } });
     res.json({ success: true, data: updated });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'Failed to update post', details: error.message });
@@ -88,7 +88,7 @@ router.delete('/:id', authenticate, async (req: any, res: any) => {
     const post = await prisma.post.findFirst({ where: { id: req.params.id, businessId: req.user.businessId } });
     if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
 
-    await prisma.post.delete({ where: { id: req.params.id, businessId: req.user.businessId } });
+    await prisma.post.delete({ where: { id: post.id } });
     res.json({ success: true, message: 'Post deleted' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'Failed to delete post', details: error.message });
@@ -103,7 +103,7 @@ router.post('/:id/schedule', authenticate, async (req: any, res: any) => {
     if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
 
     const updated = await prisma.post.update({
-      where: { id: req.params.id, businessId: req.user.businessId },
+      where: { id: post.id },
       data: {
         scheduledAt: new Date(scheduledAt),
         status: 'scheduled',
@@ -122,7 +122,7 @@ router.post('/:id/publish', authenticate, async (req: any, res: any) => {
     if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
 
     const updated = await prisma.post.update({
-      where: { id: req.params.id, businessId: req.user.businessId },
+      where: { id: post.id },
       data: {
         status: 'published',
         publishedAt: new Date(),

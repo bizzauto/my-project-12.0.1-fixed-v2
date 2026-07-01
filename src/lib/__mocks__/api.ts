@@ -68,7 +68,7 @@ module.exports = {
   }),
   postsAPI: createMockAPI({
     list: { success: true, data: { posts: [] } }, get: {}, create: {}, update: {},
-    delete: {}, schedule: {},
+    delete: {}, schedule: {}, publish: {}, generateCaption: {},
   }),
   analyticsAPI: createMockAPI({
     dashboard: { success: true, data: {} }, messages: { success: true, data: {} },
@@ -101,6 +101,7 @@ module.exports = {
   }),
   aiAPI: createMockAPI({
     generate: { success: true, data: { text: 'AI response' } }, chat: {}, analyze: {}, enhance: {},
+    caption: { success: true, data: { text: 'Generated caption' } }, hashtags: { success: true, data: { hashtags: [] } },
   }),
   teamAPI: createMockAPI({ list: {}, invite: {}, update: {}, remove: {} }),
   leadsAPI: createMockAPI({

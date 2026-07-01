@@ -443,12 +443,37 @@ router.get('/social', authenticate, cacheResponse(60), async (req: any, res: any
       }
     }
 
+    // Build weekly engagement data (last 7 days)
+    const weeklyEngagement: Array<{ name: string; likes: number; comments: number; shares: number }> = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dayStr = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+
+      const dayPosts = await prisma.post.findMany({
+        where: { businessId, createdAt: { gte: dayStart, lte: dayEnd } },
+        select: { stats: true },
+      });
+
+      let likes = 0, comments = 0, shares = 0;
+      for (const p of dayPosts) {
+        const s = p.stats && typeof p.stats === 'object' ? p.stats as any : {};
+        likes += s.likes || 0;
+        comments += s.comments || 0;
+        shares += s.shares || 0;
+      }
+      weeklyEngagement.push({ name: dayStr, likes, comments, shares });
+    }
+
     res.json({
       success: true,
       data: {
         stats: { total, published, scheduled, draft },
         byPlatform,
         posts: recentPosts,
+        weeklyEngagement,
       },
     });
   } catch (error: any) {

@@ -10,7 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RT,
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
-import { postsAPI, instagramAPI, socialAccountsAPI, analyticsAPI } from '../lib/api';
+import { postsAPI, instagramAPI, socialAccountsAPI, analyticsAPI, aiAPI } from '../lib/api';
 import { useAuthStore } from '../lib/authStore';
 
 // Types
@@ -95,6 +95,8 @@ const SocialMediaPage: React.FC = () => {
   const [showIgConnectModal, setShowIgConnectModal] = useState(false);
   const [igConnectForm, setIgConnectForm] = useState({ igUserId: '', igAccessToken: '' });
   const [igConnecting, setIgConnecting] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [uploadedMedia, setUploadedMedia] = useState<Array<{ url: string; type: string; file?: File; previewUrl: string }>>([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
 
@@ -216,19 +218,22 @@ const SocialMediaPage: React.FC = () => {
     try {
       const res = await postsAPI.list();
       if (res.data.success) {
-        const data = (res.data.data?.posts || []).map((p: any) => ({
-          id: p.id,
-          content: p.content || '',
-          platforms: p.platforms || [],
-          status: p.status || 'draft',
-          scheduledAt: p.scheduledAt || undefined,
-          publishedAt: p.publishedAt || undefined,
-          image: p.mediaUrls?.[0] || undefined,
-          likes: p.likes || 0,
-          comments: p.comments || 0,
-          shares: p.shares || 0,
-          reach: p.reach || 0,
-        }));
+        const data = (res.data.data?.posts || []).map((p: any) => {
+          const stats = p.stats && typeof p.stats === 'object' ? p.stats : {};
+          return {
+            id: p.id,
+            content: p.content || '',
+            platforms: p.platforms || [],
+            status: p.status || 'draft',
+            scheduledAt: p.scheduledAt || undefined,
+            publishedAt: p.publishedAt || undefined,
+            image: p.mediaUrls?.[0] || undefined,
+            likes: stats.likes || 0,
+            comments: stats.comments || 0,
+            shares: stats.shares || 0,
+            reach: stats.reach || 0,
+          };
+        });
         setPosts(data);
       }
     } catch (error) {
@@ -253,8 +258,10 @@ const SocialMediaPage: React.FC = () => {
       instagramAPI.getStatus().then(res => {
         if (res.data.success) {
           setIgStatus(res.data.data || null);
+        }
+      }).catch(() => {});
 
-      // Fetch social analytics
+      // Fetch social analytics (independent of Instagram status)
       setSocialLoading(true);
       analyticsAPI.social().then(res => {
         if (res.data.success) {
@@ -264,8 +271,6 @@ const SocialMediaPage: React.FC = () => {
           if (d.weeklyEngagement) setWeeklyEngagement(d.weeklyEngagement);
         }
       }).catch(() => {}).finally(() => setSocialLoading(false));
-        }
-      }).catch(() => {});
     } else {
       setLoadingSocialStatus(false);
     }
@@ -318,10 +323,20 @@ const SocialMediaPage: React.FC = () => {
     }
   };
 
-  const duplicatePost = (post: SocialPost) => {
-    const dup = { ...post, id: Date.now().toString(), status: 'draft' as const, likes: 0, comments: 0, shares: 0, reach: 0 };
-    setPosts([dup, ...posts]);
-    showToast('Post duplicated as draft');
+  const duplicatePost = async (post: SocialPost) => {
+    try {
+      const res = await postsAPI.create({
+        content: post.content,
+        platforms: post.platforms,
+      });
+      if (res.data.success) {
+        fetchPosts();
+        showToast('Post duplicated as draft');
+      }
+    } catch (error) {
+      console.error('Failed to duplicate post:', error);
+      showToast('Failed to duplicate post', 'error');
+    }
   };
 
   // Instagram: Upload media
@@ -360,6 +375,7 @@ const SocialMediaPage: React.FC = () => {
   const [igPublishResult, setIgPublishResult] = useState<{ mediaId?: string; url?: string } | null>(null);
   const [igRecentMedia, setIgRecentMedia] = useState<Array<{ id: string; media_url: string; media_type: string; caption?: string; timestamp: string; like_count?: number; comments_count?: number }>>([]);
   const [igAnalyticsLoading, setIgAnalyticsLoading] = useState(false);
+  const [generatingCaption, setGeneratingCaption] = useState(false);
 
   // Open Instagram Publish Modal
   const openIgPublishModal = (post: SocialPost) => {
@@ -508,6 +524,31 @@ const SocialMediaPage: React.FC = () => {
     }
   };
 
+  // AI: Generate caption
+  const handleGenerateCaption = async () => {
+    if (!composeContent.trim()) {
+      showToast('Enter a topic or keywords first', 'error');
+      return;
+    }
+    setGeneratingCaption(true);
+    try {
+      const platform = selectedPlatforms[0] || 'facebook';
+      const res = await aiAPI.caption({
+        topic: composeContent,
+        businessType: 'business',
+        platform,
+      });
+      if (res.data.success && res.data.data?.text) {
+        setComposeContent(res.data.data.text);
+        showToast('Caption generated!');
+      }
+    } catch (err: any) {
+      showToast(err?.response?.data?.error || 'Failed to generate caption', 'error');
+    } finally {
+      setGeneratingCaption(false);
+    }
+  };
+
   // Instagram: Remove uploaded media
   const removeIgMedia = (index: number) => {
     setUploadedMedia(prev => {
@@ -647,7 +688,7 @@ const SocialMediaPage: React.FC = () => {
       const date = p.scheduledAt || p.publishedAt;
       if (!date) return false;
       const d = new Date(date);
-      return d.getDate() === day && d.getMonth() === new Date().getMonth();
+      return d.getDate() === day && d.getMonth() === calendarMonth && d.getFullYear() === calendarYear;
     }).length;
     const demoCount = Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0;
     return { day: day > 0 && day <= 31 ? day : null, posts: isDemoMode ? demoCount : scheduledOnDay };
@@ -890,11 +931,17 @@ const SocialMediaPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-x-auto">
           <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
-              <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"><ChevronLeft size={20} /></button>
+              <button onClick={() => {
+                if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); }
+                else setCalendarMonth(m => m - 1);
+              }} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"><ChevronLeft size={20} /></button>
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
-                {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                {new Date(calendarYear, calendarMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </h3>
-              <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"><ChevronRight size={20} /></button>
+              <button onClick={() => {
+                if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(y => y + 1); }
+                else setCalendarMonth(m => m + 1);
+              }} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"><ChevronRight size={20} /></button>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex gap-1 text-xs">
@@ -1301,8 +1348,8 @@ const SocialMediaPage: React.FC = () => {
                   className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm sm:text-base"
                 />
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mt-2">
-                  <button className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg text-xs sm:text-sm hover:bg-purple-100 dark:hover:bg-purple-900/50">
-                    <Zap size={14} /> ✨ Generate with AI
+                  <button onClick={handleGenerateCaption} disabled={generatingCaption} className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg text-xs sm:text-sm hover:bg-purple-100 dark:hover:bg-purple-900/50 disabled:opacity-50">
+                    {generatingCaption ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />} {generatingCaption ? 'Generating...' : '✨ Generate with AI'}
                   </button>
                   <span className="text-xs text-gray-400">{composeContent.length} characters</span>
                 </div>
@@ -1413,9 +1460,16 @@ const SocialMediaPage: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add Media</label>
                   <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+                    <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 cursor-pointer">
                       <Image size={18} /> Upload Image
-                    </button>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/jpeg,image/png,image/webp,video/mp4"
+                        onChange={handleIgMediaUpload}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
                 </div>
               )}
@@ -1451,7 +1505,7 @@ const SocialMediaPage: React.FC = () => {
                     <input type="radio" name="schedule" checked={!!scheduleDate} onChange={() => setScheduleDate(new Date().toISOString().slice(0, 16))} className="w-4 h-4 text-blue-600" />
                     <span className="text-sm text-gray-700 dark:text-gray-300">Schedule for:</span>
                   </label>
-                  {scheduleDate !== undefined && (
+                  {scheduleDate !== '' && (
                     <input
                       type="datetime-local"
                       value={scheduleDate}
