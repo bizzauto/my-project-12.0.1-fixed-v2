@@ -26,7 +26,8 @@ async function authenticateViaN8nApiKey(req: AuthRequest): Promise<boolean> {
   const configuredKey = process.env.N8N_API_KEY;
   if (!configuredKey) return false;
 
-  if (apiKey !== configuredKey) {
+  // SECURITY: timing-safe comparison prevents length and prefix leak
+  if (apiKey.length !== configuredKey.length || !timingSafeEqual(Buffer.from(apiKey, 'utf8'), Buffer.from(configuredKey, 'utf8'))) {
     return false;
   }
 

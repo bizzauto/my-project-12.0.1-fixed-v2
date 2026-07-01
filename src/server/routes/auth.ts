@@ -1023,7 +1023,10 @@ router.post('/create-super-admin', async (req: Request, res: Response) => {
       });
     }
 
-    if (!bootstrapToken || bootstrapToken !== expectedToken) {
+    // SECURITY: constant-time comparison prevents timing oracle attacks on the bootstrap token
+    const tokenA = Buffer.from(String(bootstrapToken || ''), 'utf8');
+    const tokenB = Buffer.from(expectedToken, 'utf8');
+    if (tokenA.length !== tokenB.length || !crypto.timingSafeEqual(tokenA, tokenB)) {
       return res.status(403).json({
         success: false,
         error: 'Invalid bootstrap token',

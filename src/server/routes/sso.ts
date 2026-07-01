@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { encrypt } from '../utils/auth.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -60,7 +61,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         businessId,
         provider,
         clientId,
-        clientSecret,
+        // SECURITY: encrypt clientSecret at rest (AES-256-CBC via utils/auth.ts)
+        clientSecret: encrypt(clientSecret),
         domain: domain || null,
       },
     });
@@ -90,7 +92,8 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id },
       data: {
         ...(clientId !== undefined && { clientId }),
-        ...(clientSecret !== undefined && { clientSecret }),
+        // SECURITY: re-encrypt the clientSecret on update
+        ...(clientSecret !== undefined && { clientSecret: encrypt(clientSecret) }),
         ...(domain !== undefined && { domain }),
         ...(enabled !== undefined && { enabled }),
       },
