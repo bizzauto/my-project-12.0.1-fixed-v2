@@ -131,7 +131,7 @@ module.exports = {
     getAutoPostStatus: { data: {} },
   }),
   auditLogAPI: createMockAPI({ list: {} }),
-  postersAPI: createMockAPI({ list: {}, create: {}, delete: {} }),
+  postersAPI: createMockAPI({ list: {}, get: {}, create: {}, generate: {}, generateImage: { data: { data: { url: '' } } }, download: {}, generated: { data: { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } } }, deleteGenerated: {}, listBackgrounds: { data: { data: [] } } }),
   instagramAPI: createMockAPI({
     connect: {}, disconnect: {}, getStatus: {},
     getAccount: {}, uploadMedia: {}, createContainer: {},

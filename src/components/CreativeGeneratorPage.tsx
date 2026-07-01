@@ -227,6 +227,7 @@ const CreativeGeneratorPage: React.FC = () => {
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+  const fullscreenPreviewRef = useRef<HTMLDivElement>(null);
 
   // Image Filters
   const [filters, setFilters] = useState({ brightness: 100, contrast: 100, grayscale: 0, sepia: 0, blur: 0, saturate: 100 });
@@ -495,11 +496,9 @@ const CreativeGeneratorPage: React.FC = () => {
 
   const fetchAdminBackgrounds = async () => {
     try {
-      const res = await postersAPI.list(); // reuse posters API client
-      try {
-        const bgRes = await (await import('../lib/api')).default.get('/posters/backgrounds/active');
-        if (bgRes.data?.success) setAdminBackgrounds(bgRes.data.data || []);
-      } catch {}
+      const bgRes = await postersAPI.listBackgrounds();
+      const bgData = bgRes.data?.data;
+      if (Array.isArray(bgData)) setAdminBackgrounds(bgData);
     } catch {}
   };
 
@@ -508,16 +507,18 @@ const CreativeGeneratorPage: React.FC = () => {
       const res = await postersAPI.list();
       const data = res.data?.data || res.data || [];
       if (Array.isArray(data) && data.length > 0) {
-        setTemplates(data.map((t: any) => ({
+        const mapped = data.map((t: any) => ({
           id: t.id, name: t.name,
           emoji: getEmojiForCategory(t.category),
           gradient: getGradientForCategory(t.category),
           category: t.category,
-        })));
+        }));
+        setTemplates(mapped);
+        setSelectedTemplate(mapped[0]);
       } else {
         setTemplates(DEFAULT_TEMPLATES);
+        setSelectedTemplate(DEFAULT_TEMPLATES[0]);
       }
-      setSelectedTemplate(DEFAULT_TEMPLATES[0]);
     } catch {
       setTemplates(DEFAULT_TEMPLATES);
       setSelectedTemplate(DEFAULT_TEMPLATES[0]);
@@ -537,9 +538,9 @@ const CreativeGeneratorPage: React.FC = () => {
 
   const fetchHistory = async () => {
     try {
-      const res = await postersAPI.list();
-      const data = res.data?.data || res.data || [];
-      if (Array.isArray(data)) setHistory(data.map((item: any) => ({ id: item.id, name: item.name || 'Untitled', createdAt: item.createdAt || new Date().toISOString(), thumbnail: item.thumbnail })));
+      const res = await postersAPI.generated({ page: 1, limit: 50 });
+      const data = res.data?.data || [];
+      if (Array.isArray(data)) setHistory(data.map((item: any) => ({ id: item.id, name: item.name || 'Untitled', createdAt: item.generatedAt || item.createdAt || new Date().toISOString(), thumbnail: item.thumbnail || item.url })));
     } catch { setHistory([]); }
   };
 
@@ -570,10 +571,11 @@ const CreativeGeneratorPage: React.FC = () => {
     setIsGenerating(true);
     try {
       const res = await postersAPI.generate({ templateId: selectedTemplate?.id || '', userData: { headline, subtitle, businessName, phone } });
-      if (res.data?.headline) setHeadline(res.data.headline);
-      if (res.data?.subtitle) setSubtitle(res.data.subtitle);
-      if (res.data?.headlines) setAiHeadlines(res.data.headlines);
-      if (res.data?.subtitles) setAiSubtitles(res.data.subtitles);
+      const data = res.data?.data || res.data;
+      if (data?.headline) setHeadline(data.headline);
+      if (data?.subtitle) setSubtitle(data.subtitle);
+      if (data?.headlines) setAiHeadlines(data.headlines);
+      if (data?.subtitles) setAiSubtitles(data.subtitles);
     } catch {
       const h = language === 'hi'
         ? ['Biggest Sale Ever!', 'Festival Special!', 'New Collection!', 'Limited Time!', 'Exclusive Deal!']
@@ -615,13 +617,18 @@ const CreativeGeneratorPage: React.FC = () => {
 
   const handleWhatsAppShare = () => {
     const text = encodeURIComponent(`*${headline || 'Check this!'}*\n${subtitle || ''}\n\n${businessName ? `🏪 ${businessName}` : ''}\n${phone ? `📞 ${phone}` : '' }`);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    const phoneClean = phone?.replace(/\D/g, '') || '';
+    const url = phoneClean.length >= 10
+      ? `https://wa.me/${phoneClean.startsWith('91') ? phoneClean : '91' + phoneClean.slice(-10)}?text=${text}`
+      : `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
   };
 
   const handleDownloadImage = async () => {
-    if (!previewRef.current) return;
+    const el = fullscreenPreviewRef.current || previewRef.current;
+    if (!el) return;
     try {
-      const canvas = await html2canvas(previewRef.current, { scale: 2, useCORS: true, backgroundColor: null });
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null });
       const link = document.createElement('a');
       link.download = `poster-${Date.now()}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -1510,8 +1517,10 @@ const CreativeGeneratorPage: React.FC = () => {
                     </div>
                   )}
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button onClick={handleDownloadImage} className="p-2 bg-white rounded-lg hover:bg-gray-100"><Download size={16} className="text-gray-900" /></button>
-                    <button onClick={handleWhatsAppShare} className="p-2 bg-white rounded-lg hover:bg-gray-100"><MessageCircle size={16} className="text-gray-900" /></button>
+                    {item.thumbnail && (
+                      <a href={item.thumbnail} download className="p-2 bg-white rounded-lg hover:bg-gray-100"><Download size={16} className="text-gray-900" /></a>
+                    )}
+                    <button onClick={() => { if (item.thumbnail) window.open(`https://wa.me/?text=${encodeURIComponent(item.name)}`, '_blank'); }} className="p-2 bg-white rounded-lg hover:bg-gray-100"><MessageCircle size={16} className="text-gray-900" /></button>
                   </div>
                   <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
                     <p className="text-white text-xs truncate">{item.name}</p>
@@ -1595,7 +1604,7 @@ const CreativeGeneratorPage: React.FC = () => {
             </div>
           </div>
           <div className="max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div ref={previewRef}
+            <div ref={fullscreenPreviewRef}
               className={`w-full rounded-2xl overflow-hidden shadow-2xl ${FORMAT_OPTIONS[selectedFormat].ratio} relative select-none`}
               style={{
                 background: backgroundImage

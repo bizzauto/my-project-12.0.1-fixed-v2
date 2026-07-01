@@ -252,6 +252,8 @@ export const postersAPI = {
   generated: (params?: { page?: number; limit?: number; category?: string }) =>
     apiClient.get('/posters/generated', { params }),
   deleteGenerated: (id: string) => apiClient.delete(`/posters/generated/${id}`),
+  listBackgrounds: (params?: Record<string, any>) =>
+    apiClient.get('/posters/backgrounds/active', { params }),
 };
 
 // Chatbot API
