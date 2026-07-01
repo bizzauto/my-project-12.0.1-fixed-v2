@@ -135,7 +135,11 @@ router.get('/auth/:provider', async (req: AuthRequest, res: Response) => {
     if (!config) return res.status(404).json({ success: false, error: `${provider} SSO not configured or disabled` });
 
     const state = crypto.randomBytes(32).toString('hex');
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/sso/callback/${provider}`;
+    const appBaseUrl = process.env.APP_BASE_URL || process.env.FRONTEND_URL;
+    if (!appBaseUrl) {
+      throw new Error('APP_BASE_URL/FRONTEND_URL must be set');
+    }
+    const redirectUri = `${appBaseUrl.replace(/\/$/, '')}/api/sso/callback/${provider}`;
 
     let authUrl = '';
     switch (provider) {

@@ -63,6 +63,13 @@ router.post('/:id/test', authenticate, async (req: any, res: any) => {
       return res.status(404).json({ success: false, error: 'Webhook not found' });
     }
 
+    // SSRF protection: validate webhook URL before firing
+    const { isSafeWebhookUrl } = await import('../services/webhook-retry.service.js');
+    const urlCheck = isSafeWebhookUrl(webhook.url);
+    if (!urlCheck.safe) {
+      return res.status(400).json({ success: false, error: `Blocked URL: ${urlCheck.reason}` });
+    }
+
     // Send test payload
     const axios = (await import('axios')).default;
     const testPayload = {

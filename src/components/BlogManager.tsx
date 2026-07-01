@@ -8,6 +8,7 @@ import {
   Hash, Tag as TagIcon, Upload, Star, Archive
 } from 'lucide-react';
 import { useAuthStore } from '../lib/authStore';
+import { blogAPI } from '../lib/api';
 
 const blogAPI = {
   list: (params?: any) => fetch(`/api/blog/posts?${new URLSearchParams(params || {})}`).then(r => r.json()),

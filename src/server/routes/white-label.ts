@@ -5,9 +5,13 @@ import { prisma } from '../db.js';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.JWT_REFRESH_SECRET;
+const JWT_SECRET = process.env.RESELLER_JWT_SECRET || process.env.WL_JWT_SECRET;
 if (!JWT_SECRET) {
-  throw new Error('CRITICAL: Neither JWT_SECRET nor JWT_REFRESH_SECRET is set. Cannot start white-label module.');
+  throw new Error('CRITICAL: RESELLER_JWT_SECRET is not set. Cannot start white-label module.');
+}
+const JWT_REFRESH_FALLBACK = process.env.JWT_REFRESH_SECRET;
+if (JWT_REFRESH_FALLBACK && JWT_REFRESH_FALLBACK === JWT_SECRET) {
+  throw new Error('CRITICAL: RESELLER_JWT_SECRET must be distinct from JWT_REFRESH_SECRET to prevent token-confusion attacks.');
 }
 const PLAN_PRICES: Record<string, number> = { STARTER: 999, PRO: 4999, ENTERPRISE: 9999 };
 
@@ -19,7 +23,11 @@ const wlAuth = async (req: Request, res: Response, next: Function) => {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as { resellerId: string };
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256'],
+      audience: 'reseller',
+      issuer: 'bizzauto',
+    }) as { resellerId: string };
     (req as any).resellerId = decoded.resellerId;
     next();
   } catch {
@@ -53,7 +61,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     const clients = await (prisma as any).wl_clients.findMany({ where: { resellerId: reseller.id } });
     const activeClients = clients.filter((c: any) => c.status === 'active').length;
 
-    const token = jwt.sign({ resellerId: reseller.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ resellerId: reseller.id }, JWT_SECRET, { expiresIn: '7d', algorithm: 'HS256', audience: 'reseller', issuer: 'bizzauto' });
 
     const { password: _, ...safeReseller } = reseller;
 

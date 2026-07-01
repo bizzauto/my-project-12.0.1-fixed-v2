@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { createHash, randomBytes, createCipheriv, createDecipheriv, timingSafeEqual } from 'crypto'
-import os from 'os';
+import { randomBytes, createCipheriv, createDecipheriv, timingSafeEqual } from 'crypto'
 import path from 'path';
 import fs from 'fs';
 import { isTokenBlacklisted } from '../services/token-blacklist.service.js';
@@ -10,23 +9,82 @@ import { isTokenBlacklisted } from '../services/token-blacklist.service.js';
 // NOTE: process.env is read at CALL TIME, not module eval time.
 // This ensures dotenv.config() in index.ts has already run by the time
 // any token sign/verify happens, preventing the "different secret" bug.
-const DEV_JWT_FALLBACK = (() => {
-   const seed = os.hostname() + '__' + process.cwd();
-   return createHash('sha256').update(seed).digest('hex').slice(0, 32);
-})();
+// SECURITY: the dev fallback is a random per-process value, not derived
+// from hostname/CWD. Predictable per-host derivation would let anyone
+// who knows the box fingerprint forge tokens in any misconfigured env.
+const DEV_JWT_FALLBACK = randomBytes(32).toString('hex');
+
+const isProd = () => process.env.NODE_ENV === 'production';
 
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (secret) {
+    if (secret.length < 16) {
+      throw new Error('JWT_SECRET must be at least 16 characters');
+    }
     return secret;
   }
-  const isProd = process.env.NODE_ENV === 'production';
-  if (isProd) {
+  if (isProd()) {
     console.error('CRITICAL: JWT_SECRET environment variable is not set. Server cannot start in production without a JWT_SECRET.');
     process.exit(1);
   }
   return DEV_JWT_FALLBACK;
 }
+
+const JWT_SIGN_OPTIONS: jwt.SignOptions = {
+  expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'],
+  algorithm: 'HS256',
+  audience: process.env.JWT_AUDIENCE || 'bizzauto-web',
+  issuer: process.env.JWT_ISSUER || 'bizzauto',
+};
+
+export const generateToken = (payload: object): string => {
+  const secret = getJwtSecret();
+  return jwt.sign(payload, secret, JWT_SIGN_OPTIONS);
+};
+
+export const verifyToken = async (token: string): Promise<any> => {
+  const secret = getJwtSecret();
+  const decoded = jwt.verify(token, secret, {
+    algorithms: ['HS256'],
+    audience: process.env.JWT_AUDIENCE || 'bizzauto-web',
+    issuer: process.env.JWT_ISSUER || 'bizzauto',
+  }) as any;
+
+  // Check if token has been blacklisted (password change, logout, security event)
+  if (decoded.jti) {
+    try {
+      const blacklisted = await isTokenBlacklisted(decoded.jti);
+      if (blacklisted) {
+        throw new Error('Token has been revoked');
+      }
+    } catch (err: any) {
+      if (err.message === 'Token has been revoked') throw err;
+      // Redis unavailable — allow token (graceful degradation)
+    }
+  }
+
+  return decoded;
+};
+
+export const verifyRefreshToken = (token: string): any => {
+  const secret = process.env.JWT_REFRESH_SECRET || getJwtSecret();
+  return jwt.verify(token, secret, {
+    algorithms: ['HS256'],
+    audience: process.env.JWT_REFRESH_AUDIENCE || 'bizzauto-refresh',
+    issuer: process.env.JWT_ISSUER || 'bizzauto',
+  });
+};
+
+export const generateRefreshToken = (payload: object): string => {
+  const secret = process.env.JWT_REFRESH_SECRET || getJwtSecret();
+  return jwt.sign(payload, secret, {
+    expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '30d') as jwt.SignOptions['expiresIn'],
+    algorithm: 'HS256',
+    audience: process.env.JWT_REFRESH_AUDIENCE || 'bizzauto-refresh',
+    issuer: process.env.JWT_ISSUER || 'bizzauto',
+  });
+};
 
 // ── ENCRYPTION_KEY (AES-256) ──
 // In production, this MUST be set. In dev, persist to .encryption.key file so encrypted data survives restarts.
@@ -90,46 +148,6 @@ export const comparePassword = async (
   hashedPassword: string
 ): Promise<boolean> => {
   return bcrypt.compare(password, hashedPassword);
-};
-
-export const generateToken = (payload: object): string => {
-  const secret = getJwtSecret();
-  const token = jwt.sign(payload, secret, {
-    expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'],
-  });
-  return token;
-};
-
-export const verifyToken = async (token: string): Promise<any> => {
-  const secret = getJwtSecret();
-  const decoded = jwt.verify(token, secret) as any;
-
-  // Check if token has been blacklisted (password change, logout, security event)
-  if (decoded.jti) {
-    try {
-      const blacklisted = await isTokenBlacklisted(decoded.jti);
-      if (blacklisted) {
-        throw new Error('Token has been revoked');
-      }
-    } catch (err: any) {
-      if (err.message === 'Token has been revoked') throw err;
-      // Redis unavailable — allow token (graceful degradation)
-    }
-  }
-
-  return decoded;
-};
-
-export const verifyRefreshToken = (token: string): any => {
-  const secret = process.env.JWT_REFRESH_SECRET || getJwtSecret();
-  return jwt.verify(token, secret);
-};
-
-export const generateRefreshToken = (payload: object): string => {
-  const secret = process.env.JWT_REFRESH_SECRET || getJwtSecret();
-  return jwt.sign(payload, secret, {
-    expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '30d') as jwt.SignOptions['expiresIn'],
-  });
 };
 
 // Encryption utilities for sensitive data (WhatsApp tokens, API keys)

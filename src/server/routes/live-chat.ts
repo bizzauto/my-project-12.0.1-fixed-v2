@@ -77,10 +77,13 @@ router.post('/sessions', visitorRateLimiter, async (req: Request, res: Response)
 router.post('/sessions/:id/messages', visitorRateLimiter, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { senderType, senderId, content, contentType, metadata } = req.body;
+    const { content, contentType, metadata } = req.body;
 
     if (!content) {
       return res.status(400).json({ success: false, error: 'content is required' });
+    }
+    if (typeof content !== 'string' || content.length > 10000) {
+      return res.status(400).json({ success: false, error: 'content must be a string up to 10000 chars' });
     }
 
     const session = await prisma.liveChatSession.findUnique({ where: { id } });
@@ -96,8 +99,7 @@ router.post('/sessions/:id/messages', visitorRateLimiter, async (req: Request, r
     const message = await prisma.liveChatMessage.create({
       data: {
         sessionId: id,
-        senderType: senderType || 'visitor',
-        senderId: senderId || null,
+        senderType: 'visitor',
         content,
         contentType: contentType || 'text',
         metadata: metadata || undefined,

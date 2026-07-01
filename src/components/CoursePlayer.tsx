@@ -91,6 +91,24 @@ interface QuizResult {
   }>;
 }
 
+/**
+ * SECURITY: Sanitize lesson HTML before dangerouslySetInnerHTML.
+ * Strips script tags, event handlers, javascript: URLs to prevent stored XSS.
+ */
+function sanitizeLessonHtml(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*>/gi, '')
+    .replace(/<link\b[^<]*>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/javascript\s*:/gi, '')
+    .replace(/data\s*:\s*text\/html/gi, '');
+}
+
 export default function CoursePlayer() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -446,10 +464,13 @@ export default function CoursePlayer() {
                   </div>
                 )}
                 
-                {/* Text Content */}
+                {/* Text Content - sanitized to prevent stored XSS */}
                 {currentLesson.type === 'text' && currentLesson.content?.text && (
                   <div className="p-6">
-                    <div className="prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: currentLesson.content.text }} />
+                    <div
+                      className="prose prose-invert max-w-none"
+                      dangerouslySetInnerHTML={{ __html: sanitizeLessonHtml(currentLesson.content.text) }}
+                    />
                   </div>
                 )}
                 

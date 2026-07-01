@@ -159,8 +159,9 @@ function buildSignedPayload(
 
 /**
  * SSRF-safe URL validator — blocks internal IPs and known-bad patterns.
+ * Exported so other modules (workflows, webhooks-routes) can reuse it.
  */
-function isSafeWebhookUrl(url: string): { safe: boolean; reason?: string } {
+export function isSafeWebhookUrl(url: string): { safe: boolean; reason?: string } {
   try {
     const parsed = new URL(url);
     

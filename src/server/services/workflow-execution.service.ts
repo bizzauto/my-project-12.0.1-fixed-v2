@@ -1,5 +1,6 @@
 import { prisma } from '../db.js';
 import { EventEmitter } from 'events';
+import { isSafeWebhookUrl } from './webhook-retry.service.js';
 
 const workflowEvents = new EventEmitter();
 workflowEvents.setMaxListeners(50);
@@ -287,6 +288,12 @@ async function executeNode(
       const { default: axios } = await import('axios');
       const url = data.url;
       if (!url) return { called: false, error: 'No webhook URL' };
+
+      // SSRF protection: block private/internal/metadata IPs
+      const urlCheck = isSafeWebhookUrl(url);
+      if (!urlCheck.safe) {
+        return { called: false, error: `Blocked webhook URL: ${urlCheck.reason}` };
+      }
 
       const payload = {
         businessId: ctx.businessId,

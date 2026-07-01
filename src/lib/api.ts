@@ -940,6 +940,194 @@ export const adminAnalyticsAPI = {
   getAuditLog: (params?: Record<string, any>) => apiClient.get('/admin/analytics/audit-log', { params }),
 };
 
+// ==================== BLOG API ====================
+export const blogAPI = {
+  list: (params?: any) => apiClient.get('/blog/posts', { params }),
+  get: (id: string) => apiClient.get(`/blog/posts/${id}`),
+  create: (data: any) => apiClient.post('/blog/posts', data),
+  update: (id: string, data: any) => apiClient.put(`/blog/posts/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/blog/posts/${id}`),
+  publish: (id: string) => apiClient.post(`/blog/posts/${id}/publish`),
+  unpublish: (id: string) => apiClient.post(`/blog/posts/${id}/unpublish`),
+  categories: () => apiClient.get('/blog/categories'),
+  createCategory: (data: any) => apiClient.post('/blog/categories', data),
+  updateCategory: (id: string, data: any) => apiClient.put(`/blog/categories/${id}`, data),
+  deleteCategory: (id: string) => apiClient.delete(`/blog/categories/${id}`),
+  comments: (postId: string) => apiClient.get(`/blog/posts/${postId}/comments`),
+  approveComment: (postId: string, commentId: string) => apiClient.post(`/blog/posts/${postId}/comments/${commentId}/approve`),
+  rejectComment: (postId: string, commentId: string) => apiClient.post(`/blog/posts/${postId}/comments/${commentId}/reject`),
+  deleteComment: (postId: string, commentId: string) => apiClient.delete(`/blog/posts/${postId}/comments/${commentId}`),
+  stats: () => apiClient.get('/blog/stats'),
+};
+
+// ==================== VCARD API ====================
+export const vcardAPI = {
+  list: () => apiClient.get('/vcard'),
+  create: (data: any) => apiClient.post('/vcard', data),
+  delete: (id: string) => apiClient.delete(`/vcard/${id}`),
+  get: (id: string) => apiClient.get(`/vcard/${id}`),
+  update: (id: string, data: any) => apiClient.put(`/vcard/${id}`, data),
+};
+
+// ==================== LANDING PAGES API ====================
+export const landingPagesAPI = {
+  list: (params?: any) => apiClient.get('/landing-pages', { params }),
+  create: (data: any) => apiClient.post('/landing-pages', data),
+  get: (id: string) => apiClient.get(`/landing-pages/${id}`),
+  update: (id: string, data: any) => apiClient.put(`/landing-pages/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/landing-pages/${id}`),
+};
+
+// ==================== WEBSITES API ====================
+export const websitesAPI = {
+  list: () => apiClient.get('/websites'),
+  create: (data: any) => apiClient.post('/websites', data),
+  get: (id: string) => apiClient.get(`/websites/${id}`),
+  update: (id: string, data: any) => apiClient.put(`/websites/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/websites/${id}`),
+  publish: (id: string) => apiClient.post(`/websites/${id}/publish`),
+};
+
+// ==================== CLIENT PORTAL API ====================
+export const clientPortalAPI = {
+  list: (params?: any) => apiClient.get('/client-portal', { params }),
+  create: (data: any) => apiClient.post('/client-portal', data),
+  get: (id: string) => apiClient.get(`/client-portal/${id}`),
+  update: (id: string, data: any) => apiClient.put(`/client-portal/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/client-portal/${id}`),
+  regenerateToken: (id: string) => apiClient.post(`/client-portal/${id}/regenerate-token`),
+  // Public endpoints
+  login: (data: any) => apiClient.post('/client-portal/p/login', data),
+  getDashboard: () => apiClient.get('/client-portal/p/dashboard'),
+  getInvoices: (params?: any) => apiClient.get('/client-portal/p/invoices', { params }),
+  getAppointments: (params?: any) => apiClient.get('/client-portal/p/appointments', { params }),
+  getDeals: () => apiClient.get('/client-portal/p/deals'),
+};
+
+// ==================== SUPPORT TICKETS API ====================
+export const supportTicketsAPI = {
+  list: (params?: any) => apiClient.get('/support-tickets', { params }),
+  create: (data: any) => apiClient.post('/support-tickets', data),
+  get: (id: string) => apiClient.get(`/support-tickets/${id}`),
+  getReplies: (id: string) => apiClient.get(`/support-tickets/${id}/replies`),
+  reply: (id: string, data: any) => apiClient.post(`/support-tickets/${id}/replies`, data),
+  update: (id: string, data: any) => apiClient.put(`/support-tickets/${id}`, data),
+  close: (id: string) => apiClient.patch(`/support-tickets/${id}/close`),
+};
+
+// ==================== SSO CONFIG API ====================
+export const ssoConfigAPI = {
+  list: () => apiClient.get('/sso'),
+  create: (data: any) => apiClient.post('/sso', data),
+  get: (id: string) => apiClient.get(`/sso/${id}`),
+  update: (id: string, data: any) => apiClient.put(`/sso/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/sso/${id}`),
+};
+
+// ==================== RESELLER API ====================
+export const resellerAPI = {
+  getMe: () => apiClient.get('/wl/auth/me'),
+  listClients: () => apiClient.get('/wl/clients'),
+  createClient: (data: any) => apiClient.post('/wl/clients', data),
+  updateClient: (id: string, data: any) => apiClient.put(`/wl/clients/${id}`, data),
+  updateClientStatus: (id: string, data: any) => apiClient.patch(`/wl/clients/${id}/status`, data),
+  deleteClient: (id: string) => apiClient.delete(`/wl/clients/${id}`),
+  getBranding: () => apiClient.get('/wl/branding'),
+  updateBranding: (data: any) => apiClient.put('/wl/branding', data),
+  login: (data: any) => apiClient.post('/wl/auth/login', data),
+};
+
+// ==================== LEAD GENERATION API ====================
+export const leadGenerationAPI = {
+  deployTemplate: (data: any) => apiClient.post('/automation/deploy-template', data),
+  listLeads: (params?: any) => apiClient.get('/leads', { params }),
+  getIndiamartConfig: () => apiClient.get('/indiamart-email/config'),
+  syncIndiamart: () => apiClient.post('/indiamart-email/sync'),
+  debugIndiamartEmails: () => apiClient.get('/indiamart-email/debug-emails'),
+  connectIndiamart: (data: any) => apiClient.post('/indiamart-email/connect', data),
+  setupIndiamart: (data: any) => apiClient.post('/indiamart-email/setup', data),
+  createManualLead: (data: any) => apiClient.post('/leads/manual', data),
+  bulkImport: (data: any) => apiClient.post('/indiamart-email/bulk-import', data),
+  export: (format: string, data?: any) => apiClient.post(`/leads/export/${format}`, data, { responseType: 'blob' }),
+  bulkReply: (data: any) => apiClient.post('/leads/bulk-reply', data),
+  deleteLead: (id: string) => apiClient.delete(`/leads/${id}`),
+};
+
+// ==================== APPOINTMENTS BOOKING API ====================
+export const appointmentsBookingAPI = {
+  getTodaysAppointments: (date: string) => apiClient.get('/appointments', { params: { status: 'confirmed', date, limit: 10 } }),
+};
+
+// ==================== DATA BACKUP API ====================
+export const dataBackupAPI = {
+  create: () => apiClient.post('/backup/create'),
+};
+
+// ==================== AUDIT TRAIL EXPORT API ====================
+export const auditTrailExportAPI = {
+  list: (params?: any) => apiClient.get('/audit-log', { params }),
+  export: (params?: any) => apiClient.get('/team/audit-logs/export', { params, responseType: 'blob' }),
+};
+
+// ==================== MISSED CALL SETTINGS API ====================
+export const missedCallSettingsAPI = {
+  getStats: () => apiClient.get('/missed-calls/stats'),
+  getActivity: (params?: any) => apiClient.get('/missed-calls/activity', { params }),
+};
+
+// ==================== FILE UPLOADER API ====================
+export const fileUploaderAPI = {
+  upload: (formData: FormData) => apiClient.post('/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  get: (id: string) => apiClient.get(`/upload/${id}`),
+};
+
+// ==================== VERIFY EMAIL API ====================
+export const verifyEmailAPI = {
+  verify: (token: string) => apiClient.get(`/auth/verify-email?token=${token}`),
+  getStatus: () => apiClient.get('/auth/verification-status'),
+  sendVerification: () => apiClient.post('/auth/send-verification'),
+};
+
+// ==================== AI CONTENT SCHEDULER API ====================
+export const aiContentSchedulerAPI = {
+  listPosts: (params?: any) => apiClient.get('/posts', { params }),
+  createPost: (data: any) => apiClient.post('/posts', data),
+  deletePost: (id: string) => apiClient.delete(`/posts/${id}`),
+};
+
+// ==================== AI SALES ASSISTANT API ====================
+export const aiSalesAssistantAPI = {
+  generate: (data: any) => apiClient.post('/ai/sales-assistant', data),
+};
+
+// ==================== SMART REPLY API ====================
+export const smartReplyAPI = {
+  get: (params?: any) => apiClient.get('/ai/smart-replies', { params }),
+};
+
+// ==================== REFERRALS API ====================
+export const referralsAPI = {
+  list: (params?: any) => apiClient.get('/referrals', { params }),
+  requestPayout: () => apiClient.post('/referrals/payout'),
+};
+
+// ==================== QR CODE GENERATOR API ====================
+export const qrCodeGeneratorAPI = {
+  generate: (url: string) => apiClient.get(`/qr-code?url=${encodeURIComponent(url)}`, { responseType: 'blob' }),
+};
+
+// ==================== NETWORK STATUS API ====================
+export const networkStatusAPI = {
+  checkAuth: (baseURL: string) => apiClient.get('/auth/me', { baseURL }),
+};
+
+// ==================== EMAIL LEAD IMPORTER API ====================
+export const emailLeadImporterAPI = {
+  bulkImport: (data: any) => apiClient.post('/indiamart-email/bulk-import', data),
+};
+
 // ==================== COURSES API (Enhanced) ====================
 export const coursesAPI = {
   // Instructor endpoints

@@ -41,6 +41,7 @@ export default function VCardMakerPage() {
   const [newCard, setNewCard] = useState({ name: '', title: '', company: '', phone: '', email: '', website: '', address: '', template: 'professional' });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [cardsAPI, setCardsAPI] = useState<any>(null);
 
   useEffect(() => { loadCards(); }, []);
 

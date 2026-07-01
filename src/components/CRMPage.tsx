@@ -1076,7 +1076,32 @@ export default function CRMPage() {
                   {invoice.paymentMethod && <span>Method: {invoice.paymentMethod}</span>}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { const printContent = document.getElementById(`invoice-${invoice.id}`); if (printContent) { const w = window.open('', '_blank'); w?.document.write(`<html><head><title>Invoice ${invoice.number}</title><style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5}</style></head><body>${printContent.innerHTML}</body></html>`); w?.document.close(); w?.print(); } }} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1">
+                  <button onClick={() => {
+                    const printContent = document.getElementById(`invoice-${invoice.id}`);
+                    if (printContent) {
+                      const w = window.open('', '_blank');
+                      if (!w) return;
+                      // SECURITY: clone the DOM node instead of serializing innerHTML.
+                      // innerHTML serialization unescapes < > and re-parses tags,
+                      // letting any user-controlled field (clientName, notes, etc.)
+                      // re-execute scripts in the new window context.
+                      const safeTitle = String(invoice?.number ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&', '<': '<', '>': '>', '"': '"' }[c] || c));
+                      const cloned = printContent.cloneNode(true) as HTMLElement;
+                      cloned.querySelectorAll('script,iframe,object,embed').forEach((el) => el.remove());
+                      cloned.querySelectorAll('[onclick],[onerror],[onload],[onmouseover]').forEach((el) => {
+                        el.removeAttribute('onclick');
+                        el.removeAttribute('onerror');
+                        el.removeAttribute('onload');
+                        el.removeAttribute('onmouseover');
+                      });
+                      const styles = `body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5}`;
+                      w.document.write(`<html><head><title>Invoice ${safeTitle}</title><style>${styles}</style></head><body></body></html>`);
+                      w.document.body.appendChild(cloned);
+                      w.document.close();
+                      w.focus();
+                      w.print();
+                    }
+                  }} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1">
                     <Download size={14} /> PDF
                   </button>
                   <button onClick={() => window.print()} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1">

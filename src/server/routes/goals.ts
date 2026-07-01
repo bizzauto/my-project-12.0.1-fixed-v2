@@ -10,7 +10,7 @@ const router = Router();
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = req.businessId;
+    const businessId = req.user?.businessId;
     if (!businessId) {
       return res.status(400).json({ success: false, error: 'Business ID required' });
     }
@@ -53,7 +53,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
  */
 router.post('/', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const businessId = req.businessId;
+    const businessId = req.user?.businessId;
     if (!businessId) {
       return res.status(400).json({ success: false, error: 'Business ID required' });
     }
@@ -104,7 +104,7 @@ router.post('/', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Re
 router.put('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const businessId = req.businessId;
+    const businessId = req.user?.businessId;
 
     const existing = await prisma.goal.findFirst({ where: { id, businessId } });
     if (!existing) {
@@ -153,7 +153,7 @@ router.put('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: 
 router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const businessId = req.businessId;
+    const businessId = req.user?.businessId;
 
     const existing = await prisma.goal.findFirst({ where: { id, businessId } });
     if (!existing) {
