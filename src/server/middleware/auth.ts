@@ -87,7 +87,7 @@ export const authenticate = async (
 
     let decoded: any;
     try {
-      decoded = verifyToken(token) as any;
+      decoded = await verifyToken(token) as any;
     } catch (verifyError: any) {
       // Track failed auth attempts for IP blocking
       ipBlocker.increment(req.ip || req.socket.remoteAddress || 'unknown');

@@ -1512,12 +1512,12 @@ router.get('/verification-status', authenticate, async (req: AuthRequest, res: R
 });
 
 // DIAGNOSTIC ENDPOINT - test JWT sign/verify in the same process
-router.get('/jwt-test', (req: Request, res: Response) => {
+router.get('/jwt-test', async (req: Request, res: Response) => {
   const secret = getJwtSecret();
   const testPayload = { id: 'test-123', email: 'test@test.com', role: 'SUPER_ADMIN', businessId: 'test-biz' };
   const token = generateToken(testPayload);
   try {
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
     res.json({
       success: true,
       data: {

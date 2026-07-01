@@ -51,7 +51,8 @@ export async function recordFailedLoginAttempt(email: string): Promise<LockoutSt
       attemptsRemaining: MAX_FAILED_ATTEMPTS - currentAttempts,
       lockedUntil: null,
     };
-  } catch {
+  } catch (err) {
+    console.error('[account-lockout] Redis operation failed, lockout protection degraded:', err);
     return { locked: false, attemptsRemaining: MAX_FAILED_ATTEMPTS, lockedUntil: null };
   }
 }
@@ -62,7 +63,9 @@ export async function clearFailedLoginAttempts(email: string): Promise<void> {
   try {
     const attemptKey = `${ATTEMPT_PREFIX}${email.toLowerCase()}`;
     await r.del(attemptKey);
-  } catch {}
+  } catch (err) {
+    console.error('[account-lockout] Failed to clear login attempts:', err);
+  }
 }
 
 export async function getLockoutStatus(email: string): Promise<LockoutStatus> {
@@ -80,7 +83,9 @@ export async function getLockoutStatus(email: string): Promise<LockoutStatus> {
         lockedUntil: Date.now() + ttl * 1000,
       };
     }
-  } catch {}
+  } catch (err) {
+    console.error('[account-lockout] Failed to get lockout status:', err);
+  }
 
   return { locked: false, attemptsRemaining: MAX_FAILED_ATTEMPTS, lockedUntil: null };
 }

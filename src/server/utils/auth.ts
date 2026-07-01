@@ -100,14 +100,15 @@ export const generateToken = (payload: object): string => {
   return token;
 };
 
-export const verifyToken = (token: string): any => {
+export const verifyToken = async (token: string): Promise<any> => {
   const secret = getJwtSecret();
   const decoded = jwt.verify(token, secret) as any;
 
   // Check if token has been blacklisted (password change, logout, security event)
   if (decoded.jti) {
     try {
-      if (isTokenBlacklisted(decoded.jti)) {
+      const blacklisted = await isTokenBlacklisted(decoded.jti);
+      if (blacklisted) {
         throw new Error('Token has been revoked');
       }
     } catch (err: any) {

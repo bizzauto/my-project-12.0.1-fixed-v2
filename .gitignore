@@ -85,3 +85,33 @@ local.properties
 
 .envorg
 .envorg.txt
+
+# Secrets & private keys
+.encryption.key
+*.pem
+bizzauto-new-key
+bizzauto-new-key.pub
+temp_vps_key*
+coolify_cookies.txt
+coolify_response.html
+
+# Build artifacts & logs
+build-output*.txt
+output.txt
+output.log
+server.log
+server.err
+data.sql
+
+# One-off fix scripts (root)
+_fix_login.*
+fix-whatsapp.*
+setup-test-user.*
+fix-query-types.ts
+
+# Misc
+d.pdf
+screenshot*.png
+screenshot*.jpg
+npx
+session-memory.md

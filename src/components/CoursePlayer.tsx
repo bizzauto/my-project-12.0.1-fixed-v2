@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, CheckCircle, Circle, Lock, Loader2,
   MessageCircle, Send, ChevronDown, ChevronRight, BookOpen,
-  Clock, BarChart3, Award, Maximize2, Volume2, Menu
+  Clock, BarChart3, Award, Maximize2, Volume2, Menu, HelpCircle,
+  Check, X
 } from 'lucide-react';
 import { coursesAPI } from '../lib/api';
 
@@ -47,11 +48,47 @@ interface Course {
   enrollment?: Enrollment | null;
 }
 
+interface QuizQuestion {
+  id: string;
+  type: 'multiple_choice' | 'true_false' | 'fill_blank';
+  question: string;
+  options?: string[];
+  correctAnswer: string;
+  explanation?: string;
+  points: number;
+}
+
+interface QuizData {
+  title?: string;
+  description?: string;
+  passingScore?: number;
+  questions: QuizQuestion[];
+}
+
 interface DoubtMessage {
   id: string;
   role: 'user' | 'ai';
   content: string;
   timestamp: Date;
+}
+
+interface QuizResult {
+  score: number;
+  totalPoints: number;
+  percentage: number;
+  passingScore: number;
+  passed: boolean;
+  totalQuestions: number;
+  correctCount: number;
+  results: Array<{
+    questionId: string;
+    question: string;
+    correctAnswer: string;
+    userAnswer: string;
+    isCorrect: boolean;
+    pointsEarned: number;
+    explanation?: string;
+  }>;
 }
 
 export default function CoursePlayer() {
@@ -69,6 +106,10 @@ export default function CoursePlayer() {
   const [solvingDoubt, setSolvingDoubt] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [videoProgress, setVideoProgress] = useState(0);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [submittingQuiz, setSubmittingQuiz] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -109,6 +150,9 @@ export default function CoursePlayer() {
 
   const handleLessonClick = (lesson: Lesson) => {
     setCurrentLesson(lesson);
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    setQuizResult(null);
     if (enrollmentId && course) {
       // Update last accessed
       coursesAPI.updateProgress(enrollmentId, { progress }).catch(() => {});
@@ -192,6 +236,52 @@ export default function CoursePlayer() {
 
   const getVideoUrl = () => {
     return currentLesson?.content?.videoUrl || '';
+  };
+
+  const getQuizData = (): QuizData | null => {
+    return currentLesson?.content?.quiz || null;
+  };
+
+  const handleQuizAnswer = (questionId: string, answer: string) => {
+    setQuizAnswers(prev => ({ ...prev, [questionId]: answer }));
+  };
+
+  const handleSubmitQuiz = async () => {
+    if (!currentLesson || !courseId) return;
+    
+    const quiz = getQuizData();
+    if (!quiz) return;
+    
+    // Check all questions answered
+    const unanswered = quiz.questions.filter(q => !quizAnswers[q.id]?.trim());
+    if (unanswered.length > 0) {
+      setError(`Please answer all questions before submitting. ${unanswered.length} question(s) remaining.`);
+      return;
+    }
+    
+    setSubmittingQuiz(true);
+    setError(null);
+    
+    try {
+      const res = await coursesAPI.submitQuiz(currentLesson.id, { answers: quizAnswers });
+      if (res.data.success) {
+        setQuizResult(res.data.data);
+        setQuizSubmitted(true);
+        
+        // If passed, mark progress
+        if (res.data.data.passed && enrollmentId) {
+          const newProgress = Math.min(100, progress + Math.round(100 / getTotalLessons()));
+          setProgress(newProgress);
+          coursesAPI.updateProgress(enrollmentId, { progress: newProgress }).catch(() => {});
+        }
+      } else {
+        setError(res.data.error || 'Failed to submit quiz');
+      }
+    } catch {
+      setError('Network error submitting quiz');
+    } finally {
+      setSubmittingQuiz(false);
+    }
   };
 
   if (loading) {
@@ -360,6 +450,177 @@ export default function CoursePlayer() {
                 {currentLesson.type === 'text' && currentLesson.content?.text && (
                   <div className="p-6">
                     <div className="prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: currentLesson.content.text }} />
+                  </div>
+                )}
+                
+                {/* Quiz Content */}
+                {currentLesson.type === 'quiz' && getQuizData() && (
+                  <div className="p-6">
+                    {!quizSubmitted ? (
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <HelpCircle size={20} className="text-emerald-400" />
+                          <h2 className="text-xl font-bold text-white">
+                            {getQuizData()?.title || 'Quiz'}
+                          </h2>
+                        </div>
+                        {getQuizData()?.description && (
+                          <p className="text-gray-400 text-sm mb-6">{getQuizData()?.description}</p>
+                        )}
+                        
+                        <div className="space-y-6">
+                          {getQuizData()?.questions.map((q, idx) => (
+                            <div key={q.id} className="bg-gray-800 border border-gray-700 rounded-xl p-5">
+                              <p className="text-white font-medium mb-3">
+                                <span className="text-emerald-400 mr-2">Q{idx + 1}.</span>
+                                {q.question}
+                                <span className="text-gray-500 text-xs ml-2">({q.points || 1} pt)</span>
+                              </p>
+                              
+                              {q.type === 'multiple_choice' && q.options && (
+                                <div className="space-y-2">
+                                  {q.options.map((opt, oi) => (
+                                    <button
+                                      key={oi}
+                                      onClick={() => handleQuizAnswer(q.id, opt)}
+                                      className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
+                                        quizAnswers[q.id] === opt
+                                          ? 'bg-emerald-600/20 border-emerald-500 text-white'
+                                          : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:border-gray-500'
+                                      }`}
+                                    >
+                                      <span className="text-xs text-gray-400 mr-2">{String.fromCharCode(65 + oi)}.</span>
+                                      {opt}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {q.type === 'true_false' && (
+                                <div className="flex gap-3">
+                                  {['True', 'False'].map((opt) => (
+                                    <button
+                                      key={opt}
+                                      onClick={() => handleQuizAnswer(q.id, opt)}
+                                      className={`flex-1 px-4 py-3 rounded-lg border transition-all text-center ${
+                                        quizAnswers[q.id] === opt
+                                          ? 'bg-emerald-600/20 border-emerald-500 text-white'
+                                          : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:border-gray-500'
+                                      }`}
+                                    >
+                                      {opt}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {q.type === 'fill_blank' && (
+                                <input
+                                  type="text"
+                                  value={quizAnswers[q.id] || ''}
+                                  onChange={(e) => handleQuizAnswer(q.id, e.target.value)}
+                                  placeholder="Type your answer..."
+                                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <button
+                          onClick={handleSubmitQuiz}
+                          disabled={submittingQuiz}
+                          className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50"
+                        >
+                          {submittingQuiz ? (
+                            <Loader2 className="animate-spin" size={18} />
+                          ) : (
+                            <CheckCircle size={18} />
+                          )}
+                          {submittingQuiz ? 'Grading...' : 'Submit Quiz'}
+                        </button>
+                      </div>
+                    ) : quizResult ? (
+                      <div>
+                        <div className={`text-center p-8 rounded-2xl mb-6 ${
+                          quizResult.passed
+                            ? 'bg-emerald-900/20 border border-emerald-500/30'
+                            : 'bg-red-900/20 border border-red-500/30'
+                        }`}>
+                          {quizResult.passed ? (
+                            <Award size={48} className="mx-auto text-emerald-400 mb-3" />
+                          ) : (
+                            <X size={48} className="mx-auto text-red-400 mb-3" />
+                          )}
+                          <h3 className={`text-2xl font-bold mb-1 ${quizResult.passed ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {quizResult.passed ? 'Congratulations!' : 'Keep Learning!'}
+                          </h3>
+                          <p className="text-gray-400 mb-4">
+                            {quizResult.passed 
+                              ? 'You passed the quiz!' 
+                              : `You need ${quizResult.passingScore}% to pass. Try again!`}
+                          </p>
+                          <div className="flex items-center justify-center gap-6">
+                            <div>
+                              <p className="text-3xl font-bold text-white">{quizResult.percentage}%</p>
+                              <p className="text-xs text-gray-400">Score</p>
+                            </div>
+                            <div className="text-gray-600">|</div>
+                            <div>
+                              <p className="text-3xl font-bold text-white">{quizResult.correctCount}/{quizResult.totalQuestions}</p>
+                              <p className="text-xs text-gray-400">Correct</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          {quizResult.results.map((r, idx) => (
+                            <div key={r.questionId} className={`bg-gray-800 border rounded-xl p-5 ${
+                              r.isCorrect ? 'border-emerald-500/30' : 'border-red-500/30'
+                            }`}>
+                              <div className="flex items-start gap-3">
+                                <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  r.isCorrect ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                                }`}>
+                                  {r.isCorrect ? <Check size={14} /> : <X size={14} />}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-white font-medium mb-1">
+                                    <span className="text-gray-400 mr-1">Q{idx + 1}.</span> {r.question}
+                                  </p>
+                                  <div className="text-sm space-y-1">
+                                    <p className="text-gray-400">
+                                      Your answer: <span className={`${r.isCorrect ? 'text-emerald-400' : 'text-red-400'}`}>{r.userAnswer || '(no answer)'}</span>
+                                    </p>
+                                    {!r.isCorrect && (
+                                      <p className="text-emerald-400">
+                                        Correct answer: {r.correctAnswer}
+                                      </p>
+                                    )}
+                                    {r.explanation && (
+                                      <p className="text-gray-500 mt-1 italic">{r.explanation}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {!quizResult.passed && (
+                          <button
+                            onClick={() => {
+                              setQuizSubmitted(false);
+                              setQuizResult(null);
+                              setQuizAnswers({});
+                            }}
+                            className="mt-6 w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                          >
+                            Retry Quiz
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 )}
 
