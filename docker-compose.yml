@@ -9,10 +9,10 @@ services:
     container_name: bizzauto-app
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "3000:3000"
     environment:
       - NODE_ENV=production
-      - PORT=4000
+      - PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - JWT_SECRET=${JWT_SECRET}
