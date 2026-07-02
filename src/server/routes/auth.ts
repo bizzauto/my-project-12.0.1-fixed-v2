@@ -9,8 +9,7 @@ import QRCode from 'qrcode';
 import { encrypt, decrypt } from '../utils/auth.js';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate.js';
-import { forgotPasswordSchema, resetPasswordSchema } from '../validations/schemas.js';
-import { validate } from '../middleware/validate.js';
+import { forgotPasswordSchema, passwordOnlySchema } from '../validations/schemas.js';
 import { registerSchema, loginSchema, changePasswordSchema } from '../validations/schemas.js';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
@@ -32,7 +31,7 @@ const loginLimiter = rateLimit({
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,
+  max: 3, // Reduced from 10 to prevent abuse
   message: { success: false, error: 'Too many registration attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -48,7 +47,7 @@ const forgotPasswordLimiter = rateLimit({
 
 const verifyOtpLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10,
+  max: 3, // Reduced from 10 to prevent brute force attacks
   message: { success: false, error: 'Too many OTP verification attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -1264,7 +1263,7 @@ router.post('/verify-otp', verifyOtpLimiter, validate(verifyOtpSchema), async (r
   }
 });
 
-router.post('/reset-password', resetPasswordLimiter, validate(resetPasswordSchema), async (req: Request, res: Response) => {
+router.post('/reset-password', resetPasswordLimiter, validate(passwordOnlySchema), async (req: Request, res: Response) => {
   try {
     const { email, otp, newPassword } = req.body;
 
