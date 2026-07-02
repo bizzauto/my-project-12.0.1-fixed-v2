@@ -40,13 +40,13 @@ RUN chmod +x start.sh
 RUN mkdir -p uploads logs && chown -R appuser:appgroup uploads logs
 
 ENV NODE_ENV=production
-ENV PORT=4000
+ENV PORT=3000
 ENV NODE_OPTIONS="--max-old-space-size=768"
-EXPOSE 4000
+EXPOSE 3000
 
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:${PORT:-4000}/health || exit 1
+  CMD wget --quiet --tries=1 --spider http://localhost:${PORT:-3000}/health || exit 1
 
 CMD ["./start.sh"]
