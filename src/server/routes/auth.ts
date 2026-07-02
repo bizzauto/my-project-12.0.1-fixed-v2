@@ -9,6 +9,8 @@ import QRCode from 'qrcode';
 import { encrypt, decrypt } from '../utils/auth.js';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate.js';
+import { forgotPasswordSchema, resetPasswordSchema } from '../validations/schemas.js';
+import { validate } from '../middleware/validate.js';
 import { registerSchema, loginSchema, changePasswordSchema } from '../validations/schemas.js';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
@@ -1182,10 +1184,9 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-router.post('/forgot-password', forgotPasswordLimiter, async (req: Request, res: Response) => {
+router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSchema), async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
     // Rate limiting: max 3 OTP requests per email per 15 minutes
     const existing = otpStore.get(email);
@@ -1242,10 +1243,9 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req: Request, res:
   }
 });
 
-router.post('/verify-otp', verifyOtpLimiter, async (req: Request, res: Response) => {
+router.post('/verify-otp', verifyOtpLimiter, validate(verifyOtpSchema), async (req: Request, res: Response) => {
   try {
     const { email, otp } = req.body;
-    if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP are required' });
 
     const stored = otpStore.get(email);
     if (!stored || stored.expiresAt < Date.now()) {
@@ -1264,11 +1264,9 @@ router.post('/verify-otp', verifyOtpLimiter, async (req: Request, res: Response)
   }
 });
 
-router.post('/reset-password', resetPasswordLimiter, async (req: Request, res: Response) => {
+router.post('/reset-password', resetPasswordLimiter, validate(resetPasswordSchema), async (req: Request, res: Response) => {
   try {
     const { email, otp, newPassword } = req.body;
-    if (!email || !otp || !newPassword) return res.status(400).json({ success: false, error: 'All fields are required' });
-    if (newPassword.length < 8) return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
 
     const stored = otpStore.get(email);
     if (!stored || stored.expiresAt < Date.now()) {

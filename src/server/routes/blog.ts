@@ -1,6 +1,23 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
+import { validate } from '../middleware/validate.js';
+import { z } from 'zod';
+// Rate-limit: max 5 comments per IP/hour to a single path
+const commentRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const blogCommentSchema = z.object({
+  name: z.string().min(1, 'Name required').max(100),
+  email: z.string().email('Invalid email'),
+  content: z.string().min(1, 'Content required').max(5000),
+}).strict();
 
 const router = Router();
 
@@ -552,22 +569,18 @@ router.get('/p/:slug', async (req: any, res: Response) => {
   }
 });
 
-// Submit comment (public, no auth)
-router.post('/p/:postId/comments', async (req: any, res: Response) => {
-  try {
-    const { name, email, content } = req.body;
-    const postId = req.params.postId as string;
+  // Submit comment (public, no auth)
+  router.post('/p/:postId/comments', commentRateLimiter, validate(blogCommentSchema), async (req: any, res: Response) => {
+    try {
+      const { name, email, content } = req.body;
+      const postId = req.params.postId as string;
 
-    if (!name || !email || !content) {
-      return res.status(400).json({ success: false, error: 'Name, email, and content are required' });
-    }
+      const post = await prisma.blogPost.findFirst({
+        where: { id: postId, status: 'published' },
+      });
 
-    const post = await prisma.blogPost.findFirst({
-      where: { id: postId, status: 'published' },
-    });
-
-    if (!post) {
-      return res.status(404).json({ success: false, error: 'Post not found' });
+      if (!post) {
+        return res.status(404).json({ success: false, error: 'Post not found' });
     }
 
     const comment = await prisma.blogComment.create({

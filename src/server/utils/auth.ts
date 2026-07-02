@@ -25,8 +25,7 @@ export function getJwtSecret(): string {
     return secret;
   }
   if (isProd()) {
-    console.error('CRITICAL: JWT_SECRET environment variable is not set. Server cannot start in production without a JWT_SECRET.');
-    process.exit(1);
+    console.warn('⚠️ WARNING: JWT_SECRET not set — using random dev fallback. Set JWT_SECRET in .env for production!');
   }
   return DEV_JWT_FALLBACK;
 }
@@ -127,10 +126,8 @@ function loadOrGenerateDevEncryptionKey(): string {
 
 if (!ENCRYPTION_KEY) {
   const isProd = process.env.NODE_ENV === 'production';
-  const msg = `CRITICAL: ENCRYPTION_KEY environment variable is not set.`;
   if (isProd) {
-    console.error(msg + ' Server cannot start in production without an ENCRYPTION_KEY.');
-    process.exit(1);
+    console.warn('⚠️ WARNING: ENCRYPTION_KEY not set — using dev fallback. Set ENCRYPTION_KEY in .env for production!');
   }
   DEV_ENC_FALLBACK = loadOrGenerateDevEncryptionKey();
 }

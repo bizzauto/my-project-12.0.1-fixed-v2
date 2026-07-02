@@ -74,8 +74,11 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email format'),
 }).strict();
 
-export const resetPasswordSchema = z.object({
+export const verifyOtpSchema = z.object({
   email: z.string().email('Invalid email format'),
   otp: z.string().length(6, 'OTP must be 6 digits'),
-  newPassword: passwordSchema,
+}).strict();
+
+export const passwordOnlySchema = z.object({
+  password: passwordSchema,
 }).strict();

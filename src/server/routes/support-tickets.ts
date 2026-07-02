@@ -3,6 +3,39 @@ import { prisma } from '../db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createTicketSchema, updateTicketSchema, replyTicketSchema } from '../validations/remaining-schemas.js';
+import rateLimit from 'express-rate-limit';
+import { z } from 'zod';
+
+const ticketSubmitLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const ticketTrackReplyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { success: false, error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const submitTicketSchema = z.object({
+  businessId: z.string().min(1, 'Business ID required'),
+  name: z.string().min(1, 'Name required').max(200),
+  email: z.string().email('Invalid email'),
+  phone: z.string().optional(),
+  subject: z.string().min(1, 'Subject required').max(300),
+  description: z.string().min(1, 'Description required').max(5000),
+  category: z.string().optional(),
+}).strict();
+
+const trackReplySchema = z.object({
+  name: z.string().min(1, 'Name required').max(200),
+  message: z.string().min(1, 'Message required').max(5000),
+}).strict();
 
 const router = Router();
 
@@ -195,16 +228,9 @@ router.get('/stats/overview', authenticate, async (req: any, res: Response) => {
 // ==================== PUBLIC ROUTES (for end users) ====================
 
 // Submit ticket (no auth - public endpoint)
-router.post('/submit', async (req: any, res: Response) => {
+router.post('/submit', ticketSubmitLimiter, validate(submitTicketSchema), async (req: any, res: Response) => {
   try {
     const { businessId, name, email, phone, subject, description, category } = req.body;
-
-    if (!businessId || !name || !subject || !description) {
-      return res.status(400).json({
-        success: false,
-        error: 'businessId, name, subject, and description are required',
-      });
-    }
 
     const ticket = await prisma.supportTicket.create({
       data: {
@@ -253,13 +279,9 @@ router.get('/track/:ticketNumber', async (req: any, res: Response) => {
 });
 
 // Add reply to ticket (public - by ticket number)
-router.post('/track/:ticketNumber/reply', async (req: any, res: Response) => {
+router.post('/track/:ticketNumber/reply', ticketTrackReplyLimiter, validate(trackReplySchema), async (req: any, res: Response) => {
   try {
     const { name, message } = req.body;
-
-    if (!name || !message) {
-      return res.status(400).json({ success: false, error: 'Name and message are required' });
-    }
 
     const ticket = await prisma.supportTicket.findFirst({
       where: { ticketNumber: req.params.ticketNumber },

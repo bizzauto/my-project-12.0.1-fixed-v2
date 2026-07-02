@@ -8,6 +8,7 @@ const REQUIRED_VARS = {
   DATABASE_URL: { description: 'PostgreSQL connection string', pattern: /^postgresql:\/\// },
   JWT_SECRET: { description: 'JWT signing secret (min 32 chars)', minLength: 32 },
   JWT_REFRESH_SECRET: { description: 'JWT refresh secret (min 32 chars)', minLength: 32 },
+  RESELLER_JWT_SECRET: { description: 'White-label reseller JWT secret (must be distinct from JWT_SECRET)', minLength: 32 },
   ENCRYPTION_KEY: { description: 'AES-256 encryption key (64 hex chars)', pattern: /^[a-f0-9]{64}$/i },
 };
 
@@ -72,8 +73,56 @@ export function validateEnvironment(): ValidationResult {
     errors.push('❌ SECURITY: JWT_SECRET is too short — must be at least 32 characters');
   }
 
+  // Check for default/weak JWT secrets
+  if (process.env.JWT_SECRET && (
+    process.env.JWT_SECRET.includes('your-jwt-secret') ||
+    process.env.JWT_SECRET.includes('change-me') ||
+    process.env.JWT_SECRET.includes('example') ||
+    process.env.JWT_SECRET.length < 64
+  )) {
+    errors.push('❌ SECURITY: JWT_SECRET contains default/weak value or is too short (minimum 64 chars recommended)');
+  }
+
+  if (process.env.JWT_REFRESH_SECRET && (
+    process.env.JWT_REFRESH_SECRET.includes('your-jwt-refresh') ||
+    process.env.JWT_REFRESH_SECRET.includes('change-me') ||
+    process.env.JWT_REFRESH_SECRET.length < 64
+  )) {
+    errors.push('❌ SECURITY: JWT_REFRESH_SECRET contains default/weak value or is too short (minimum 64 chars recommended)');
+  }
+
   if (process.env.ENCRYPTION_KEY && !/^[a-f0-9]{64}$/i.test(process.env.ENCRYPTION_KEY)) {
     errors.push('❌ SECURITY: ENCRYPTION_KEY must be exactly 64 hex characters');
+  }
+
+  if (process.env.ENCRYPTION_KEY && (
+    process.env.ENCRYPTION_KEY.includes('your-aes-256') ||
+    process.env.ENCRYPTION_KEY.includes('change-me')
+  )) {
+    errors.push('❌ SECURITY: ENCRYPTION_KEY contains default template value — MUST be changed');
+  }
+
+  if (process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN && (
+    process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN.includes('your-super-admin') ||
+    process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN.includes('change-me') ||
+    process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN.length < 32
+  )) {
+    errors.push('❌ SECURITY: SUPER_ADMIN_BOOTSTRAP_TOKEN contains default value or is too short');
+  }
+
+  // White-label reseller JWT must be distinct from main JWT secrets
+  if (process.env.RESELLER_JWT_SECRET && (
+    process.env.RESELLER_JWT_SECRET === process.env.JWT_SECRET ||
+    process.env.RESELLER_JWT_SECRET === process.env.JWT_REFRESH_SECRET
+  )) {
+    errors.push('❌ SECURITY: RESELLER_JWT_SECRET must be distinct from JWT_SECRET and JWT_REFRESH_SECRET');
+  }
+
+  if (process.env.RESELLER_JWT_SECRET && (
+    process.env.RESELLER_JWT_SECRET.includes('your-reseller-jwt') ||
+    process.env.RESELLER_JWT_SECRET.length < 32
+  )) {
+    errors.push('❌ SECURITY: RESELLER_JWT_SECRET contains default value or is too short (minimum 32 chars)');
   }
 
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'development') {

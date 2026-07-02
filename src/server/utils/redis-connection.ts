@@ -40,9 +40,15 @@ export function createRedisConnection() {
   console.log(`[Redis] REDIS_URL: ${redisUrl ? `SET (${maskUrl(redisUrl)})` : 'NOT SET'}, REDIS_PASSWORD: ${redisPassword ? 'SET' : 'NOT SET'}, REDIS_HOST: ${redisHost || 'NOT SET'}, REDIS_PORT: ${redisPort || 'NOT SET (default 6379)'}, REDIS_USERNAME: ${redisUsername ? `SET (prefix: ${redisUsername.slice(0, 12)}...)` : 'NOT SET'}, REDIS_ENABLED: ${redisEnabled || 'NOT SET'}`);
 
   // Check if REDIS_USERNAME contains a full Redis URL (Coolify quirk)
+  // Priority: REDIS_URL with auth > REDIS_USERNAME full URL > REDIS_HOST + REDIS_PASSWORD
   const effectiveUrl = (redisUrl && redisUrl.includes('@')) ? redisUrl
-    : (redisUsername && redisUsername.startsWith('redis://')) ? redisUsername
+    : (redisUsername && redisUsername.startsWith('redis://') && redisUsername.includes('@')) ? redisUsername
     : null;
+
+  // If REDIS_URL is localhost without auth but REDIS_USERNAME has the real URL, use REDIS_USERNAME
+  if (redisUrl && !redisUrl.includes('@') && redisUsername && redisUsername.startsWith('redis://') && redisUsername.includes('@')) {
+    console.log('[Redis] ⚠️ REDIS_URL has no auth but REDIS_USERNAME contains full URL — using REDIS_USERNAME (Coolify quirk)');
+  }
 
   // Log the effective URL (masked) for debugging
   if (effectiveUrl) {
@@ -104,8 +110,8 @@ export function createRedisConnection() {
 }
 
 function getTimeoutConfig() {
-  const cmdTimeout = parseInt(process.env.REDIS_COMMAND_TIMEOUT || '3000', 10);
-  const connTimeout = parseInt(process.env.REDIS_CONNECT_TIMEOUT || '3000', 10);
+  const cmdTimeout = parseInt(process.env.REDIS_COMMAND_TIMEOUT || '5000', 10);
+  const connTimeout = parseInt(process.env.REDIS_CONNECT_TIMEOUT || '10000', 10);
   return { commandTimeout: cmdTimeout, connectTimeout: connTimeout };
 }
 
@@ -122,11 +128,15 @@ function connectToRedis(url: string) {
   const client = new IORedis(url, {
     maxRetriesPerRequest: null,
     retryStrategy(times: number) {
-      // NO RETRIES: If connection fails once, mark unreachable and stop
-      if (redisDisabled || redisUnreachable || times > 0) return null;
-      console.log('[Redis] ⛔ First connection attempt failed — marking Redis as unreachable. No further retries.');
-      redisUnreachable = true;
-      return null;
+      // Allow 3 retries with exponential backoff before giving up
+      if (times > 3) {
+        console.log(`[Redis] ⛔ Connection failed after ${times} attempts — marking Redis as unreachable.`);
+        redisUnreachable = true;
+        return null;
+      }
+      const delay = Math.min(times * 1000, 5000);
+      console.log(`[Redis] Retry attempt ${times + 1} in ${delay}ms...`);
+      return delay;
     },
     enableOfflineQueue: false,
     connectTimeout,

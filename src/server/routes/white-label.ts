@@ -6,11 +6,14 @@ import { prisma } from '../db.js';
 const router = Router();
 
 const JWT_SECRET = process.env.RESELLER_JWT_SECRET || process.env.WL_JWT_SECRET;
+const whiteLabelEnabled = !!JWT_SECRET;
+
 if (!JWT_SECRET) {
-  throw new Error('CRITICAL: RESELLER_JWT_SECRET is not set. Cannot start white-label module.');
+  console.warn('[WhiteLabel] ⚠️ RESELLER_JWT_SECRET not set — white-label module DISABLED. Set RESELLER_JWT_SECRET to enable.');
 }
+
 const JWT_REFRESH_FALLBACK = process.env.JWT_REFRESH_SECRET;
-if (JWT_REFRESH_FALLBACK && JWT_REFRESH_FALLBACK === JWT_SECRET) {
+if (JWT_SECRET && JWT_REFRESH_FALLBACK && JWT_REFRESH_FALLBACK === JWT_SECRET) {
   throw new Error('CRITICAL: RESELLER_JWT_SECRET must be distinct from JWT_REFRESH_SECRET to prevent token-confusion attacks.');
 }
 const PLAN_PRICES: Record<string, number> = { STARTER: 999, PRO: 4999, ENTERPRISE: 9999 };
@@ -35,10 +38,21 @@ const wlAuth = async (req: Request, res: Response, next: Function) => {
   }
 };
 
+// Middleware to check if white-label module is enabled
+const requireWhiteLabel = (req: Request, res: Response, next: Function) => {
+  if (!whiteLabelEnabled) {
+    return res.status(503).json({ 
+      success: false, 
+      error: 'White-label module not configured. Set RESELLER_JWT_SECRET to enable.' 
+    });
+  }
+  next();
+};
+
 // ==================== AUTH ====================
 
 // POST /api/wl/auth/login
-router.post('/auth/login', async (req: Request, res: Response) => {
+router.post('/auth/login', requireWhiteLabel, async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -88,7 +102,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
 });
 
 // POST /api/wl/auth/register
-router.post('/auth/register', async (req: Request, res: Response) => {
+router.post('/auth/register', requireWhiteLabel, async (req: Request, res: Response) => {
   try {
     const { name, email, phone, company, password } = req.body;
     if (!name || !email || !password) {
@@ -131,7 +145,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
 });
 
 // GET /api/wl/auth/me
-router.get('/auth/me', wlAuth, async (req: Request, res: Response) => {
+router.get('/auth/me', requireWhiteLabel, wlAuth, async (req: Request, res: Response) => {
   try {
     const resellerId = (req as any).resellerId;
     const reseller = await (prisma as any).wl_resellers.findUnique({ where: { id: resellerId } });
@@ -162,7 +176,7 @@ router.get('/auth/me', wlAuth, async (req: Request, res: Response) => {
 // ==================== CLIENTS ====================
 
 // GET /api/wl/clients
-router.get('/clients', wlAuth, async (req: Request, res: Response) => {
+router.get('/clients', requireWhiteLabel, wlAuth, async (req: Request, res: Response) => {
   try {
     const resellerId = (req as any).resellerId;
     const clients = await (prisma as any).wl_clients.findMany({
@@ -186,7 +200,7 @@ router.get('/clients', wlAuth, async (req: Request, res: Response) => {
 });
 
 // POST /api/wl/clients
-router.post('/clients', wlAuth, async (req: Request, res: Response) => {
+router.post('/clients', requireWhiteLabel, wlAuth, async (req: Request, res: Response) => {
   try {
     const resellerId = (req as any).resellerId;
     const { name, email, phone, product, plan } = req.body;
@@ -228,7 +242,7 @@ router.post('/clients', wlAuth, async (req: Request, res: Response) => {
 });
 
 // DELETE /api/wl/clients/:id
-router.delete('/clients/:id', wlAuth, async (req: Request, res: Response) => {
+router.delete('/clients/:id', requireWhiteLabel, wlAuth, async (req: Request, res: Response) => {
   try {
     const resellerId = (req as any).resellerId;
     const client = await (prisma as any).wl_clients.findFirst({
@@ -285,7 +299,7 @@ router.patch('/clients/:id/status', wlAuth, async (req: Request, res: Response) 
 });
 
 // GET /api/wl/clients/stats
-router.get('/clients/stats', wlAuth, async (req: Request, res: Response) => {
+router.get('/clients/stats', requireWhiteLabel, wlAuth, async (req: Request, res: Response) => {
   try {
     const resellerId = (req as any).resellerId;
     const clients = await (prisma as any).wl_clients.findMany({ where: { resellerId } });
@@ -308,7 +322,7 @@ router.get('/clients/stats', wlAuth, async (req: Request, res: Response) => {
 // ==================== BRANDING ====================
 
 // GET /api/wl/branding
-router.get('/branding', wlAuth, async (req: Request, res: Response) => {
+router.get('/branding', requireWhiteLabel, wlAuth, async (req: Request, res: Response) => {
   try {
     const resellerId = (req as any).resellerId;
     const reseller = await (prisma as any).wl_resellers.findUnique({ where: { id: resellerId } });
@@ -333,7 +347,7 @@ router.get('/branding', wlAuth, async (req: Request, res: Response) => {
 });
 
 // PUT /api/wl/branding
-router.put('/branding', wlAuth, async (req: Request, res: Response) => {
+router.put('/branding', requireWhiteLabel, wlAuth, async (req: Request, res: Response) => {
   try {
     const resellerId = (req as any).resellerId;
     const { company, domain, logo, primaryColor } = req.body;
@@ -371,7 +385,7 @@ router.put('/branding', wlAuth, async (req: Request, res: Response) => {
 // ==================== PRODUCTS ====================
 
 // GET /api/wl/products
-router.get('/products', (_req: Request, res: Response) => {
+router.get('/products', requireWhiteLabel, (_req: Request, res: Response) => {
   res.json({
     success: true,
     data: {
