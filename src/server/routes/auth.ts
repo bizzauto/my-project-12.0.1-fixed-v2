@@ -9,7 +9,7 @@ import QRCode from 'qrcode';
 import { encrypt, decrypt } from '../utils/auth.js';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate.js';
-import { forgotPasswordSchema, passwordOnlySchema } from '../validations/schemas.js';
+import { forgotPasswordSchema, passwordOnlySchema, verifyOtpSchema } from '../validations/schemas.js';
 import { registerSchema, loginSchema, changePasswordSchema } from '../validations/schemas.js';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
